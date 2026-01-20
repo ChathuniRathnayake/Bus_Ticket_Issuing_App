@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "328031291537",
+    "project_id": "bus-ticket-issuing",
+    "storage_bucket": "bus-ticket-issuing.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:328031291537:android:19faa6c294a928de2d9730",
+        "android_client_info": {
+          "package_name": "com.example.mobile_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCZOOka_1w1gSrpnv1mdNQEHh1dH6xXT7A"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
