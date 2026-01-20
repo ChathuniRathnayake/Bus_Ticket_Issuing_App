@@ -6,7 +6,7 @@ class SeatWidget extends StatelessWidget {
   final bool isAvailable;
   final int seatNo;
 
-  const SeatWidget({required this.isAvailable, required this.seatNo});
+  const SeatWidget({super.key, required this.isAvailable, required this.seatNo});
 
   @override
   Widget build(BuildContext context) {

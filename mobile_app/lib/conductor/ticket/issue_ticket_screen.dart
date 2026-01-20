@@ -5,7 +5,7 @@ import 'package:mobile_app/widgets/custom_textfield.dart';
 class IssueTicketScreen extends StatelessWidget {
   final int seatNo;
 
-  const IssueTicketScreen({required this.seatNo});
+  const IssueTicketScreen({super.key, required this.seatNo});
 
   @override
   Widget build(BuildContext context) {
