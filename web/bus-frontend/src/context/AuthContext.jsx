@@ -1,3 +1,4 @@
+// src/context/AuthContext.jsx (updated with busId in initial routes)
 import { createContext, useContext, useState } from 'react';
 import { mockBuses } from '../mocks/data';
 
@@ -12,14 +13,13 @@ export function AuthProvider({ children }) {
   const [buses, setBuses] = useState(mockBuses);
 
   const [routes, setRoutes] = useState([
-    { id: 'R1', name: 'Colombo-Kandy', stops: ['Colombo', 'Kegalle', 'Kandy'], startTime: '08:00', endTime: '12:30' },
-    { id: 'R2', name: 'Colombo-Galle', stops: ['Colombo', 'Panadura', 'Galle'], startTime: '06:30', endTime: '10:00' },
+    { id: 'R1', name: 'Colombo-Kandy', stops: ['Colombo', 'Kegalle', 'Kandy'], startTime: '08:00', endTime: '12:30', busId: 1 }, // Added busId
+    { id: 'R2', name: 'Colombo-Galle', stops: ['Colombo', 'Panadura', 'Galle'], startTime: '06:30', endTime: '10:00', busId: 2 }, // Added busId
   ]);
 
   const [users, setUsers] = useState([
     { id: 'U1', name: 'Ruwan Perera', email: 'conductor1@example.com', phone: '+94771234567', role: 'conductor', assignedBus: 1 },
     { id: 'U2', name: 'Nimali Fernando', email: 'driver1@example.com', phone: '+94776543210', role: 'driver', assignedBus: 2 },
-    // Passengers - not added by admin (mocked or from registration)
     { id: 'P1', name: 'Sarasi', email: 'sarasi@example.com', role: 'passenger' },
   ]);
 
@@ -77,7 +77,7 @@ export function AuthProvider({ children }) {
     ]);
   };
 
-  // Admin can toggle seat status (but disabled in UI for SeatLayouts)
+  // Admin can toggle seat status (but we'll disable it in UI for SeatLayouts)
   const toggleSeatStatus = (busId, seatNumber) => {
     setBuses((prevBuses) =>
       prevBuses.map((bus) => {
@@ -92,6 +92,22 @@ export function AuthProvider({ children }) {
         };
       })
     );
+  };
+
+  const bookSeat = (busId, routeId, seat, boardingStop, destinationStop) => {
+    const newTicket = {
+      id: `T${tickets.length + 1}`,
+      busId,
+      seat,
+      type: 'online',
+      time: '2026-01-20 ' + new Date().toLocaleTimeString(),
+      passengerName: 'Current Passenger',
+      conductorName: null,
+      routeId,
+      boardingStop,
+      destinationStop,
+    };
+    setTickets((prev) => [...prev, newTicket]);
   };
 
   return (
@@ -112,6 +128,7 @@ export function AuthProvider({ children }) {
         setTickets,
         activityLogs,
         setActivityLogs,
+        bookSeat,
       }}
     >
       {children}

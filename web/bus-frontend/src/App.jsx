@@ -1,3 +1,4 @@
+// src/App.js (corrected import and route for Bookings/SeatBooking)
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 
 // Pages
@@ -5,13 +6,14 @@ import Login from './pages/dashboard/Login';
 import DashboardHome from './pages/dashboard/Home';
 import Buses from './pages/dashboard/Buses';
 import DashboardLayout from './components/DashboardLayout';
-//import PassengersHome from './pages/passengers/Home';
-import RoutesPage from './pages/dashboard/Routes';           // new
-import SeatLayouts from './pages/dashboard/SeatLayouts';     // new
-import TicketsMonitor from './pages/dashboard/TicketsMonitor'; // new
-import UsersManagement from './pages/dashboard/UsersManagement'; // new
+import RoutesPage from './pages/dashboard/Routes';
+import SeatLayouts from './pages/dashboard/SeatLayouts';
+import TicketsMonitor from './pages/dashboard/TicketsMonitor';
+import UsersManagement from './pages/dashboard/UsersManagement';
+import PassengersHome from './pages/passengers/Home';
+import SeatBooking from './pages/passengers/Bookings'; // Corrected to match file name
 
-// Context-based auth (recommended to avoid Recoil + React 19 issues)
+// Context-based auth
 import { useAuth } from './context/AuthContext';
 
 function ProtectedRoute({ children, allowedRole }) {
@@ -24,7 +26,6 @@ function ProtectedRoute({ children, allowedRole }) {
 function App() {
   return (
     <Router>
-    
       <Routes>
         <Route path="/login" element={<Login />} />
 
@@ -36,17 +37,27 @@ function App() {
                 <Routes>
                   <Route path="home" element={<DashboardHome />} />
                   <Route path="buses" element={<Buses />} />
-                  <Route path="routes" element={<RoutesPage />} />           {/* new */}
-                  <Route path="seats" element={<SeatLayouts />} />           {/* new */}
-                  <Route path="tickets" element={<TicketsMonitor />} />      {/* new */}
-                  <Route path="users" element={<UsersManagement />} />        {/* new */}
+                  <Route path="routes" element={<RoutesPage />} />
+                  <Route path="seats" element={<SeatLayouts />} />
+                  <Route path="tickets" element={<TicketsMonitor />} />
+                  <Route path="users" element={<UsersManagement />} />
                 </Routes>
               </DashboardLayout>
             </ProtectedRoute>
           }
         />
 
-        {/* ... passengers routes ... */}
+        <Route
+          path="/passengers/*"
+          element={
+            <ProtectedRoute allowedRole="passengers">
+              <Routes>
+                <Route path="home" element={<PassengersHome />} />
+                <Route path="book/:routeId" element={<SeatBooking />} /> {/* Corrected to SeatBooking */}
+              </Routes>
+            </ProtectedRoute>
+          }
+        />
       </Routes>
     </Router>
   );

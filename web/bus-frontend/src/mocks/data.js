@@ -27,7 +27,7 @@ export const mockBuses = [
   },
  
   {
-    id: 1,
+    id: 3,
     busNo: 'WP-ABC-1234',
     model: 'Volvo B11R',
     route: 'Colombo-Kandy',
@@ -41,5 +41,5 @@ export const mockBuses = [
   },
   // Add seatLayout to all other buses the same way
 
-  { id: 'U3', name: 'Amara Silva', email: 'driver1@example.com', role: 'driver', phone: '+94776543210' },// ... add more buses if needed
+  
 ];
