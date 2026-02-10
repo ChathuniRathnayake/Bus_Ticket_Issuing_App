@@ -11,7 +11,7 @@ import SeatLayouts from './pages/dashboard/SeatLayouts';
 import TicketsMonitor from './pages/dashboard/TicketsMonitor';
 import UsersManagement from './pages/dashboard/UsersManagement';
 import PassengersHome from './pages/passengers/Home';
-import SeatBooking from './pages/passengers/Bookings'; // Corrected to match file name
+import SeatBooking from './pages/passengers/Bookings'; 
 
 // Context-based auth
 import { useAuth } from './context/AuthContext';
@@ -27,7 +27,7 @@ function App() {
   return (
     <Router>
       <Routes>
-        <Route path="/login" element={<Login />} />
+        <Route path="/" element={<Login />} />
 
         <Route
           path="/dashboard/*"
@@ -53,7 +53,7 @@ function App() {
             <ProtectedRoute allowedRole="passengers">
               <Routes>
                 <Route path="home" element={<PassengersHome />} />
-                <Route path="book/:routeId" element={<SeatBooking />} /> {/* Corrected to SeatBooking */}
+                <Route path="book/:routeId" element={<SeatBooking />} /> 
               </Routes>
             </ProtectedRoute>
           }
