@@ -1,0 +1,13 @@
+Analyzing mobile_app...                                         
+
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\conductor\dashboard\conductor_dashboard.dart:196:33 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\conductor\dashboard\conductor_dashboard.dart:209:50 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\conductor\seat_map\seat_widget.dart:61:35 - deprecated_member_use
+   info - Don't invoke 'print' in production code - lib\core\services\conductor_auth_service.dart:16:7 - avoid_print
+   info - The imported package 'crypto' isn't a dependency of the importing package - lib\core\utils\hash.dart:2:8 - depend_on_referenced_packages
+   info - 'describeEnum' is deprecated and shouldn't be used. Use the `name` getter on enums instead. This feature was deprecated after v3.14.0-2.0.pre - lib\models\seat_model.dart:25:17 - deprecated_member_use
+   info - 'describeEnum' is deprecated and shouldn't be used. Use the `name` getter on enums instead. This feature was deprecated after v3.14.0-2.0.pre - lib\models\seat_model.dart:35:16 - deprecated_member_use
+   info - The private field _isLoading could be 'final' - lib\passenger\auth\passenger_login.dart:15:8 - prefer_final_fields
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\passenger\onboarding\onboarding_screen.dart:184:47 - deprecated_member_use
+
+9 issues found. (ran in 2.2s)
