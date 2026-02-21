@@ -1,19 +1,31 @@
-// src/pages/Signup.jsx (new file)
+// src/pages/passengers/Signup.jsx
+
 import { useForm } from 'react-hook-form';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { Box, Typography, TextField, Button } from '@mui/material';
+import axios from 'axios';
 
 function Signup() {
   const { register, handleSubmit } = useForm();
-  const { registerUser } = useAuth(); // NEW: We'll add this to AuthContext
+  const { registerUser } = useAuth();
   const navigate = useNavigate();
 
-  const onSubmit = (data) => {
-    registerUser(data.name, data.email, data.phone, data.password);
-    alert('Signup successful! Please login.');
-    navigate('/login');
-  };
+  const onSubmit = async (data) => {
+  try {
+    await axios.post(
+      'http://localhost:5000/api/passenger/signup',
+      data
+    );
+
+    alert('Signup successful!');
+    navigate('/passenger/login');
+
+  } catch (error) {
+    console.error(error);
+    alert('Signup failed');
+  }
+};
 
   return (
     <Box
@@ -29,7 +41,7 @@ function Signup() {
       }}
     >
       <Typography variant="h4" color="primary" gutterBottom>
-        Signup
+        Passenger Signup
       </Typography>
 
       <form onSubmit={handleSubmit(onSubmit)}>
@@ -84,7 +96,13 @@ function Signup() {
       </form>
 
       <Typography variant="body2" color="text.secondary" sx={{ mt: 3 }}>
-        Already have an account? <a href="/login">Login</a>
+        Already have an account?{" "}
+        <span
+          style={{ color: '#1976d2', cursor: 'pointer', fontWeight: 500 }}
+          onClick={() => navigate('/passenger/login')}
+        >
+          Login
+        </span>
       </Typography>
     </Box>
   );
