@@ -1,19 +1,17 @@
 import 'package:flutter/material.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/custom_textfield.dart';
-import 'passenger_signup.dart';
-import 'forgot_password.dart';
 
-class PassengerLoginScreen extends StatefulWidget {
-  const PassengerLoginScreen({super.key});
+class ResetPasswordScreen extends StatefulWidget {
+  const ResetPasswordScreen({super.key});
 
   @override
-  State<PassengerLoginScreen> createState() => _PassengerLoginScreenState();
+  State<ResetPasswordScreen> createState() => _ResetPasswordScreenState();
 }
 
-class _PassengerLoginScreenState extends State<PassengerLoginScreen> {
-  final TextEditingController emailController = TextEditingController();
+class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
   final TextEditingController passwordController = TextEditingController();
+  final TextEditingController confirmPasswordController = TextEditingController();
   bool _isLoading = false;
 
   @override
@@ -40,26 +38,26 @@ class _PassengerLoginScreenState extends State<PassengerLoginScreen> {
         child: Column(
           children: [
             const SizedBox(height: 100),
-            const Icon(Icons.directions_bus, size: 80, color: Colors.white),
+            const Icon(Icons.vpn_key, size: 80, color: Colors.white),
             const SizedBox(height: 10),
             const Text(
               "TicketGo",
               style: TextStyle(
                 color: Colors.white,
-                fontSize: 32,
+                fontSize: 24,
                 fontWeight: FontWeight.bold,
               ),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 10),
             const Text(
-              "Login as Passenger",
+              "Reset Password",
               style: TextStyle(
-                fontSize: 24,
+                fontSize: 28,
                 fontWeight: FontWeight.bold,
                 color: Colors.white,
               ),
             ),
-            const SizedBox(height: 40),
+            const SizedBox(height: 30),
             Expanded(
               child: Container(
                 width: double.infinity,
@@ -75,25 +73,16 @@ class _PassengerLoginScreenState extends State<PassengerLoginScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const SizedBox(height: 20),
                       const Text(
-                        "Email",
-                        style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
-                      ),
-                      const SizedBox(height: 10),
-                      Container(
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFA6E7F0),
-                          borderRadius: BorderRadius.circular(15),
-                        ),
-                        child: CustomTextField(
-                          controller: emailController,
-                          hint: "Email",
+                        "Enter your new password below",
+                        style: TextStyle(
+                          fontSize: 16,
+                          color: Colors.grey,
                         ),
                       ),
-                      const SizedBox(height: 25),
+                      const SizedBox(height: 30),
                       const Text(
-                        "Password",
+                        "New Password",
                         style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
                       ),
                       const SizedBox(height: 10),
@@ -104,58 +93,45 @@ class _PassengerLoginScreenState extends State<PassengerLoginScreen> {
                         ),
                         child: CustomTextField(
                           controller: passwordController,
-                          hint: "Password",
+                          hint: "New Password",
                           obscure: true,
                         ),
                       ),
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: TextButton(
-                          onPressed: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => const ForgotPasswordScreen(),
-                              ),
-                            );
-                          },
-                          child: const Text(
-                            "Forgot Password?",
-                            style: TextStyle(color: Color(0xFF1B56FD)),
-                          ),
+                      const SizedBox(height: 25),
+                      const Text(
+                        "Confirm Password",
+                        style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
+                      ),
+                      const SizedBox(height: 10),
+                      Container(
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFA6E7F0),
+                          borderRadius: BorderRadius.circular(15),
+                        ),
+                        child: CustomTextField(
+                          controller: confirmPasswordController,
+                          hint: "Confirm Password",
+                          obscure: true,
                         ),
                       ),
-                      const SizedBox(height: 30),
+                      const SizedBox(height: 40),
                       _isLoading
                           ? const Center(child: CircularProgressIndicator())
                           : SizedBox(
                               width: double.infinity,
                               height: 55,
                               child: CustomButton(
-                                text: "Login",
+                                text: "Reset Password",
                                 onTap: () {
-                                  // Mock login
+                                  // In a real app, update password logic here
                                   ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(content: Text("Passenger Login Simulated")),
+                                    const SnackBar(content: Text("Password Reset Successful")),
                                   );
+                                  // Pop until login screen
+                                  Navigator.of(context).popUntil((route) => route.isFirst);
                                 },
                               ),
                             ),
-                      const SizedBox(height: 20),
-                      Center(
-                        child: TextButton(
-                          onPressed: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(builder: (_) => const PassengerSignUpScreen()),
-                            );
-                          },
-                          child: const Text(
-                            "Don't have an account? Sign Up",
-                            style: TextStyle(color: Color(0xFF1B56FD)),
-                          ),
-                        ),
-                      ),
                     ],
                   ),
                 ),

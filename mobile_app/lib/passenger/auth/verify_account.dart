@@ -1,19 +1,17 @@
 import 'package:flutter/material.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/custom_textfield.dart';
-import 'passenger_signup.dart';
-import 'forgot_password.dart';
+import 'reset_password.dart';
 
-class PassengerLoginScreen extends StatefulWidget {
-  const PassengerLoginScreen({super.key});
+class VerifyAccountScreen extends StatefulWidget {
+  const VerifyAccountScreen({super.key});
 
   @override
-  State<PassengerLoginScreen> createState() => _PassengerLoginScreenState();
+  State<VerifyAccountScreen> createState() => _VerifyAccountScreenState();
 }
 
-class _PassengerLoginScreenState extends State<PassengerLoginScreen> {
-  final TextEditingController emailController = TextEditingController();
-  final TextEditingController passwordController = TextEditingController();
+class _VerifyAccountScreenState extends State<VerifyAccountScreen> {
+  final TextEditingController otpController = TextEditingController();
   bool _isLoading = false;
 
   @override
@@ -39,27 +37,35 @@ class _PassengerLoginScreenState extends State<PassengerLoginScreen> {
         ),
         child: Column(
           children: [
-            const SizedBox(height: 100),
-            const Icon(Icons.directions_bus, size: 80, color: Colors.white),
+            const SizedBox(height: 60),
+            Row(
+              children: [
+                IconButton(
+                  onPressed: () => Navigator.pop(context),
+                  icon: const Icon(Icons.arrow_back, color: Colors.white),
+                ),
+              ],
+            ),
+            const Icon(Icons.verified_user, size: 80, color: Colors.white),
             const SizedBox(height: 10),
             const Text(
               "TicketGo",
               style: TextStyle(
                 color: Colors.white,
-                fontSize: 32,
+                fontSize: 24,
                 fontWeight: FontWeight.bold,
               ),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 10),
             const Text(
-              "Login as Passenger",
+              "Verify Account",
               style: TextStyle(
-                fontSize: 24,
+                fontSize: 28,
                 fontWeight: FontWeight.bold,
                 color: Colors.white,
               ),
             ),
-            const SizedBox(height: 40),
+            const SizedBox(height: 30),
             Expanded(
               child: Container(
                 width: double.infinity,
@@ -75,68 +81,45 @@ class _PassengerLoginScreenState extends State<PassengerLoginScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const SizedBox(height: 20),
                       const Text(
-                        "Email",
-                        style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
-                      ),
-                      const SizedBox(height: 10),
-                      Container(
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFA6E7F0),
-                          borderRadius: BorderRadius.circular(15),
-                        ),
-                        child: CustomTextField(
-                          controller: emailController,
-                          hint: "Email",
-                        ),
-                      ),
-                      const SizedBox(height: 25),
-                      const Text(
-                        "Password",
-                        style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
-                      ),
-                      const SizedBox(height: 10),
-                      Container(
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFA6E7F0),
-                          borderRadius: BorderRadius.circular(15),
-                        ),
-                        child: CustomTextField(
-                          controller: passwordController,
-                          hint: "Password",
-                          obscure: true,
-                        ),
-                      ),
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: TextButton(
-                          onPressed: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => const ForgotPasswordScreen(),
-                              ),
-                            );
-                          },
-                          child: const Text(
-                            "Forgot Password?",
-                            style: TextStyle(color: Color(0xFF1B56FD)),
-                          ),
+                        "Enter the 6-digit code sent to your email",
+                        style: TextStyle(
+                          fontSize: 16,
+                          color: Colors.grey,
                         ),
                       ),
                       const SizedBox(height: 30),
+                      const Text(
+                        "Verification Code",
+                        style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
+                      ),
+                      const SizedBox(height: 10),
+                      Container(
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFA6E7F0),
+                          borderRadius: BorderRadius.circular(15),
+                        ),
+                        child: CustomTextField(
+                          controller: otpController,
+                          hint: "Enter Code",
+                          keyboardType: TextInputType.number,
+                        ),
+                      ),
+                      const SizedBox(height: 40),
                       _isLoading
                           ? const Center(child: CircularProgressIndicator())
                           : SizedBox(
                               width: double.infinity,
                               height: 55,
                               child: CustomButton(
-                                text: "Login",
+                                text: "Verify",
                                 onTap: () {
-                                  // Mock login
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(content: Text("Passenger Login Simulated")),
+                                  // In a real app, verify OTP logic here
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => const ResetPasswordScreen(),
+                                    ),
                                   );
                                 },
                               ),
@@ -145,13 +128,10 @@ class _PassengerLoginScreenState extends State<PassengerLoginScreen> {
                       Center(
                         child: TextButton(
                           onPressed: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(builder: (_) => const PassengerSignUpScreen()),
-                            );
+                            // Resend code logic
                           },
                           child: const Text(
-                            "Don't have an account? Sign Up",
+                            "Didn't receive code? Resend",
                             style: TextStyle(color: Color(0xFF1B56FD)),
                           ),
                         ),
