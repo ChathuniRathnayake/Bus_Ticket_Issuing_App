@@ -1,10 +1,22 @@
 import 'package:flutter/material.dart';
-import 'package:mobile_app/conductor/auth/conductor_login.dart';
+import 'package:mobile_app/models/bus_model.dart';
+import 'package:mobile_app/models/conductor_model.dart';
+import 'package:mobile_app/models/route_model.dart';
+import 'package:mobile_app/core/models/seat_status.dart';
+import 'package:mobile_app/widgets/bottom_nav.dart';
 import 'seat_widget.dart';
-import 'seat_status.dart';
 
 class SeatMapScreen extends StatelessWidget {
-  const SeatMapScreen({super.key});
+  final Conductor conductor;
+  final Bus? bus;
+  final RouteModel? route;
+
+  const SeatMapScreen({
+    super.key,
+    required this.conductor,
+    this.bus,
+    this.route,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -41,7 +53,6 @@ class SeatMapScreen extends StatelessWidget {
                 itemBuilder: (context, index) {
                   int col = index % 5;
                   int row = index ~/ 5;
-                  int col = index % 5;
 
                   int seatNo;
                   if (col < 2) {
@@ -62,7 +73,7 @@ class SeatMapScreen extends StatelessWidget {
           ],
         ),
       ),
-      bottomNavigationBar: AppBottomNav(),
+      bottomNavigationBar: const AppBottomNav(),
     );
   }
 
