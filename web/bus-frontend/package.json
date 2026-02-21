@@ -12,6 +12,7 @@
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^13.5.0",
+    "axios": "^1.13.5",
     "dayjs": "^1.11.19",
     "jspdf": "^4.0.0",
     "leaflet": "^1.9.4",
