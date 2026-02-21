@@ -15,18 +15,17 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   final List<OnboardingData> _pages = [
     OnboardingData(
-    imagePath: 'assets/images/logo.png',
       title: "Welcome to TicketGo",
       subtitle: "Travel smarter. Book faster. Ride easier.",
-      imagePath: 'assets/images/logo.png',
-      buttonText: "Next",
+      imagePaths: ['assets/images/bus.jpg', 'assets/images/logo.png'],
+      buttonText1: "Next",
     ),
     OnboardingData(
       title: "Find Your Bus Easily",
       description: "Search buses by route and date.\nCheck live seat availability before booking.",
       icon: Icons.search,
-      buttonText: "Next",
-      buttonText: "Previous",
+      buttonText1: "Next",
+      buttonText2: "Previous",
     ),
     OnboardingData(
       title: "Book Your Seat Anytime",
@@ -37,7 +36,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         "Digital ticket with QR code",
       ],
       icon: Icons.confirmation_num,
-      buttonText: "Get Started",
+      buttonText1: "Get Started",
+      buttonText2: "Previous",
     ),
   ];
 
@@ -118,18 +118,20 @@ class OnboardingData {
   final String? subtitle;
   final String? description;
   final List<String>? highlights;
-  final String buttonText;
+  final String buttonText1; // Page Next/GetStarted
+  final String? buttonText2; // Page Previous
   final IconData? icon;
-  final String? imagePath;
+  final List<String>? imagePaths;
 
   OnboardingData({
     required this.title,
     this.subtitle,
     this.description,
     this.highlights,
-    required this.buttonText,
+    required this.buttonText1,
+    this.buttonText2,
     this.icon,
-    this.imagePath,
+    this.imagePaths,
   });
 }
 
@@ -176,18 +178,17 @@ class _OnboardingPage extends StatelessWidget {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Row(
-                          children: const [
-                            Icon(Icons.directions_bus, color: Colors.white, size: 24),
-                            SizedBox(width: 8),
-                            Text(
-                              "TicketGo",
-                              style: TextStyle(
+                          children: [
+                            Image.asset(
+                              'assets/images/logo.png',
+                              height: 30,
+                              errorBuilder: (context, error, stackTrace) => const Icon(
+                                Icons.directions_bus,
                                 color: Colors.white,
-                                fontSize: 20,
-                                fontWeight: FontWeight.bold,
+                                size: 24,
                               ),
                             ),
-                          ],
+                            ],
                         ),
                         TextButton(
                           onPressed: onSkip,
@@ -209,16 +210,25 @@ class _OnboardingPage extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 30),
               child: Column(
                 children: [
-                  if (data.imagePath != null)
-                    Image.asset(
-                      data.imagePath!,
-                      height: 150,
-                      fit: BoxFit.contain,
-                      errorBuilder: (context, error, stackTrace) => const Icon(
-                        Icons.image_not_supported,
-                        size: 150,
-                        color: Colors.white,
-                      ),
+                  if (data.imagePaths != null)
+                    Column(
+                      children: data.imagePaths!.asMap().entries.map((entry) {
+                        int idx = entry.key;
+                        String path = entry.value;
+                        return Padding(
+                          padding: EdgeInsets.only(bottom: idx < data.imagePaths!.length - 1 ? 20 : 0),
+                          child: Image.asset(
+                            path,
+                            height: data.imagePaths!.length > 1 ? 100 : 150,
+                            fit: BoxFit.contain,
+                            errorBuilder: (context, error, stackTrace) => const Icon(
+                              Icons.image_not_supported,
+                              size: 100,
+                              color: Colors.white,
+                            ),
+                          ),
+                        );
+                      }).toList(),
                     )
                   else if (data.icon != null)
                     Icon(
@@ -226,7 +236,7 @@ class _OnboardingPage extends StatelessWidget {
                       size: 150,
                       color: Colors.white,
                     ),
-                  const SizedBox(height: 40),
+                  const SizedBox(height: 30),
                   Text(
                     data.title,
                     textAlign: TextAlign.center,
@@ -248,7 +258,7 @@ class _OnboardingPage extends StatelessWidget {
                       ),
                     ),
                   ],
-                  const SizedBox(height: 40),
+                  const SizedBox(height: 30),
                   if (data.description != null || data.highlights != null)
                     Container(
                       width: double.infinity,
@@ -306,7 +316,7 @@ class _OnboardingPage extends StatelessWidget {
             const Spacer(flex: 2),
             // Navigation Buttons
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 80),
+              padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 60),
               child: Row(
                 children: [
                   if (currentPage > 0)
@@ -316,18 +326,17 @@ class _OnboardingPage extends StatelessWidget {
                         child: SizedBox(
                           height: 55,
                           child: CustomButton(
-                            text: "Previous",
+                            text: data.buttonText2 ?? "Previous",
                             onTap: onPrevious,
                           ),
                         ),
                       ),
                     ),
                   Expanded(
-                    flex: 2,
                     child: SizedBox(
                       height: 55,
                       child: CustomButton(
-                        text: data.buttonText,
+                        text: data.buttonText1,
                         onTap: onNext,
                       ),
                     ),
