@@ -14,7 +14,7 @@ class PassengerLoginScreen extends StatefulWidget {
 class _PassengerLoginScreenState extends State<PassengerLoginScreen> {
   final TextEditingController emailController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
-  bool _isLoading = false;
+  final bool _isLoading = false;
 
   @override
   Widget build(BuildContext context) {
