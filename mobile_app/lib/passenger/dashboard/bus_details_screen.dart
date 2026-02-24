@@ -2,17 +2,20 @@ import 'package:flutter/material.dart';
 import '../../widgets/custom_button.dart';
 import '../passenger_bottom_nav.dart';
 import '../auth/passenger_login.dart';
+import 'seat_booking_screen.dart';
 
 class BusDetailsScreen extends StatefulWidget {
   final Map<String, String> bus;
   final String from;
   final String to;
+  final String date;
 
   const BusDetailsScreen({
     super.key,
     required this.bus,
     required this.from,
     required this.to,
+    required this.date,
   });
 
   @override
@@ -151,7 +154,17 @@ class _BusDetailsScreenState extends State<BusDetailsScreen> {
             CustomButton(
               text: 'Book a Seat',
               onTap: () {
-                // Booking logic
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => SeatBookingScreen(
+                      bus: widget.bus,
+                      from: widget.from,
+                      to: widget.to,
+                      date: widget.date,
+                    ),
+                  ),
+                );
               },
             ),
             const SizedBox(height: 20),

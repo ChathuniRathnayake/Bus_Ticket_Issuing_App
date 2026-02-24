@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import '../auth/passenger_login.dart';
+import '../passenger_bottom_nav.dart';
 import 'bus_details_screen.dart';
 
-class BusResultsScreen extends StatelessWidget {
+class BusResultsScreen extends StatefulWidget {
   final String from;
   final String to;
   final String date;
@@ -13,6 +14,13 @@ class BusResultsScreen extends StatelessWidget {
     required this.to,
     required this.date,
   });
+
+  @override
+  State<BusResultsScreen> createState() => _BusResultsScreenState();
+}
+
+class _BusResultsScreenState extends State<BusResultsScreen> {
+  int _selectedIndex = 1; // "Find" tab active by default
 
   @override
   Widget build(BuildContext context) {
@@ -50,7 +58,7 @@ class BusResultsScreen extends StatelessWidget {
         backgroundColor: Colors.white,
         elevation: 0,
         title: Text(
-          '$from to $to',
+          '${widget.from} to ${widget.to}',
           style: const TextStyle(color: Colors.black, fontSize: 18),
         ),
         leading: IconButton(
@@ -81,7 +89,7 @@ class BusResultsScreen extends StatelessWidget {
                 const Icon(Icons.calendar_today, size: 16, color: Colors.blue),
                 const SizedBox(width: 8),
                 Text(
-                  'Date: $date',
+                  'Date: ${widget.date}',
                   style: const TextStyle(fontWeight: FontWeight.w500),
                 ),
               ],
@@ -99,6 +107,14 @@ class BusResultsScreen extends StatelessWidget {
             ),
           ),
         ],
+      ),
+      bottomNavigationBar: PassengerBottomNav(
+        currentIndex: _selectedIndex,
+        onTap: (index) {
+          setState(() {
+            _selectedIndex = index;
+          });
+        },
       ),
     );
   }
@@ -180,8 +196,9 @@ class BusResultsScreen extends StatelessWidget {
                     MaterialPageRoute(
                       builder: (_) => BusDetailsScreen(
                         bus: bus,
-                        from: from,
-                        to: to,
+                        from: widget.from,
+                        to: widget.to,
+                        date: widget.date,
                       ),
                     ),
                   );
