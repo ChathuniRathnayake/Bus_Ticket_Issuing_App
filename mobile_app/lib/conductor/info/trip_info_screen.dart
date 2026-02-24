@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:mobile_app/conductor/info/info_card.dart';
 import '../auth/conductor_login.dart';
-import '../../widgets/bottom_nav.dart';
+import '../conductor_bottom_nav.dart';
 
 class TripInfoScreen extends StatelessWidget {
   final String conductorId;
@@ -107,7 +107,7 @@ class TripInfoScreen extends StatelessWidget {
           ),
         ),
       ),
-      bottomNavigationBar: AppBottomNav(),
+      bottomNavigationBar: const ConductorBottomNav(),
     );
   }
 

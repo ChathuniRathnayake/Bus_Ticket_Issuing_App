@@ -3,7 +3,7 @@ import 'package:mobile_app/models/bus_model.dart';
 import 'package:mobile_app/models/conductor_model.dart';
 import 'package:mobile_app/models/route_model.dart';
 import 'package:mobile_app/core/models/seat_status.dart';
-import 'package:mobile_app/widgets/bottom_nav.dart';
+import 'package:mobile_app/conductor/conductor_bottom_nav.dart';
 import 'seat_widget.dart';
 
 class SeatMapScreen extends StatelessWidget {
@@ -73,7 +73,7 @@ class SeatMapScreen extends StatelessWidget {
           ],
         ),
       ),
-      bottomNavigationBar: const AppBottomNav(),
+      bottomNavigationBar: const ConductorBottomNav(),
     );
   }
 

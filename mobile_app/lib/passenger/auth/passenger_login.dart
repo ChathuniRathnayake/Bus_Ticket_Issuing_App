@@ -3,6 +3,7 @@ import '../../widgets/custom_button.dart';
 import '../../widgets/custom_textfield.dart';
 import 'passenger_signup.dart';
 import 'forgot_password.dart';
+import '../dashboard/dashboard_screen.dart';
 
 class PassengerLoginScreen extends StatefulWidget {
   const PassengerLoginScreen({super.key});
@@ -134,10 +135,24 @@ class _PassengerLoginScreenState extends State<PassengerLoginScreen> {
                               child: CustomButton(
                                 text: "Login",
                                 onTap: () {
-                                  // Mock login
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(content: Text("Passenger Login Simulated")),
-                                  );
+                                  final email = emailController.text.trim();
+                                  final password = passwordController.text.trim();
+
+                                  if (email == 'test@mail.com' && password == 'passenger123') {
+                                    Navigator.pushReplacement(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) => const PassengerDashboard(),
+                                      ),
+                                    );
+                                  } else {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text("Invalid Email or Password"),
+                                        backgroundColor: Colors.red,
+                                      ),
+                                    );
+                                  }
                                 },
                               ),
                             ),
