@@ -1,65 +1,70 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Shield } from "lucide-react";
 
-export default function AdminLogin({ goPassenger }) {
+export default function AdminLogin() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const navigate = useNavigate();
 
-  // Function to handle login
   const handleLogin = async () => {
-    try {
-      const res = await fetch("http://localhost:5000/api/admin/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
-      });
-
-      const data = await res.json();
-
-      if (res.ok) {
-        alert("Admin login successful: " + data.token);
-        // You can save the token in localStorage or context here
-        localStorage.setItem("adminToken", data.token);
-      } else {
-        alert(data.message);
-      }
-    } catch (err) {
-      console.error(err);
-      alert("Server error, please try again.");
+    if (!email || !password) {
+      alert("Please fill all fields");
+      return;
     }
+    setLoading(true);
+    setTimeout(() => {
+      setLoading(false);
+      navigate("/admin-dashboard");
+    }, 500);
   };
 
   return (
-    <div className="w-96 p-6 bg-white rounded shadow">
-      <h1 className="text-2xl font-bold mb-4">Admin Login</h1>
+    <div className="flex min-h-[80vh] items-center justify-center">
+      <Card className="w-full max-w-md">
+        <CardHeader className="space-y-1 text-center">
+          <div className="mx-auto w-12 h-12 bg-zinc-900 text-white rounded-2xl flex items-center justify-center">
+            <Shield className="h-7 w-7" />
+          </div>
+          <CardTitle className="text-3xl">Admin Login</CardTitle>
+          <CardDescription>Sign in to manage the bus system</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="space-y-2">
+            <Label htmlFor="email">Email Address</Label>
+            <Input
+              id="email"
+              type="email"
+              placeholder="admin@bus.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="password">Password</Label>
+            <Input
+              id="password"
+              type="password"
+              placeholder="••••••••"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
+          </div>
 
-      <input
-        className="w-full p-2 border mb-3"
-        placeholder="Email"
-        value={email}
-        onChange={(e) => setEmail(e.target.value)}
-      />
-
-      <input
-        className="w-full p-2 border mb-3"
-        placeholder="Password"
-        type="password"
-        value={password}
-        onChange={(e) => setPassword(e.target.value)}
-      />
-
-      <button
-        className="w-full p-2 bg-red-600 text-white rounded"
-        onClick={handleLogin}
-      >
-        Login
-      </button>
-
-      <button
-        className="text-sm text-blue-500 mt-3"
-        onClick={goPassenger}
-      >
-        Back to Passenger Login
-      </button>
+          <Button
+            onClick={handleLogin}
+            disabled={loading}
+            className="w-full h-12 bg-zinc-900 hover:bg-black text-lg"
+          >
+            {loading ? "Logging in..." : "Login to Dashboard"}
+          </Button>
+        </CardContent>
+      </Card>
     </div>
   );
 }
