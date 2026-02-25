@@ -1,41 +1,41 @@
 import 'package:flutter/material.dart';
 import '../../widgets/custom_button.dart';
-import '../auth/passenger_login.dart';
+import '../auth/conductor_login.dart';
 
-class OnboardingScreen extends StatefulWidget {
-  const OnboardingScreen({super.key});
+class ConductorOnboardingScreen extends StatefulWidget {
+  const ConductorOnboardingScreen({super.key});
 
   @override
-  State<OnboardingScreen> createState() => _OnboardingScreenState();
+  State<ConductorOnboardingScreen> createState() => _ConductorOnboardingScreenState();
 }
 
-class _OnboardingScreenState extends State<OnboardingScreen> {
+class _ConductorOnboardingScreenState extends State<ConductorOnboardingScreen> {
   final PageController _pageController = PageController();
   int _currentPage = 0;
 
   final List<OnboardingData> _pages = [
     OnboardingData(
-      title: "Welcome to TicketGo",
-      subtitle: "Travel smarter. Book faster. Ride easier.",
+      title: "Welcome Conductor",
+      subtitle: "Manage your bus route and passengers with ease.",
       imagePaths: ['assets/images/logo.png'],
       buttonText1: "Next",
     ),
     OnboardingData(
-      title: "Find Your Bus Easily",
-      description: "Search buses by route and date.\nCheck live seat availability before booking.",
-      icon: Icons.search,
+      title: "Validate Tickets",
+      description: "Quickly scan passenger QR codes or validate tickets manually to ensure a smooth boarding process.",
+      icon: Icons.qr_code_scanner,
       buttonText1: "Next",
       buttonText2: "Previous",
     ),
     OnboardingData(
-      title: "Book Your Seat Anytime",
-      subtitle: "Fast. Secure. Convenient.",
+      title: "Real-time Seat Management",
+      subtitle: "Keep track of seat availability.",
       highlights: [
-        "Select your seat",
-        "Instant booking confirmation",
-        "Digital ticket with QR code",
+        "Live seat updates",
+        "Manage passenger boarding",
+        "Route progress tracking",
       ],
-      icon: Icons.confirmation_num,
+      icon: Icons.event_seat,
       buttonText1: "Get Started",
       buttonText2: "Previous",
     ),
@@ -64,7 +64,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   void _navigateToLogin() {
     Navigator.pushReplacement(
       context,
-      MaterialPageRoute(builder: (_) => const PassengerLoginScreen()),
+      MaterialPageRoute(builder: (_) => const ConductorLoginScreen()),
     );
   }
 
@@ -118,8 +118,8 @@ class OnboardingData {
   final String? subtitle;
   final String? description;
   final List<String>? highlights;
-  final String buttonText1; // Page Next/GetStarted
-  final String? buttonText2; // Page Previous
+  final String buttonText1; 
+  final String? buttonText2; 
   final IconData? icon;
   final List<String>? imagePaths;
 
@@ -163,11 +163,10 @@ class _OnboardingPage extends StatelessWidget {
       child: SafeArea(
         child: Column(
           children: [
-            // Header with TicketGo and Skip (only shown after first page)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
               child: currentPage == 0
-                  ? const SizedBox(height: 48) // Maintain height for layout consistency
+                  ? const SizedBox(height: 48) 
                   : Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
@@ -182,7 +181,7 @@ class _OnboardingPage extends StatelessWidget {
                                 size: 24,
                               ),
                             ),
-                            ],
+                          ],
                         ),
                         TextButton(
                           onPressed: onSkip,
@@ -199,7 +198,6 @@ class _OnboardingPage extends StatelessWidget {
                     ),
             ),
             const Spacer(),
-            // Main Content
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 30),
               child: Column(
@@ -207,13 +205,12 @@ class _OnboardingPage extends StatelessWidget {
                   if (data.imagePaths != null)
                     Column(
                       children: data.imagePaths!.asMap().entries.map((entry) {
-                        int idx = entry.key;
                         String path = entry.value;
                         return Padding(
-                          padding: EdgeInsets.only(bottom: idx < data.imagePaths!.length - 1 ? 8 : 0),
+                          padding: const EdgeInsets.only(bottom: 0),
                           child: Image.asset(
                             path,
-                            height: path == 'assets/images/logo.png' ? 120 : (data.imagePaths!.length > 1 ? 100 : 150),
+                            height: 120,
                             fit: BoxFit.contain,
                             errorBuilder: (context, error, stackTrace) => const Icon(
                               Icons.image_not_supported,
@@ -308,7 +305,6 @@ class _OnboardingPage extends StatelessWidget {
               ),
             ),
             const Spacer(flex: 2),
-            // Navigation Buttons
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 60),
               child: Row(

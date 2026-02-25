@@ -21,18 +21,9 @@ class _VerifyAccountScreenState extends State<VerifyAccountScreen> {
       body: Container(
         width: double.infinity,
         decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            stops: [0.05, 0.12, 0.34, 0.37, 0.65, 0.66],
-            colors: [
-              Color(0xFF1B56FD),
-              Color(0xFF1B56FD),
-              Color(0xFF60B5FF),
-              Color(0xFF70BDFF),
-              Color(0xFFE3F2FD),
-              Color(0xFFF5F7FB),
-            ],
+          image: DecorationImage(
+            image: AssetImage('assets/images/auth_bg.png'),
+            fit: BoxFit.cover,
           ),
         ),
         child: Column(
@@ -99,16 +90,10 @@ class _VerifyAccountScreenState extends State<VerifyAccountScreen> {
                         style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
                       ),
                       const SizedBox(height: 10),
-                      Container(
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFA6E7F0),
-                          borderRadius: BorderRadius.circular(15),
-                        ),
-                        child: CustomTextField(
-                          controller: otpController,
-                          hint: "Enter Code",
-                          keyboardType: TextInputType.number,
-                        ),
+                      CustomTextField(
+                        controller: otpController,
+                        hint: "Enter Code",
+                        keyboardType: TextInputType.number,
                       ),
                       const SizedBox(height: 40),
                       _isLoading

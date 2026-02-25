@@ -24,34 +24,14 @@ class _PassengerLoginScreenState extends State<PassengerLoginScreen> {
       body: Container(
         width: double.infinity,
         decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            stops: [0.05, 0.12, 0.34, 0.37, 0.68, 0.69],
-            colors: [
-              Color(0xFF1B56FD),
-              Color(0xFF1B56FD),
-              Color(0xFF60B5FF),
-              Color(0xFF70BDFF),
-              Color(0xFFE3F2FD), // Light blue instead of pure white
-              Color(0xFFF5F7FB), // Matches Scaffold background
-            ],
+          image: DecorationImage(
+            image: AssetImage('assets/images/auth_bg.png'),
+            fit: BoxFit.cover,
           ),
         ),
         child: Column(
           children: [
             const SizedBox(height: 50),
-            Image.asset(
-              'assets/images/bus1.png',
-              height: 115,
-              fit: BoxFit.contain,
-              errorBuilder: (context, error, stackTrace) => const Icon(
-                Icons.directions_bus,
-                color: Colors.white,
-                size: 80,
-              ),
-            ),
-            const SizedBox(height: 8),
             Image.asset(
               'assets/images/logo.png',
               height: 120,
@@ -96,15 +76,9 @@ class _PassengerLoginScreenState extends State<PassengerLoginScreen> {
                         style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
                       ),
                       const SizedBox(height: 10),
-                      Container(
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFA6E7F0),
-                          borderRadius: BorderRadius.circular(15),
-                        ),
-                        child: CustomTextField(
-                          controller: emailController,
-                          hint: "Email",
-                        ),
+                      CustomTextField(
+                        controller: emailController,
+                        hint: "Email",
                       ),
                       const SizedBox(height: 25),
                       const Text(
@@ -112,16 +86,10 @@ class _PassengerLoginScreenState extends State<PassengerLoginScreen> {
                         style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
                       ),
                       const SizedBox(height: 10),
-                      Container(
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFA6E7F0),
-                          borderRadius: BorderRadius.circular(15),
-                        ),
-                        child: CustomTextField(
-                          controller: passwordController,
-                          hint: "Password",
-                          obscure: true,
-                        ),
+                      CustomTextField(
+                        controller: passwordController,
+                        hint: "Password",
+                        obscure: true,
                       ),
                       Align(
                         alignment: Alignment.centerRight,
