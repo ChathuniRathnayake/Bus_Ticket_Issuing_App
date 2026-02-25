@@ -17,7 +17,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     OnboardingData(
       title: "Welcome to TicketGo",
       subtitle: "Travel smarter. Book faster. Ride easier.",
-      imagePaths: ['assets/images/bus.jpg', 'assets/images/logo.png'],
+      imagePaths: ['assets/images/bus1.png', 'assets/images/logo.png'],
       buttonText1: "Next",
     ),
     OnboardingData(
@@ -216,10 +216,13 @@ class _OnboardingPage extends StatelessWidget {
                         int idx = entry.key;
                         String path = entry.value;
                         return Padding(
-                          padding: EdgeInsets.only(bottom: idx < data.imagePaths!.length - 1 ? 20 : 0),
+                          padding: EdgeInsets.only(bottom: idx < data.imagePaths!.length - 1 ? 8 : 0),
                           child: Image.asset(
                             path,
-                            height: data.imagePaths!.length > 1 ? 100 : 150,
+                            // bus1.png a bit big (115) but not bigger than logo (120)
+                            height: path == 'assets/images/bus1.png' 
+                                ? 115 
+                                : (path == 'assets/images/logo.png' ? 120 : (data.imagePaths!.length > 1 ? 100 : 150)),
                             fit: BoxFit.contain,
                             errorBuilder: (context, error, stackTrace) => const Icon(
                               Icons.image_not_supported,
