@@ -15,3 +15,5 @@ logs/
 # OS / Editor
 .DS_Store
 .vscode/
+
+web/bus-backend/config/serviceAccountKey.json

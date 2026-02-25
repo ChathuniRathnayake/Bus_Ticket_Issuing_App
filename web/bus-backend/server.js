@@ -1,13 +1,15 @@
+// web/bus-backend/index.js
 import express from "express";
 import cors from "cors";
 import admin from "firebase-admin";
 import dotenv from "dotenv";
+const PORT = process.env.PORT || 5000;
 
-// Load env variables
+// Import service account from config folder
+import serviceAccount from "./config/serviceAccountKey.json" assert { type: "json" };
+
+// Load environment variables
 dotenv.config();
-
-// Import service account JSON
-import serviceAccount from "./serviceAccountKey.json" assert { type: "json" };
 
 // Initialize Firebase Admin
 admin.initializeApp({
@@ -20,16 +22,23 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Routes (⚠️ must include .js extension in ESM)
-import passengerRoutes from "./routes/passengerRoutes.js";
-import adminRoutes from "./routes/adminRoutes.js";
+// Example placeholder routes (add your routes later)
+// app.use("/api/passenger", passengerRoutes);
+// app.use("/api/admin", adminRoutes);
 
-app.use("/api/passenger", passengerRoutes);
-app.use("/api/admin", adminRoutes);
+// Start server
 
-// Port config
-const PORT = process.env.PORT || 5000;
 
+
+
+// Test route
+app.get("/", (req, res) => {
+  res.send("🚀 Server is working!");
+});
+
+
+
+// Start server
 app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+  console.log(`✅ Backend is connected and running on port ${PORT}`);
 });
