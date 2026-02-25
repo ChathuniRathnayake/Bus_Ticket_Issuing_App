@@ -155,16 +155,9 @@ class _OnboardingPage extends StatelessWidget {
     return Container(
       width: double.infinity,
       decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            Color(0xFF1B56FD),
-            Color(0xFF60B5FF),
-            Color(0xFFE3F2FD),
-            Color(0xFFF5F7FB),
-          ],
-          stops: [0.0, 0.5, 0.8, 0.81],
+        image: DecorationImage(
+          image: AssetImage('assets/images/auth_bg.png'),
+          fit: BoxFit.cover,
         ),
       ),
       child: SafeArea(

@@ -21,18 +21,9 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       body: Container(
         width: double.infinity,
         decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            stops: [0.05, 0.12, 0.34, 0.37, 0.65, 0.66],
-            colors: [
-              Color(0xFF1B56FD),
-              Color(0xFF1B56FD),
-              Color(0xFF60B5FF),
-              Color(0xFF70BDFF),
-              Color(0xFFE3F2FD),
-              Color(0xFFF5F7FB),
-            ],
+          image: DecorationImage(
+            image: AssetImage('assets/images/auth_bg.png'),
+            fit: BoxFit.cover,
           ),
         ),
         child: Column(

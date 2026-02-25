@@ -22,18 +22,9 @@ class _PassengerSignUpScreenState extends State<PassengerSignUpScreen> {
       body: Container(
         width: double.infinity,
         decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            stops: [0.05, 0.12, 0.34, 0.37, 0.73, 0.74],
-            colors: [
-              Color(0xFF1B56FD),
-              Color(0xFF1B56FD),
-              Color(0xFF60B5FF),
-              Color(0xFF70BDFF),
-              Color(0xFFE3F2FD), // Light blue transition
-              Color(0xFFF5F7FB), // Matches Scaffold background
-            ],
+          image: DecorationImage(
+            image: AssetImage('assets/images/auth_bg.png'),
+            fit: BoxFit.cover,
           ),
         ),
         child: Column(
