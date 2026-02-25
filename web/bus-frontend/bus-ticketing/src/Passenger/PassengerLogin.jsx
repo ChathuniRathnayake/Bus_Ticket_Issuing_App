@@ -1,8 +1,15 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Bus } from "lucide-react";
 
-export default function PassengerLogin({ goAdmin, goRegister }) {
+export default function PassengerLogin() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const navigate = useNavigate();
 
   const handleLogin = async () => {
     const res = await fetch("http://localhost:5000/api/passenger/login", {
@@ -16,15 +23,56 @@ export default function PassengerLogin({ goAdmin, goRegister }) {
   };
 
   return (
-    <div className="w-96 p-6 bg-white rounded shadow">
-      <h1 className="text-2xl font-bold mb-4">Passenger Login</h1>
-      <input className="w-full p-2 border mb-3" placeholder="Username" value={username} onChange={e => setUsername(e.target.value)} />
-      <input className="w-full p-2 border mb-3" placeholder="Password" type="password" value={password} onChange={e => setPassword(e.target.value)} />
-      <button className="w-full p-2 bg-blue-600 text-white rounded" onClick={handleLogin}>Login</button>
-      <div className="flex justify-between mt-3">
-        <button className="text-sm text-blue-500" onClick={goRegister}>Create Account</button>
-        <button className="text-sm text-blue-500" onClick={goAdmin}>Admin Login</button>
-      </div>
+    <div className="flex min-h-[80vh] items-center justify-center">
+      <Card className="w-full max-w-md">
+        <CardHeader className="space-y-1 text-center">
+          <div className="mx-auto w-12 h-12 bg-blue-600 text-white rounded-2xl flex items-center justify-center">
+            <Bus className="h-7 w-7" />
+          </div>
+          <CardTitle className="text-3xl">Passenger Login</CardTitle>
+          <CardDescription>Book your bus tickets easily</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="space-y-2">
+            <Label htmlFor="username">Username</Label>
+            <Input
+              id="username"
+              placeholder="Enter your username"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="password">Password</Label>
+            <Input
+              id="password"
+              type="password"
+              placeholder="••••••••"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
+          </div>
+
+          <Button onClick={handleLogin} className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-lg">
+            Login
+          </Button>
+
+          <div className="flex justify-between text-sm pt-2">
+            <button
+              onClick={() => navigate("/admin-login")}
+              className="text-blue-600 hover:underline font-medium"
+            >
+              Admin Login →
+            </button>
+            <button
+              onClick={() => navigate("/register")}
+              className="text-blue-600 hover:underline font-medium"
+            >
+              Create Account
+            </button>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }
