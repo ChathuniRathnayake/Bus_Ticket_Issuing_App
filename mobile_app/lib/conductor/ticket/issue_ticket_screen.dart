@@ -4,7 +4,7 @@ import '../../models/bus_model.dart';
 import '../../models/conductor_model.dart';
 import '../../models/route_model.dart';
 import '../auth/conductor_login.dart';
-import '../../widgets/bottom_nav.dart'; // <- import your existing bottom nav
+import '../conductor_bottom_nav.dart'; // <- import your existing bottom nav
 
 class IssueTicketScreen extends StatelessWidget {
   final int seatNo;
@@ -143,7 +143,7 @@ class IssueTicketScreen extends StatelessWidget {
           ],
         ),
       ),
-      bottomNavigationBar: AppBottomNav(), // <- use your bottom nav here
+      bottomNavigationBar: const ConductorBottomNav(), // <- use your bottom nav here
     );
   }
 

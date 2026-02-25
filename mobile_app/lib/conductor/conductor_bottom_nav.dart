@@ -2,19 +2,19 @@ import 'package:flutter/material.dart';
 import 'package:mobile_app/conductor/info/trip_info_screen.dart';
 import 'package:mobile_app/conductor/seat_map/seat_map_screen.dart';
 // import 'package:mobile_app/conductor/ticket/issue_ticket_screen.dart';
-import '../conductor/dashboard/conductor_dashboard.dart';
-import '../../models/conductor_model.dart';
-import '../../models/bus_model.dart';
-import '../../models/route_model.dart';
+import 'dashboard/conductor_dashboard.dart';
+import '../models/conductor_model.dart';
+import '../models/bus_model.dart';
+import '../models/route_model.dart';
 
-class AppBottomNav extends StatefulWidget {
-  const AppBottomNav({super.key});
+class ConductorBottomNav extends StatefulWidget {
+  const ConductorBottomNav({super.key});
 
   @override
-  State<AppBottomNav> createState() => _AppBottomNavState();
+  State<ConductorBottomNav> createState() => _ConductorBottomNavState();
 }
 
-class _AppBottomNavState extends State<AppBottomNav> {
+class _ConductorBottomNavState extends State<ConductorBottomNav> {
   int _selectedIndex = 0;
 
   void _onItemTapped(int index) {

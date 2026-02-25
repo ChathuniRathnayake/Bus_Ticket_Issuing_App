@@ -4,7 +4,7 @@ import 'package:mobile_app/models/bus_model.dart';
 import 'package:mobile_app/models/conductor_model.dart';
 import 'package:mobile_app/models/route_model.dart';
 import '../../widgets/custom_button.dart';
-import '../../widgets/bottom_nav.dart';
+import '../conductor_bottom_nav.dart';
 import '../seat_map/seat_map_screen.dart';
 
 class ConductorDashboard extends StatelessWidget {
@@ -174,7 +174,7 @@ class ConductorDashboard extends StatelessWidget {
         ),
       ),
       // Bottom Navigation
-      bottomNavigationBar: AppBottomNav(),
+      bottomNavigationBar: const ConductorBottomNav(),
     );
   }
 

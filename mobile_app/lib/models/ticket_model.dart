@@ -26,7 +26,7 @@ class Ticket {
     required this.issuedAt,
   });
 
-  // Convert Ticket to JSON (useful for Firebase)
+  // Convert Ticket to JSON
   Map<String, dynamic> toJson() {
     return {
       'ticketId': ticketId,
