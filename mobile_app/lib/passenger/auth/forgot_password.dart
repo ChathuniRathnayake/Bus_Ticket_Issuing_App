@@ -99,15 +99,9 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                         style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
                       ),
                       const SizedBox(height: 10),
-                      Container(
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFA6E7F0),
-                          borderRadius: BorderRadius.circular(15),
-                        ),
-                        child: CustomTextField(
-                          controller: emailController,
-                          hint: "Email",
-                        ),
+                      CustomTextField(
+                        controller: emailController,
+                        hint: "Email",
                       ),
                       const SizedBox(height: 40),
                       _isLoading

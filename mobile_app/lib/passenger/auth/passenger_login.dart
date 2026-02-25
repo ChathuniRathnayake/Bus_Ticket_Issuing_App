@@ -42,17 +42,6 @@ class _PassengerLoginScreenState extends State<PassengerLoginScreen> {
           children: [
             const SizedBox(height: 50),
             Image.asset(
-              'assets/images/bus1.png',
-              height: 115,
-              fit: BoxFit.contain,
-              errorBuilder: (context, error, stackTrace) => const Icon(
-                Icons.directions_bus,
-                color: Colors.white,
-                size: 80,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Image.asset(
               'assets/images/logo.png',
               height: 120,
               fit: BoxFit.contain,
@@ -96,15 +85,9 @@ class _PassengerLoginScreenState extends State<PassengerLoginScreen> {
                         style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
                       ),
                       const SizedBox(height: 10),
-                      Container(
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFA6E7F0),
-                          borderRadius: BorderRadius.circular(15),
-                        ),
-                        child: CustomTextField(
-                          controller: emailController,
-                          hint: "Email",
-                        ),
+                      CustomTextField(
+                        controller: emailController,
+                        hint: "Email",
                       ),
                       const SizedBox(height: 25),
                       const Text(
@@ -112,16 +95,10 @@ class _PassengerLoginScreenState extends State<PassengerLoginScreen> {
                         style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
                       ),
                       const SizedBox(height: 10),
-                      Container(
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFA6E7F0),
-                          borderRadius: BorderRadius.circular(15),
-                        ),
-                        child: CustomTextField(
-                          controller: passwordController,
-                          hint: "Password",
-                          obscure: true,
-                        ),
+                      CustomTextField(
+                        controller: passwordController,
+                        hint: "Password",
+                        obscure: true,
                       ),
                       Align(
                         alignment: Alignment.centerRight,

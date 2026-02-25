@@ -82,16 +82,9 @@ class _ConductorLoginScreenState extends State<ConductorLoginScreen> {
                       ),
                       const SizedBox(height: 10),
                       // Text field with light blue background from the image
-                      Container(
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFA6E7F0), // Light blue background
-                          borderRadius: BorderRadius.circular(15),
-                        ),
-                        child: CustomTextField(
-                          controller: userIdController,
-                          hint: "User ID",
-                          // Ensure CustomTextField's decoration has no border/fill or matches this
-                        ),
+                      CustomTextField(
+                        controller: userIdController,
+                        hint: "User ID",
                       ),
                       const SizedBox(height: 25),
                       const Text(
@@ -99,16 +92,10 @@ class _ConductorLoginScreenState extends State<ConductorLoginScreen> {
                         style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
                       ),
                       const SizedBox(height: 10),
-                      Container(
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFA6E7F0), // Light blue background
-                          borderRadius: BorderRadius.circular(15),
-                        ),
-                        child: CustomTextField(
-                          controller: passwordController,
-                          hint: "Password",
-                          obscure: true,
-                        ),
+                      CustomTextField(
+                        controller: passwordController,
+                        hint: "Password",
+                        obscure: true,
                       ),
                       const SizedBox(height: 50),
                       _isLoading
