@@ -27,28 +27,42 @@ class _PassengerLoginScreenState extends State<PassengerLoginScreen> {
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            stops: [0.05, 0.12, 0.34, 0.37, 0.51, 0.52],
+            stops: [0.05, 0.12, 0.34, 0.37, 0.68, 0.69],
             colors: [
               Color(0xFF1B56FD),
               Color(0xFF1B56FD),
               Color(0xFF60B5FF),
               Color(0xFF70BDFF),
-              Color(0xFFFFFFFF),
-              Color(0xFFFFFFFF),
+              Color(0xFFE3F2FD), // Light blue instead of pure white
+              Color(0xFFF5F7FB), // Matches Scaffold background
             ],
           ),
         ),
         child: Column(
           children: [
-            const SizedBox(height: 100),
-            const Icon(Icons.directions_bus, size: 80, color: Colors.white),
-            const SizedBox(height: 10),
-            const Text(
-              "TicketGo",
-              style: TextStyle(
+            const SizedBox(height: 50),
+            Image.asset(
+              'assets/images/bus1.png',
+              height: 115,
+              fit: BoxFit.contain,
+              errorBuilder: (context, error, stackTrace) => const Icon(
+                Icons.directions_bus,
                 color: Colors.white,
-                fontSize: 32,
-                fontWeight: FontWeight.bold,
+                size: 80,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Image.asset(
+              'assets/images/logo.png',
+              height: 120,
+              fit: BoxFit.contain,
+              errorBuilder: (context, error, stackTrace) => const Text(
+                "TicketGo",
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 32,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
             const SizedBox(height: 20),
