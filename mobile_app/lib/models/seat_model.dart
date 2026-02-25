@@ -18,7 +18,7 @@ class Seat {
     this.ticket,
   });
 
-  // Convert Seat to JSON for Firebase
+  // Convert Seat to JSON
   Map<String, dynamic> toJson() {
     return {
       'seatNo': seatNo,
