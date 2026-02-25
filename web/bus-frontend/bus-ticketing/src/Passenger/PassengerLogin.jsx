@@ -53,23 +53,28 @@ export default function PassengerLogin() {
             />
           </div>
 
-          <Button onClick={handleLogin} className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-lg">
+          <Button 
+            onClick={handleLogin} 
+            className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-lg cursor-pointer"
+          >
             Login
           </Button>
 
-          <div className="flex justify-between text-sm pt-2">
-            <button
+          <div className="flex justify-between pt-2">
+            <Button 
+              variant="link" 
               onClick={() => navigate("/admin-login")}
-              className="text-blue-600 hover:underline font-medium"
+              className="cursor-pointer"
             >
               Admin Login →
-            </button>
-            <button
-              onClick={() => navigate("/register")}
-              className="text-blue-600 hover:underline font-medium"
+            </Button>
+            <Button 
+              variant="link" 
+              onClick={() => navigate("/register")}   
+              className="cursor-pointer"
             >
               Create Account
-            </button>
+            </Button>
           </div>
         </CardContent>
       </Card>

@@ -1,25 +1,33 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Bus } from "lucide-react";
 
-export default function Register({ goLogin }) {
+export default function Register() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const navigate = useNavigate();
 
-  const handleRegister = async () => {
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
     const res = await fetch("http://localhost:5000/api/passenger/register", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ username, password }),
     });
+
     const data = await res.json();
+
     if (res.ok) {
-      alert(data.message);
-      goLogin();
-    } else alert(data.message);
+      alert("✅ Signup Successful!\nYou can now login with your credentials.");
+      navigate("/passenger-login");     // Navigate to login after success
+    } else {
+      alert(data.message || "Signup failed");
+    }
   };
 
   return (
@@ -32,37 +40,46 @@ export default function Register({ goLogin }) {
           <CardTitle className="text-3xl">Create Account</CardTitle>
           <CardDescription>Join thousands of happy passengers</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="space-y-2">
-            <Label htmlFor="username">Username</Label>
-            <Input
-              id="username"
-              placeholder="Choose a username"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="password">Password</Label>
-            <Input
-              id="password"
-              type="password"
-              placeholder="Create a strong password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
-          </div>
 
-          <Button onClick={handleRegister} className="w-full h-12 bg-green-600 hover:bg-green-700 text-lg">
-            Create Account
-          </Button>
+        <CardContent>
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <div className="space-y-2">
+              <Label htmlFor="username">Username</Label>
+              <Input
+                id="username"
+                placeholder="Choose a username"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="password">Password</Label>
+              <Input
+                id="password"
+                type="password"
+                placeholder="Create a strong password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+              />
+            </div>
 
-          <button
-            onClick={goLogin}
-            className="w-full text-sm text-blue-600 hover:underline font-medium"
+            <Button 
+              type="submit" 
+              className="w-full h-12 bg-green-600 hover:bg-green-700 text-lg cursor-pointer"
+            >
+              Create Account
+            </Button>
+          </form>
+
+          <Button 
+            variant="link" 
+            onClick={() => navigate("/passenger-login")}
+            className="w-full mt-4 cursor-pointer"
           >
             ← Back to Login
-          </button>
+          </Button>
         </CardContent>
       </Card>
     </div>
