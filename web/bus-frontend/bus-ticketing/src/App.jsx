@@ -1,13 +1,16 @@
-import React from 'react'
+import { useState } from "react";
+import PassengerLogin from "./Passenger/PassengerLogin";
+import AdminLogin from "./Admin/AdminLogin";
+import Register from "./Passenger/PassengerSignup";
 
-function App() {
+export default function App() {
+  const [page, setPage] = useState("passengerLogin");
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100">
-      <h1 className="text-3xl font-bold text-blue-600">
-        Tailwind is working 🎉
-      </h1>
+    <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      {page === "passengerLogin" && <PassengerLogin goAdmin={() => setPage("adminLogin")} goRegister={() => setPage("register")} />}
+      {page === "adminLogin" && <AdminLogin goPassenger={() => setPage("passengerLogin")} />}
+      {page === "register" && <Register goLogin={() => setPage("passengerLogin")} />}
     </div>
-  )
+  );
 }
-
-export default App
