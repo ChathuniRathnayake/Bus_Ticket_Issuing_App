@@ -1,10 +1,9 @@
-// web/bus-backend/controllers/adminController.js
-import admin from "firebase-admin";
-import jwt from "jsonwebtoken";
+// controllers/adminController.js
+import { admin, db } from "../config/firebase.js";
 
 export const loginAdmin = async (req, res) => {
   try {
-    const { idToken } = req.body; // Firebase ID token from frontend
+    const { idToken } = req.body;
 
     if (!idToken) {
       return res.status(400).json({ message: "No token provided" });
@@ -12,22 +11,27 @@ export const loginAdmin = async (req, res) => {
 
     // Verify Firebase ID token
     const decodedToken = await admin.auth().verifyIdToken(idToken);
+    const uid = decodedToken.uid;
 
-    // Check if user has admin role
-    if (!decodedToken.role || decodedToken.role !== "admin") {
-      return res.status(403).json({ message: "Not authorized" });
+    // Check role in Firestore
+    const userDoc = await db.collection("users").doc(uid).get();
+
+    if (!userDoc.exists) {
+      return res.status(403).json({ message: "User not found" });
     }
 
-    // Issue backend JWT for your APIs (optional)
-    const token = jwt.sign(
-      { uid: decodedToken.uid, email: decodedToken.email, role: "admin" },
-      process.env.JWT_SECRET,
-      { expiresIn: "1d" }
-    );
+    if (userDoc.data().role !== "admin") {
+      return res.status(403).json({ message: "Not authorized as admin" });
+    }
 
-    res.json({ token, message: "Login successful" });
-  } catch (err) {
-    console.error("Admin login error:", err);
-    res.status(500).json({ message: "Server error", error: err.message });
+    res.json({
+      message: "Admin login successful",
+      uid,
+      email: decodedToken.email,
+    });
+
+  } catch (error) {
+    console.error("Admin login error:", error);
+    res.status(500).json({ message: "Server error" });
   }
 };
