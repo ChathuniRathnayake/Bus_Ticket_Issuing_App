@@ -25,20 +25,20 @@ class _PassengerSignUpScreenState extends State<PassengerSignUpScreen> {
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            stops: [0.05, 0.12, 0.34, 0.37, 0.51, 0.52],
+            stops: [0.05, 0.12, 0.34, 0.37, 0.73, 0.74],
             colors: [
               Color(0xFF1B56FD),
               Color(0xFF1B56FD),
               Color(0xFF60B5FF),
               Color(0xFF70BDFF),
-              Color(0xFFFFFFFF),
-              Color(0xFFFFFFFF),
+              Color(0xFFE3F2FD), // Light blue transition
+              Color(0xFFF5F7FB), // Matches Scaffold background
             ],
           ),
         ),
         child: Column(
           children: [
-            const SizedBox(height: 60),
+            const SizedBox(height: 50),
             Row(
               children: [
                 IconButton(
@@ -47,17 +47,31 @@ class _PassengerSignUpScreenState extends State<PassengerSignUpScreen> {
                 ),
               ],
             ),
-            const Icon(Icons.directions_bus, size: 60, color: Colors.white),
-            const SizedBox(height: 10),
-            const Text(
-              "TicketGo",
-              style: TextStyle(
+            Image.asset(
+              'assets/images/bus1.png',
+              height: 100, // Slightly smaller for signup layout
+              fit: BoxFit.contain,
+              errorBuilder: (context, error, stackTrace) => const Icon(
+                Icons.directions_bus,
                 color: Colors.white,
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
+                size: 60,
               ),
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 8),
+            Image.asset(
+              'assets/images/logo.png',
+              height: 100,
+              fit: BoxFit.contain,
+              errorBuilder: (context, error, stackTrace) => const Text(
+                "TicketGo",
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+            const SizedBox(height: 15),
             const Text(
               "Create Account",
               style: TextStyle(

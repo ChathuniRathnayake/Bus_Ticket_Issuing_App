@@ -161,9 +161,10 @@ class _OnboardingPage extends StatelessWidget {
           colors: [
             Color(0xFF1B56FD),
             Color(0xFF60B5FF),
-            Colors.white,
+            Color(0xFFE3F2FD),
+            Color(0xFFF5F7FB),
           ],
-          stops: [0.0, 0.4, 0.7],
+          stops: [0.0, 0.5, 0.8, 0.81],
         ),
       ),
       child: SafeArea(
