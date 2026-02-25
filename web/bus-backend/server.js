@@ -1,9 +1,7 @@
-// web/bus-backend/index.js
 import express from "express";
 import cors from "cors";
 import admin from "firebase-admin";
 import dotenv from "dotenv";
-const PORT = process.env.PORT || 5000;
 
 // Import service account from config folder
 import serviceAccount from "./config/serviceAccountKey.json" assert { type: "json" };
@@ -22,23 +20,19 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Example placeholder routes (add your routes later)
-// app.use("/api/passenger", passengerRoutes);
-// app.use("/api/admin", adminRoutes);
+// Import admin routes
+import adminRoutes from "./routes/adminRoutes.js";
 
-// Start server
-
-
-
+// Use routes
+app.use("/api/admin", adminRoutes);
 
 // Test route
 app.get("/", (req, res) => {
-  res.send("🚀 Server is working!");
+  res.send("🚀 Backend is connected!");
 });
 
-
-
 // Start server
+const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
-  console.log(`✅ Backend is connected and running on port ${PORT}`);
+  console.log(`✅ Backend running on port ${PORT}`);
 });
