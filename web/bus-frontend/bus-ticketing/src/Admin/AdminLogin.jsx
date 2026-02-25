@@ -11,61 +11,55 @@ export default function AdminLogin() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
-
   const handleLogin = () => {
     if (!email || !password) {
       alert("Please fill all fields");
       return;
     }
-
     setLoading(true);
-
     setTimeout(() => {
       setLoading(false);
       alert("✅ Login Successful!");
       navigate("/admin-dashboard");
     }, 800);
   };
-
   return (
-    <div className="flex min-h-[80vh] items-center justify-center">
-      <Card className="w-full max-w-md">
+    <div className="flex min-h-[80vh] items-center justify-center bg-background/50 animate-fade-in">
+      <Card className="w-full max-w-md shadow-xl rounded-2xl border-border">
         <CardHeader className="space-y-1 text-center">
-          <div className="mx-auto w-12 h-12 bg-zinc-900 text-white rounded-2xl flex items-center justify-center">
-            <Shield className="h-7 w-7" />
+          <div className="mx-auto w-14 h-14 bg-zinc-900 text-white rounded-full flex items-center justify-center mb-4">
+            <Shield className="h-8 w-8" />
           </div>
-          <CardTitle className="text-3xl">Admin Login</CardTitle>
-          <CardDescription>Sign in to manage the bus system</CardDescription>
+          <CardTitle className="text-3xl font-semibold">Admin Login</CardTitle>
+          <CardDescription className="text-muted-foreground">Secure access to manage the bus ticketing system</CardDescription>
         </CardHeader>
-
-        <CardContent className="space-y-6">
+        <CardContent className="px-8 space-y-6">
           <div className="space-y-2">
-            <Label htmlFor="email">Email Address</Label>
+            <Label htmlFor="email" className="text-sm font-medium">Email Address</Label>
             <Input
               id="email"
               type="email"
-              placeholder="admin@bus.com"
+              placeholder="Enter your admin email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+              className="h-11 transition-all focus:ring-2 focus:ring-zinc-500"
             />
           </div>
-
           <div className="space-y-2">
-            <Label htmlFor="password">Password</Label>
+            <Label htmlFor="password" className="text-sm font-medium">Password</Label>
             <Input
               id="password"
               type="password"
-              placeholder="••••••••"
+              placeholder="Enter your password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
+              className="h-11 transition-all focus:ring-2 focus:ring-zinc-500"
             />
           </div>
-
-          {/* Fixed: Text is now clearly visible */}
           <Button
             onClick={handleLogin}
             disabled={loading}
-            className="w-full h-12 bg-zinc-900 hover:bg-black text-white text-lg cursor-pointer"
+            className="w-full h-11 bg-zinc-900 hover:bg-zinc-800 text-white text-lg transition-colors cursor cursor-pointer"
           >
             {loading ? "Logging in..." : "Login to Dashboard"}
           </Button>

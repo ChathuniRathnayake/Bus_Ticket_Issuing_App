@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Bus } from "lucide-react";
 
 export default function AddBus({ buses, setBuses }) {
   const [form, setForm] = useState({
@@ -19,6 +19,7 @@ export default function AddBus({ buses, setBuses }) {
     e.preventDefault();
     const { busId, routeId, totalSeats, busNo, status } = form;
     if (!busId || !routeId || !totalSeats || !busNo || !status) return alert("Please fill all fields");
+
     setLoading(true);
     setTimeout(() => {
       setBuses([...buses, form]);
@@ -30,52 +31,107 @@ export default function AddBus({ buses, setBuses }) {
   };
 
   return (
-    <div className="flex min-h-[80vh] items-center justify-center">
-      <Card className="w-full max-w-md">
-        <CardHeader>
-          <div className="flex items-center gap-3">
-            <Button variant="ghost" size="icon" onClick={() => navigate("/admin-dashboard")}>
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
-            <CardTitle className="text-2xl">Add New Bus</CardTitle>
+    <div className="flex min-h-[80vh] items-center justify-center bg-background/50 animate-fade-in">
+      <Card className="w-full max-w-lg shadow-xl rounded-2xl border-border">
+        
+        <CardHeader className="text-center">
+          
+          {/* Icon */}
+          <div className="mx-auto w-12 h-12 bg-[#9966CC]/20 text-[#9966CC] rounded-full flex items-center justify-center mb-4">
+            <Bus className="h-6 w-6" />
           </div>
-          <CardDescription>Add a bus to the fleet</CardDescription>
+
+          <CardTitle className="text-3xl font-semibold">Add New Bus</CardTitle>
+          <CardDescription className="text-muted-foreground mt-2">
+            Expand your fleet with a new bus entry
+          </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-6">
-          <form onSubmit={handleSubmit}>
+
+        <CardContent className="px-8 space-y-6">
+          <form onSubmit={handleSubmit} className="grid gap-4">
+
             <div className="space-y-2">
-              <Label htmlFor="busId">Bus ID</Label>
-              <Input id="busId" name="busId" value={form.busId} onChange={handleChange} placeholder="BUS-001" />
+              <Label htmlFor="busId" className="text-sm font-medium">Bus ID</Label>
+              <Input
+                id="busId"
+                name="busId"
+                value={form.busId}
+                onChange={handleChange}
+                placeholder="e.g., BUS-001"
+                className="h-11 transition-all focus:ring-2 focus:ring-[#9966CC]"
+              />
             </div>
+
             <div className="space-y-2">
-              <Label htmlFor="routeId">Route ID</Label>
-              <Input id="routeId" name="routeId" value={form.routeId} onChange={handleChange} placeholder="R001" />
+              <Label htmlFor="routeId" className="text-sm font-medium">Route ID</Label>
+              <Input
+                id="routeId"
+                name="routeId"
+                value={form.routeId}
+                onChange={handleChange}
+                placeholder="e.g., R001"
+                className="h-11 transition-all focus:ring-2 focus:ring-[#9966CC]"
+              />
             </div>
+
             <div className="space-y-2">
-              <Label htmlFor="totalSeats">Total Seats</Label>
-              <Input id="totalSeats" name="totalSeats" type="number" value={form.totalSeats} onChange={handleChange} />
+              <Label htmlFor="totalSeats" className="text-sm font-medium">Total Seats</Label>
+              <Input
+                id="totalSeats"
+                name="totalSeats"
+                type="number"
+                value={form.totalSeats}
+                onChange={handleChange}
+                placeholder="e.g., 50"
+                className="h-11 transition-all focus:ring-2 focus:ring-[#9966CC]"
+              />
             </div>
+
             <div className="space-y-2">
-              <Label htmlFor="busNo">Bus Number</Label>
-              <Input id="busNo" name="busNo" value={form.busNo} onChange={handleChange} placeholder="NB-1234" />
+              <Label htmlFor="busNo" className="text-sm font-medium">Bus Number</Label>
+              <Input
+                id="busNo"
+                name="busNo"
+                value={form.busNo}
+                onChange={handleChange}
+                placeholder="e.g., NB-1234"
+                className="h-11 transition-all focus:ring-2 focus:ring-[#9966CC]"
+              />
             </div>
+
             <div className="space-y-2">
-              <Label htmlFor="status">Status</Label>
+              <Label htmlFor="status" className="text-sm font-medium">Status</Label>
               <select
                 id="status"
                 name="status"
                 value={form.status}
                 onChange={handleChange}
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#9966CC] transition-all"
               >
                 <option value="Active">Active</option>
                 <option value="Inactive">Inactive</option>
               </select>
             </div>
 
-            <Button type="submit" disabled={loading} className="w-full mt-6 bg-violet-600 hover:bg-violet-700">
-              {loading ? "Adding..." : "Add Bus"}
-            </Button>
+            <div className="flex items-center gap-4 mt-6">
+              
+              <Button
+                variant="outline"
+                onClick={() => navigate("/admin-dashboard")}
+                className="flex-1 h-11 gap-2 hover:bg-[#9966CC]/10 transition-colors cursor-pointer"
+              >
+                <ArrowLeft className="h-4 w-4 r" /> Back
+              </Button>
+
+              <Button
+                type="submit"
+                disabled={loading}
+                className="flex-1 h-11 text-white bg-[#9966CC] hover:bg-[#875bb5] transition-colors cursor-pointer"
+              >
+                {loading ? "Adding..." : "Add Bus"}
+              </Button>
+
+            </div>
           </form>
         </CardContent>
       </Card>
