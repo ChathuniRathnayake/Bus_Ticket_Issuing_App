@@ -24,17 +24,17 @@ export default function AdminLogin() {
     setLoading(true);
 
     try {
-      // 1️⃣ Sign in with Firebase Auth
+      // Sign in with Firebase Auth
       const userCredential = await signInWithEmailAndPassword(
         auth,
         email,
         password
       );
 
-      // 2️⃣ Get Firebase ID Token
+      // Get Firebase ID Token
       const token = await userCredential.user.getIdToken();
 
-      // 3️⃣ Send token to backend for admin verification
+      // Send token to backend for admin verification
       const response = await fetch(
         "http://localhost:5000/api/admin/login",
         {
@@ -52,10 +52,10 @@ export default function AdminLogin() {
         throw new Error(data.message);
       }
 
-      // 4️⃣ Store token locally
+      // Store token locally
       localStorage.setItem("token", token);
 
-      alert("✅ Login Successful!");
+      alert("Login Successful!");
       navigate("/admin-dashboard");
 
     } catch (error) {
