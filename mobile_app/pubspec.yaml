@@ -44,6 +44,9 @@ dependencies:
   pdf: ^3.11.3
   printing: ^5.14.2
   path_provider: ^2.1.5
+  firebase_core: ^4.4.0
+  firebase_auth: ^6.1.4
+  cloud_firestore: ^6.1.2
   
 
 dev_dependencies:

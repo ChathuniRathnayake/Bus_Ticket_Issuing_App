@@ -1,12 +1,12 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-class ConductorAuthService {
+class PassengerAuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  // Register Conductor
-  Future<UserCredential> registerConductor({
+  // Register Passenger
+  Future<UserCredential> registerPassenger({
     required String email,
     required String password,
   }) async {
@@ -17,15 +17,15 @@ class ConductorAuthService {
 
     await _firestore.collection('users').doc(credential.user!.uid).set({
       'email': email,
-      'role': 'conductor',
+      'role': 'passenger',
       'createdAt': Timestamp.now(),
     });
 
     return credential;
   }
 
-  // Login Conductor
-  Future<User?> loginConductor({
+  // Login Passenger
+  Future<User?> loginPassenger({
     required String email,
     required String password,
   }) async {
@@ -39,9 +39,9 @@ class ConductorAuthService {
         .doc(credential.user!.uid)
         .get();
 
-    if (doc['role'] != 'conductor') {
+    if (doc['role'] != 'passenger') {
       await _auth.signOut();
-      throw Exception("Not authorized as conductor");
+      throw Exception("Not authorized as passenger");
     }
 
     return credential.user;
