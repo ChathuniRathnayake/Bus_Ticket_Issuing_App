@@ -5,6 +5,7 @@ import {
   createAdmin,
   getAdmins,
   deleteAdmin,
+  updateAdmin,
 } from "../controllers/adminController.js";
 
 import { verifyToken, verifyAdmin } from "../middleware/authMiddleware.js";
@@ -17,6 +18,7 @@ router.post("/login", loginAdmin);
 // Admin Management (Protected)
 router.post("/", verifyToken, verifyAdmin, createAdmin);
 router.get("/", verifyToken, verifyAdmin, getAdmins);
+router.put("/:id", verifyToken, verifyAdmin, updateAdmin);
 router.delete("/:id", verifyToken, verifyAdmin, deleteAdmin);
 
 // Test route
