@@ -51,8 +51,10 @@ export default function AddBus({ buses, setBuses, routes }) {
     return total;
   };
 
-  const handleSubmit = (e) => {
+  // ✅ BACKEND CONNECTED SUBMIT
+  const handleSubmit = async (e) => {
     e.preventDefault();
+
     const { busId, routeId, totalSeats, busNo, status } = form;
 
     if (!busId || !routeId || !totalSeats || !busNo || !status) {
@@ -63,20 +65,39 @@ export default function AddBus({ buses, setBuses, routes }) {
     const selected = parseInt(totalSeats);
 
     if (expected !== selected) {
-      if (!window.confirm(
-        `Calculated seats from layout (${expected}) do not match selected total (${selected}).\n\nContinue anyway?`
-      )) {
+      if (
+        !window.confirm(
+          `Calculated seats from layout (${expected}) do not match selected total (${selected}). Continue anyway?`
+        )
+      ) {
         return;
       }
     }
 
     setLoading(true);
-    setTimeout(() => {
-      const newBus = { ...form, calculatedSeats: expected };
-      setBuses([...buses, newBus]);
-      alert(`Bus Added!\nBus ID: ${busId}\nBus No: ${busNo}\nSeats: ${totalSeats}`);
-      
-      // Reset form
+
+    try {
+      const token = localStorage.getItem("token");
+
+      const res = await fetch("http://localhost:5000/api/bus", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          ...form,
+          calculatedSeats: expected,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) throw new Error(data.message);
+
+      alert(`Bus Added Successfully!\nBus ID: ${busId}`);
+
+      // Reset form (same as your original)
       setForm({
         busId: "",
         routeId: "",
@@ -91,9 +112,15 @@ export default function AddBus({ buses, setBuses, routes }) {
         hasBackFullRow: "yes",
         backRowSeats: "5",
       });
-      setLoading(false);
+
       navigate("/admin-dashboard/manage-buses");
-    }, 500);
+
+    } catch (error) {
+      console.error(error);
+      alert("Failed to add bus");
+    }
+
+    setLoading(false);
   };
 
   const seatOptions = ["30", "42", "46", "52", "54"];

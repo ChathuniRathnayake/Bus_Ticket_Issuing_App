@@ -26,16 +26,26 @@ export default function ManageConductors() {
   const [editId, setEditId] = useState(null);
   const [form, setForm] = useState({ name: "", password: "" });
 
-  const token = localStorage.getItem("token"); // Admin token
+  const token = localStorage.getItem("token");
 
-  // Fetch conductors from backend
+
+
+  // 🔹 FETCH CONDUCTORS
   const fetchConductors = async () => {
+    if (!token) return;
+
     try {
       setLoading(true);
-      const res = await axios.get("http://localhost:5000/api/conductor", {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+
+      const res = await axios.get(
+        "http://localhost:5000/api/conductor",
+        {
+          headers: { Authorization: `Bearer ${token}` }
+        }
+      );
+
       setConductors(res.data);
+
     } catch (error) {
       console.error(error);
       alert(error.response?.data?.message || "Failed to fetch conductors");
@@ -44,48 +54,75 @@ export default function ManageConductors() {
     }
   };
 
+
+
+  // 🔹 INITIAL LOAD
   useEffect(() => {
     if (!token) {
       alert("You must login first");
       navigate("/admin-login");
       return;
     }
-    fetchConductors();
-  }, []);
 
+    fetchConductors();
+  }, [token, navigate]);
+
+
+
+  // 🔹 EDIT
   const handleEdit = (c) => {
     setEditId(c.id);
     setForm({ name: c.name, password: "" });
   };
 
+
+
+  // 🔹 UPDATE
   const handleSave = async (id) => {
     try {
       await axios.put(
         `http://localhost:5000/api/conductor/${id}`,
-        { name: form.name, password: form.password || undefined },
-        { headers: { Authorization: `Bearer ${token}` } }
+        {
+          name: form.name,
+          password: form.password || undefined
+        },
+        {
+          headers: { Authorization: `Bearer ${token}` }
+        }
       );
-      fetchConductors(); // Refresh data
+
+      fetchConductors();
       setEditId(null);
+
     } catch (error) {
       console.error(error);
       alert(error.response?.data?.message || "Failed to update conductor");
     }
   };
 
+
+
+  // 🔹 DELETE
   const handleDelete = async (id) => {
     if (!confirm("Delete this conductor?")) return;
 
     try {
-      await axios.delete(`http://localhost:5000/api/conductor/${id}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      fetchConductors(); // Refresh data
+      await axios.delete(
+        `http://localhost:5000/api/conductor/${id}`,
+        {
+          headers: { Authorization: `Bearer ${token}` }
+        }
+      );
+
+      fetchConductors();
+
     } catch (error) {
       console.error(error);
       alert(error.response?.data?.message || "Failed to delete conductor");
     }
   };
+
+
 
   return (
     <div className="max-w-6xl mx-auto p-6 bg-background/50 animate-fade-in">
@@ -98,18 +135,29 @@ export default function ManageConductors() {
           >
             <ArrowLeft className="h-5 w-5" /> Back to Dashboard
           </Button>
-          <h2 className="text-3xl font-bold tracking-tight">Manage Conductors</h2>
+          <h2 className="text-3xl font-bold tracking-tight">
+            Manage Conductors
+          </h2>
         </div>
-        <Input placeholder="Search conductors..." className="w-64 h-10" />
+
+        <Input
+          placeholder="Search conductors..."
+          className="w-64 h-10"
+        />
       </div>
 
       <Card className="shadow-lg rounded-2xl border-border">
         <CardHeader>
-          <CardTitle>Conductors ({conductors.length})</CardTitle>
+          <CardTitle>
+            Conductors ({conductors.length})
+          </CardTitle>
         </CardHeader>
+
         <CardContent>
           {loading ? (
-            <p className="text-center py-12 text-muted-foreground">Loading...</p>
+            <p className="text-center py-12 text-muted-foreground">
+              Loading...
+            </p>
           ) : conductors.length === 0 ? (
             <div className="text-center py-12">
               <Users className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
@@ -125,22 +173,31 @@ export default function ManageConductors() {
                     <TableHead>ID</TableHead>
                     <TableHead>Name</TableHead>
                     <TableHead>Password</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
+                    <TableHead className="text-right">
+                      Actions
+                    </TableHead>
                   </TableRow>
                 </TableHeader>
+
                 <TableBody>
                   {conductors.map((c) => (
                     <TableRow
                       key={c.id}
                       className="even:bg-muted/50 hover:bg-muted transition-all duration-300"
                     >
-                      <TableCell>{c.id || c.conductorId}</TableCell>
+                      <TableCell>
+                        {c.id || c.conductorId}
+                      </TableCell>
+
                       <TableCell>
                         {editId === c.id ? (
                           <Input
                             value={form.name}
                             onChange={(e) =>
-                              setForm({ ...form, name: e.target.value })
+                              setForm({
+                                ...form,
+                                name: e.target.value
+                              })
                             }
                             className="h-10 w-full focus:ring-blue-500"
                           />
@@ -148,6 +205,7 @@ export default function ManageConductors() {
                           c.name
                         )}
                       </TableCell>
+
                       <TableCell>
                         {editId === c.id ? (
                           <Input
@@ -155,7 +213,10 @@ export default function ManageConductors() {
                             value={form.password}
                             placeholder="••••••••"
                             onChange={(e) =>
-                              setForm({ ...form, password: e.target.value })
+                              setForm({
+                                ...form,
+                                password: e.target.value
+                              })
                             }
                             className="h-10 w-full focus:ring-blue-500"
                           />
@@ -163,6 +224,7 @@ export default function ManageConductors() {
                           "•".repeat(c.password?.length || 8)
                         )}
                       </TableCell>
+
                       <TableCell className="text-right flex gap-2 justify-end">
                         {editId === c.id ? (
                           <Button
@@ -182,6 +244,7 @@ export default function ManageConductors() {
                             <Pencil className="h-4 w-4" /> Edit
                           </Button>
                         )}
+
                         <Button
                           size="sm"
                           onClick={() => handleDelete(c.id)}
@@ -193,6 +256,7 @@ export default function ManageConductors() {
                     </TableRow>
                   ))}
                 </TableBody>
+
               </Table>
             </div>
           )}
