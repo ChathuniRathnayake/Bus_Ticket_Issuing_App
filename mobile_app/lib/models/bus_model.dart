@@ -1,27 +1,30 @@
 class Bus {
-  final String busId;
-  final String routeId;
-  final int totalSeats;
+  final String id;
+  final String plateNumber;
+  final String model;
+  final int capacity;
 
   Bus({
-    required this.busId,
-    required this.routeId,
-    required this.totalSeats,
+    required this.id,
+    required this.plateNumber,
+    required this.model,
+    required this.capacity,
   });
 
-  factory Bus.fromMap(Map<String, dynamic> map) {
+  factory Bus.fromMap(Map<String, dynamic> map, {String? id}) {
     return Bus(
-      busId: map['busId'] ?? '',
-      routeId: map['routeId'] ?? '',
-      totalSeats: map['totalSeats'] ?? 0,
+      id: id ?? map['id'] ?? '',
+      plateNumber: map['plateNumber'] ?? '',
+      model: map['model'] ?? '',
+      capacity: map['capacity'] ?? 0,
     );
   }
 
   Map<String, dynamic> toMap() {
     return {
-      'busId': busId,
-      'routeId': routeId,
-      'totalSeats': totalSeats,
+      'plateNumber': plateNumber,
+      'model': model,
+      'capacity': capacity,
     };
   }
 }

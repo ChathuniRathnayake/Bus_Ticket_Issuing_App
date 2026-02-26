@@ -20,14 +20,11 @@ class SeatMapScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final List<SeatStatus> seatStatuses = List.generate(
-      42,
-      (index) {
-        if (index % 7 == 0) return SeatStatus.booked;
-        if (index % 5 == 0) return SeatStatus.droppingNext;
-        return SeatStatus.available;
-      },
-    );
+    final List<SeatStatus> seatStatuses = List.generate(42, (index) {
+      if (index % 7 == 0) return SeatStatus.booked;
+      if (index % 5 == 0) return SeatStatus.droppingNext;
+      return SeatStatus.available;
+    });
 
     return Scaffold(
       backgroundColor: const Color(0xFFF1FAFB),
@@ -66,6 +63,9 @@ class SeatMapScreen extends StatelessWidget {
                   return SeatWidget(
                     seatNo: seatNo,
                     status: seatStatuses[seatNo - 1],
+                    bus: bus,
+                    conductor: conductor,
+                    route: route,
                   );
                 },
               ),
@@ -93,10 +93,7 @@ class _LegendItem extends StatelessWidget {
   final Color color;
   final String label;
 
-  const _LegendItem({
-    required this.color,
-    required this.label,
-  });
+  const _LegendItem({required this.color, required this.label});
 
   @override
   Widget build(BuildContext context) {

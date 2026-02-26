@@ -36,8 +36,8 @@ class Ticket {
       'boardingStop': boardingStop,
       'dropStop': dropStop,
       'price': price,
-      'busId': bus.busId,
-      'conductorId': conductor.conductorId,
+      'busId': bus.id,
+      'conductorId': conductor.id,
       'issuedAt': issuedAt.toIso8601String(),
     };
   }

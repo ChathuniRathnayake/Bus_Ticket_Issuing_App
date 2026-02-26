@@ -79,7 +79,7 @@ class IssueTicketScreen extends StatelessWidget {
                     const Icon(Icons.person, size: 16, color: Colors.white),
                     const SizedBox(width: 4),
                     Text(
-                      conductor.conductorId,
+                      conductor.userId,
                       style: const TextStyle(
                         color: Colors.white,
                         fontWeight: FontWeight.bold,
@@ -110,7 +110,7 @@ class IssueTicketScreen extends StatelessWidget {
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
-            _infoCard("Bus ID", bus?.busId ?? "BUS-101"),
+            _infoCard("Bus ID", bus?.id ?? "BUS-101"),
             _infoCard("Seat Number", seatNo.toString()),
             _infoCard("Passenger Type", "Adult"),
             _infoCard("Boarding Stop", "Kandy"),
@@ -143,7 +143,8 @@ class IssueTicketScreen extends StatelessWidget {
           ],
         ),
       ),
-      bottomNavigationBar: const ConductorBottomNav(), // <- use your bottom nav here
+      bottomNavigationBar:
+          const ConductorBottomNav(), // <- use your bottom nav here
     );
   }
 

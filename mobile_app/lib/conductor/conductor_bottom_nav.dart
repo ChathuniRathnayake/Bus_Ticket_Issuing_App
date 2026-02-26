@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:mobile_app/conductor/info/trip_info_screen.dart';
 import 'package:mobile_app/conductor/seat_map/seat_map_screen.dart';
-// import 'package:mobile_app/conductor/ticket/issue_ticket_screen.dart';
+import 'package:mobile_app/conductor/ticket/issue_ticket_screen.dart';
 import 'dashboard/conductor_dashboard.dart';
 import '../models/conductor_model.dart';
 import '../models/bus_model.dart';
@@ -25,17 +25,25 @@ class _ConductorBottomNavState extends State<ConductorBottomNav> {
 
     // Dummy objects just for testing
     final dummyConductor = Conductor(
-      conductorId: "TEST123",
+      id: "C001",
+      userId: "TEST123",
+      email: "test@company.com",
       name: "kamal",
       busId: "B001",
-      password: "pass",
-    );
-    final dummyBus = Bus(busId: "BUS-001", routeId: "R001", totalSeats: 50);
-    final dummyRoute = RouteModel(
       routeId: "R001",
-      name: "Test Route", // required
-      nextStop: "Test Stop",
-      stops: ["Stop 1", "Stop 2", "Stop 3"], // required
+    );
+    final dummyBus = Bus(
+      id: "BUS-001",
+      plateNumber: "ABC-1234",
+      model: "Volvo",
+      capacity: 50,
+    );
+    final dummyRoute = RouteModel(
+      id: "R001",
+      name: "Test Route",
+      startPoint: "Origin",
+      endPoint: "Destination",
+      stops: ["Stop 1", "Stop 2", "Stop 3"],
     );
 
     switch (index) {
@@ -53,9 +61,17 @@ class _ConductorBottomNavState extends State<ConductorBottomNav> {
           route: dummyRoute,
         );
         break;
-
+      case 2:
+        // directly open the issue ticket screen with a placeholder seat
+        screen = IssueTicketScreen(
+          seatNo: 1,
+          bus: dummyBus,
+          conductor: dummyConductor,
+          route: dummyRoute,
+        );
+        break;
       case 3:
-        screen = TripInfoScreen(conductorId: dummyConductor.conductorId);
+        screen = TripInfoScreen(conductorId: dummyConductor.userId);
         break;
       default:
         return;

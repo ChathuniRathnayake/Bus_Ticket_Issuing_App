@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:mobile_app/core/services/conductor_auth_service.dart';
-import 'package:mobile_app/models/bus_model.dart';
-import 'package:mobile_app/models/conductor_model.dart';
-import 'package:mobile_app/models/route_model.dart';
+import '../../core/services/conductor_auth_service.dart';
+import '../../models/conductor_model.dart';
+import '../../models/bus_model.dart';
+import '../../models/route_model.dart';
 import '../dashboard/conductor_dashboard.dart';
 import '../../widgets/custom_textfield.dart';
 import '../../widgets/custom_button.dart';
@@ -15,14 +15,14 @@ class ConductorLoginScreen extends StatefulWidget {
 }
 
 class _ConductorLoginScreenState extends State<ConductorLoginScreen> {
-  final TextEditingController userIdController = TextEditingController();
+  final TextEditingController emailController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
   bool _isLoading = false;
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F7FB),
+      backgroundColor: const Color(0xFFF5F7FB), // light background
       body: Container(
         width: double.infinity,
         decoration: const BoxDecoration(
@@ -36,7 +36,7 @@ class _ConductorLoginScreenState extends State<ConductorLoginScreen> {
             const SizedBox(height: 100),
             Image.asset(
               'assets/images/logo.png',
-              height: 120, // Adjusted for layout balance
+              height: 120,
               fit: BoxFit.contain,
             ),
             const SizedBox(height: 30),
@@ -45,42 +45,46 @@ class _ConductorLoginScreenState extends State<ConductorLoginScreen> {
               style: TextStyle(
                 fontSize: 30,
                 fontWeight: FontWeight.bold,
-                color: Colors.white,
+                color: Colors.white, // matches the blue background
               ),
             ),
             const SizedBox(height: 40),
-            // Updated Form Container to match the image
             Expanded(
               child: Container(
                 width: double.infinity,
                 decoration: const BoxDecoration(
-                  color: Colors.white,
+                  color: Colors.white, // white form container
                   borderRadius: BorderRadius.only(
                     topLeft: Radius.circular(50),
                     topRight: Radius.circular(50),
                   ),
                 ),
-                padding: const EdgeInsets.symmetric(horizontal: 35, vertical: 50),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 35, vertical: 50),
                 child: SingleChildScrollView(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      
                       const SizedBox(height: 40),
                       const Text(
-                        "User ID",
-                        style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
+                        "Email",
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 16,
+                        ),
                       ),
                       const SizedBox(height: 10),
-                      // Text field with light blue background from the image
                       CustomTextField(
-                        controller: userIdController,
-                        hint: "User ID",
+                        controller: emailController,
+                        hint: "Email",
                       ),
                       const SizedBox(height: 25),
                       const Text(
                         "Password",
-                        style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 16,
+                        ),
                       ),
                       const SizedBox(height: 10),
                       CustomTextField(
@@ -93,10 +97,12 @@ class _ConductorLoginScreenState extends State<ConductorLoginScreen> {
                           ? const Center(child: CircularProgressIndicator())
                           : SizedBox(
                               width: double.infinity,
-                              height: 55, // Set height to match design
+                              height: 55,
                               child: CustomButton(
                                 text: "Login",
                                 onTap: _handleLogin,
+                                color: const Color(0xFF1B56FD), // primary blue
+                                textColor: Colors.white,
                               ),
                             ),
                     ],
@@ -114,7 +120,7 @@ class _ConductorLoginScreenState extends State<ConductorLoginScreen> {
     setState(() => _isLoading = true);
     final authService = ConductorAuthService();
     final data = await authService.login(
-      userIdController.text.trim(),
+      emailController.text.trim(),
       passwordController.text.trim(),
     );
 
@@ -135,7 +141,7 @@ class _ConductorLoginScreenState extends State<ConductorLoginScreen> {
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text("Invalid UserID or Password"),
+          content: Text("Invalid email or password"),
           behavior: SnackBarBehavior.floating,
           backgroundColor: Colors.redAccent,
         ),
