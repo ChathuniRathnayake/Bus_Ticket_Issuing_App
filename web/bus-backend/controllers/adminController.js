@@ -73,6 +73,40 @@ export const getAdmins = async (req, res) => {
   }
 };
 
+// Update admin
+export const updateAdmin = async (req, res) => {
+  try {
+    const { id } = req.params; // admin UID
+    const { email, password } = req.body;
+
+    if (!id) return res.status(400).json({ message: "Admin ID required" });
+
+    const updateData = {};
+    if (email) updateData.email = email;
+    if (password) updateData.password = password;
+
+    // Update Firebase Auth
+    if (Object.keys(updateData).length > 0) {
+      await admin.auth().updateUser(id, updateData);
+    }
+
+    // Update Firestore - users collection
+    const updateFirestore = {};
+    if (email) updateFirestore.email = email;
+
+    if (Object.keys(updateFirestore).length > 0) {
+      await db.collection("users").doc(id).update(updateFirestore);
+      await db.collection("admins").doc(id).update(updateFirestore);
+    }
+
+    res.json({ message: "Admin updated successfully" });
+
+  } catch (error) {
+    console.error("Update admin error:", error);
+    res.status(500).json({ message: error.message || "Server error" });
+  }
+};
+
 // Delete admin
 export const deleteAdmin = async (req, res) => {
   try {
