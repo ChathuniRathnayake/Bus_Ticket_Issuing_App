@@ -55,12 +55,12 @@ export default function ManageAdmins() {
 
   // Save updated admin to backend
   const handleSave = async (index) => {
-    const admin = admins[index];
+    const admin = admins[index]; // ✅ use admin.id
     try {
       await axios.put(
-        `http://localhost:5000/api/admin/${id}`, 
+        `http://localhost:5000/api/admin/${admin.id}`,
         { email: form.email, password: form.password },
-        { headers: { Authorization: `Bearer ${token}` } } // Auth header
+        { headers: { Authorization: `Bearer ${token}` } }
       );
       alert("Admin updated successfully");
       fetchAdmins(); // refresh data
@@ -81,7 +81,7 @@ export default function ManageAdmins() {
         headers: { Authorization: `Bearer ${token}` },
       });
       alert("Admin deleted successfully");
-      fetchAdmins(); // refresh data
+      fetchAdmins();
     } catch (error) {
       console.error(error);
       alert(error.response?.data?.message || "Failed to delete admin");
