@@ -1,9 +1,11 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+
 import { ArrowLeft, User, Save, Upload } from "lucide-react";
 
 export default function Profile() {
@@ -14,45 +16,125 @@ export default function Profile() {
     lastName: "",
     email: "",
     phone: "",
-    profilePic: "", // base64 or URL
+    profilePic: "",
   });
 
-  // Load profile from localStorage once on mount
- useEffect(() => {
-  const saved = localStorage.getItem("passengerProfile");
-  if (saved) {
-    try {
-      setProfile(JSON.parse(saved));
-    } catch (err) {
-      console.error("Failed to parse saved profile:", err);
-    }
-  }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-}, []); // ← empty array is fine here // ← this fixes the red line
+  const token = localStorage.getItem("token");
 
+  // =========================
+  // LOAD PROFILE FROM BACKEND
+  // =========================
+  useEffect(() => {
+    if (!token) {
+      navigate("/passenger-login");
+      return;
+    }
+
+    const fetchProfile = async () => {
+      try {
+        const res = await fetch(
+          "http://localhost:5000/api/passenger/profile",
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
+
+        const data = await res.json();
+
+        if (!res.ok) {
+          throw new Error(data.message);
+        }
+
+        setProfile(data);
+
+        // Cache locally for dashboard use
+        localStorage.setItem(
+          "passengerProfile",
+          JSON.stringify(data)
+        );
+
+      } catch (error) {
+        console.error(error);
+        alert("Failed to load profile");
+      }
+    };
+
+    fetchProfile();
+  }, [token, navigate]);
+
+  // =========================
+  // HANDLE INPUT CHANGE
+  // =========================
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setProfile((prev) => ({ ...prev, [name]: value }));
+
+    setProfile((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
   };
 
+  // =========================
+  // IMAGE UPLOAD (BASE64)
+  // =========================
   const handleImageUpload = (e) => {
     const file = e.target.files[0];
     if (!file) return;
 
     const reader = new FileReader();
+
     reader.onloadend = () => {
-      setProfile((prev) => ({ ...prev, profilePic: reader.result }));
+      setProfile((prev) => ({
+        ...prev,
+        profilePic: reader.result,
+      }));
     };
+
     reader.readAsDataURL(file);
   };
 
-  const handleSave = () => {
-    localStorage.setItem("passengerProfile", JSON.stringify(profile));
-    alert("Profile saved successfully!");
+  // =========================
+  // SAVE PROFILE TO BACKEND
+  // =========================
+  const handleSave = async () => {
+    try {
+      const res = await fetch(
+        "http://localhost:5000/api/passenger/profile",
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify(profile),
+        }
+      );
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.message);
+      }
+
+      // Update cache
+      localStorage.setItem(
+        "passengerProfile",
+        JSON.stringify(profile)
+      );
+
+      alert("Profile saved successfully!");
+
+    } catch (error) {
+      console.error(error);
+      alert("Failed to save profile");
+    }
   };
 
   return (
     <div className="max-w-4xl mx-auto p-6 bg-background/50 animate-fade-in">
+      
       {/* Header */}
       <div className="flex items-center gap-4 mb-8">
         <Button
@@ -60,20 +142,31 @@ export default function Profile() {
           onClick={() => navigate("/passenger-dashboard")}
           className="h-10 gap-2 hover:bg-muted transition-all duration-300 cursor-pointer"
         >
-          <ArrowLeft className="h-5 w-5" /> Back to Dashboard
+          <ArrowLeft className="h-5 w-5" />
+          Back to Dashboard
         </Button>
-        <h2 className="text-3xl font-bold tracking-tight">My Profile</h2>
+
+        <h2 className="text-3xl font-bold tracking-tight">
+          My Profile
+        </h2>
       </div>
 
       <Card className="shadow-lg rounded-2xl border-border">
         <CardHeader>
-          <CardTitle className="text-2xl">Personal Information</CardTitle>
-          <CardDescription>Update your profile details</CardDescription>
+          <CardTitle className="text-2xl">
+            Personal Information
+          </CardTitle>
+
+          <CardDescription>
+            Update your profile details
+          </CardDescription>
         </CardHeader>
 
         <CardContent className="space-y-8 pt-6">
+
           {/* Profile Picture */}
           <div className="flex flex-col items-center sm:flex-row sm:items-start gap-6">
+            
             <div className="relative w-32 h-32">
               {profile.profilePic ? (
                 <img
@@ -89,10 +182,12 @@ export default function Profile() {
             </div>
 
             <div className="flex-1 space-y-4">
-              <Label htmlFor="profilePic" className="text-sm font-medium">
+              <Label htmlFor="profilePic">
                 Profile Picture
               </Label>
+
               <div className="flex items-center gap-4 flex-wrap">
+                
                 <label
                   htmlFor="profilePic"
                   className="cursor-pointer px-4 py-2 bg-muted hover:bg-muted/80 rounded-md transition-colors flex items-center gap-2"
@@ -100,6 +195,7 @@ export default function Profile() {
                   <Upload className="h-4 w-4" />
                   Upload Photo
                 </label>
+
                 <Input
                   id="profilePic"
                   type="file"
@@ -107,71 +203,63 @@ export default function Profile() {
                   onChange={handleImageUpload}
                   className="hidden"
                 />
+
                 {profile.profilePic && (
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => setProfile((prev) => ({ ...prev, profilePic: "" }))}
+                    onClick={() =>
+                      setProfile((prev) => ({
+                        ...prev,
+                        profilePic: "",
+                      }))
+                    }
                   >
                     Remove
                   </Button>
                 )}
               </div>
-              <p className="text-xs text-muted-foreground">
-                Recommended: Square image (e.g., 400×400), max 2MB
-              </p>
             </div>
           </div>
 
           {/* Form */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+
             <div className="space-y-2">
-              <Label htmlFor="firstName">First Name</Label>
+              <Label>First Name</Label>
               <Input
-                id="firstName"
                 name="firstName"
                 value={profile.firstName}
                 onChange={handleChange}
-                placeholder="Enter your first name"
                 className="h-11"
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="lastName">Last Name</Label>
+              <Label>Last Name</Label>
               <Input
-                id="lastName"
                 name="lastName"
                 value={profile.lastName}
                 onChange={handleChange}
-                placeholder="Enter your last name"
                 className="h-11"
               />
             </div>
 
             <div className="space-y-2 md:col-span-2">
-              <Label htmlFor="email">Email</Label>
+              <Label>Email</Label>
               <Input
-                id="email"
-                name="email"
-                type="email"
                 value={profile.email}
-                onChange={handleChange}
-                placeholder="your.email@example.com"
+                disabled
                 className="h-11"
-                disabled // Usually not changeable without verification
               />
             </div>
 
             <div className="space-y-2 md:col-span-2">
-              <Label htmlFor="phone">Phone Number</Label>
+              <Label>Phone</Label>
               <Input
-                id="phone"
                 name="phone"
-                type="tel"
                 value={profile.phone}
                 onChange={handleChange}
-                placeholder="+94 77 123 4567"
                 className="h-11"
               />
             </div>
@@ -187,6 +275,7 @@ export default function Profile() {
               Save Profile
             </Button>
           </div>
+
         </CardContent>
       </Card>
     </div>

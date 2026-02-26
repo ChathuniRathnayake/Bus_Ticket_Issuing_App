@@ -1,25 +1,36 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Bus, UserPlus } from "lucide-react";
+import { UserPlus } from "lucide-react";
 
 export default function Register() {
   const navigate = useNavigate();
-  const [form, setForm] = useState({ email: "", password: "", confirmPassword: "" });
+
+  const [form, setForm] = useState({
+    email: "",
+    password: "",
+    confirmPassword: "",
+  });
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
   const handleChange = (e) => {
-    setForm({ ...form, [e.target.name]: e.target.value });
+    setForm({
+      ...form,
+      [e.target.name]: e.target.value,
+    });
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
 
+    // ✅ Validations (unchanged)
     if (form.password !== form.confirmPassword) {
       setError("Passwords do not match");
       return;
@@ -35,39 +46,72 @@ export default function Register() {
       return;
     }
 
-    setLoading(true);
+    try {
+      setLoading(true);
 
-    setTimeout(() => {
-      // Mock registration success
-      localStorage.setItem("token", "mock-passenger-token-" + Date.now());
-      localStorage.setItem("userEmail", form.email);
-      // Create empty profile (fill later in Profile page)
-      localStorage.setItem(
-        "passengerProfile",
-        JSON.stringify({ email: form.email, firstName: "", lastName: "", phone: "", profilePic: "" })
+      // 🔌 CALL BACKEND REGISTER API
+      const res = await fetch(
+        "http://localhost:5000/api/passenger/register",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            email: form.email,
+            password: form.password,
+          }),
+        }
       );
 
-      alert("Registration successful! Welcome!");
-      navigate("/passenger-dashboard");
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.message || "Registration failed");
+      }
+
+      alert("Registration successful! Please login.");
+
+      // Redirect to login
+      navigate("/passenger-login");
+
+    } catch (error) {
+      console.error(error);
+      setError(error.message);
+    } finally {
       setLoading(false);
-    }, 800);
+    }
   };
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-zinc-50 to-zinc-100 p-6">
       <Card className="w-full max-w-md shadow-2xl rounded-3xl border-border overflow-hidden">
+        
         <CardHeader className="text-center pb-2">
           <div className="mx-auto w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mb-4">
             <UserPlus className="h-8 w-8" />
           </div>
-          <CardTitle className="text-3xl font-bold">Register</CardTitle>
-          <CardDescription>Create your account to start booking</CardDescription>
+
+          <CardTitle className="text-3xl font-bold">
+            Register
+          </CardTitle>
+
+          <CardDescription>
+            Create your account to start booking
+          </CardDescription>
         </CardHeader>
 
         <CardContent className="px-8 pb-8 pt-4 space-y-6">
-          {error && <p className="text-red-600 text-center text-sm">{error}</p>}
+          
+          {error && (
+            <p className="text-red-600 text-center text-sm">
+              {error}
+            </p>
+          )}
 
           <form onSubmit={handleSubmit} className="space-y-5">
+
+            {/* Email */}
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
               <Input
@@ -82,6 +126,7 @@ export default function Register() {
               />
             </div>
 
+            {/* Password */}
             <div className="space-y-2">
               <Label htmlFor="password">Password</Label>
               <Input
@@ -96,8 +141,11 @@ export default function Register() {
               />
             </div>
 
+            {/* Confirm Password */}
             <div className="space-y-2">
-              <Label htmlFor="confirmPassword">Confirm Password</Label>
+              <Label htmlFor="confirmPassword">
+                Confirm Password
+              </Label>
               <Input
                 id="confirmPassword"
                 name="confirmPassword"
@@ -110,6 +158,7 @@ export default function Register() {
               />
             </div>
 
+            {/* Submit */}
             <Button
               type="submit"
               disabled={loading}
@@ -119,9 +168,14 @@ export default function Register() {
             </Button>
           </form>
 
+          {/* Login Link */}
           <p className="text-center text-sm text-muted-foreground mt-4">
             Already have an account?{" "}
-            <Button variant="link" onClick={() => navigate("/passenger-login")} className="text-blue-600 hover:underline p-0">
+            <Button
+              variant="link"
+              onClick={() => navigate("/passenger-login")}
+              className="text-blue-600 hover:underline p-0"
+            >
               Login here
             </Button>
           </p>

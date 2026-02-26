@@ -1,9 +1,63 @@
-// routes/passengerRoutes.js
-// const express = require("express");
-// const router = express.Router();
-// const { loginPassenger, registerPassenger } = require("../controllers/passengerController");
+import express from "express";
+import {
+  registerPassenger,
+  loginPassenger,
+  getPassengerProfile,
+  updatePassengerProfile,
+  searchBuses,
+  getBusSeats,
+  bookSeat
+} from "../controllers/passengerController.js";
 
-// router.post("/login", loginPassenger);
-// router.post("/register", registerPassenger);
+import { verifyToken } from "../middleware/authMiddleware.js";
 
-// module.exports = router;
+const router = express.Router();
+
+
+// =========================
+// 🔐 AUTH
+// =========================
+
+// Register passenger
+router.post("/register", registerPassenger);
+
+// Login passenger
+router.post("/login", loginPassenger);
+
+
+// =========================
+// 👤 PROFILE
+// =========================
+
+// Get logged passenger profile
+router.get("/profile", verifyToken, getPassengerProfile);
+
+// Update profile
+router.put("/profile", verifyToken, updatePassengerProfile);
+
+
+// =========================
+// 🔎 BUS SEARCH
+// =========================
+
+// Get all buses (search later can filter)
+router.get("/search-buses", searchBuses);
+
+
+// =========================
+// 💺 SEATS
+// =========================
+
+// Get seat layout of bus
+router.get("/bus/:busId/seats", getBusSeats);
+
+
+// =========================
+// 🎟 BOOKING
+// =========================
+
+// Book seat
+router.post("/book-seat", verifyToken, bookSeat);
+
+
+export default router;
