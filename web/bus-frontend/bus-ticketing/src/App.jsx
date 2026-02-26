@@ -30,16 +30,16 @@ export default function App() {
 
   // Load data from localStorage on app start
   useEffect(() => {
-    const storedBuses = localStorage.getItem("buses");
-    if (storedBuses) {
-      setBusesState(JSON.parse(storedBuses));
-    }
-
-    const storedRoutes = localStorage.getItem("routes");
-    if (storedRoutes) {
-      setRoutesState(JSON.parse(storedRoutes));
-    }
-  }, []);
+  const storedBuses = localStorage.getItem("buses");
+  if (storedBuses) {
+    setBusesState(JSON.parse(storedBuses));
+  }
+  const storedRoutes = localStorage.getItem("routes");
+  if (storedRoutes) {
+    setRoutesState(JSON.parse(storedRoutes));
+  }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+}, []);
 
   // Save functions (auto-save to localStorage)
   const setBuses = (newBuses) => {

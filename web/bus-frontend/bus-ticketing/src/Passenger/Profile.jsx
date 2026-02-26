@@ -18,16 +18,17 @@ export default function Profile() {
   });
 
   // Load profile from localStorage once on mount
-  useEffect(() => {
-    const saved = localStorage.getItem("passengerProfile");
-    if (saved) {
-      try {
-        setProfile(JSON.parse(saved));
-      } catch (err) {
-        console.error("Failed to parse saved profile:", err);
-      }
+ useEffect(() => {
+  const saved = localStorage.getItem("passengerProfile");
+  if (saved) {
+    try {
+      setProfile(JSON.parse(saved));
+    } catch (err) {
+      console.error("Failed to parse saved profile:", err);
     }
-  }, [setProfile]); // ← this fixes the red line
+  }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+}, []); // ← empty array is fine here // ← this fixes the red line
 
   const handleChange = (e) => {
     const { name, value } = e.target;
