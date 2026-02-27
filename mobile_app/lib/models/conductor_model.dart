@@ -1,31 +1,38 @@
 class Conductor {
-  final String conductorId;
+  final String id;        // Firestore document ID
+  final String userId;    // custom user identifier
+  final String email;
   final String name;
-  final String busId;
-  final String password;
+  final String? busId;
+  final String? routeId;
 
   Conductor({
-    required this.conductorId,
+    required this.id,
+    required this.userId,
+    required this.email,
     required this.name,
-    required this.busId,
-    required this.password,
+    this.busId,
+    this.routeId,
   });
 
-  factory Conductor.fromMap(Map<String, dynamic> map) {
+  factory Conductor.fromMap(Map<String, dynamic> map, {String? id}) {
     return Conductor(
-      conductorId: map['conductorId'] ?? '',
+      id: id ?? map['id'] ?? '',
+      userId: map['userId'] ?? '',
+      email: map['email'] ?? '',
       name: map['name'] ?? '',
-      busId: map['busId'] ?? '',
-      password: map['password'] ?? '',
+      busId: map['busId'],
+      routeId: map['routeId'],
     );
   }
 
   Map<String, dynamic> toMap() {
     return {
-      'conductorId': conductorId,
+      'userId': userId,
+      'email': email,
       'name': name,
       'busId': busId,
-      'password': password,
+      'routeId': routeId,
     };
   }
 }

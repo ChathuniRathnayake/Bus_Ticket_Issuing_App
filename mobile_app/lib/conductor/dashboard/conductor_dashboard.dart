@@ -45,18 +45,27 @@ class ConductorDashboard extends StatelessWidget {
             children: [
               // Back Button
               IconButton(
-                icon: const Icon(Icons.arrow_back, color: Colors.white, size: 28),
+                icon: const Icon(
+                  Icons.arrow_back,
+                  color: Colors.white,
+                  size: 28,
+                ),
                 onPressed: () {
                   Navigator.pushReplacement(
                     context,
-                    MaterialPageRoute(builder: (_) => const ConductorLoginScreen()),
+                    MaterialPageRoute(
+                      builder: (_) => const ConductorLoginScreen(),
+                    ),
                   );
                 },
               ),
 
               // Conductor ID pill
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 6,
+                ),
                 decoration: BoxDecoration(
                   color: const Color(0xFF00ACC1),
                   borderRadius: BorderRadius.circular(20),
@@ -66,7 +75,7 @@ class ConductorDashboard extends StatelessWidget {
                     const Icon(Icons.person, size: 16, color: Colors.white),
                     const SizedBox(width: 4),
                     Text(
-                      conductor.conductorId,
+                      conductor.userId,
                       style: const TextStyle(
                         color: Colors.white,
                         fontWeight: FontWeight.bold,
@@ -82,7 +91,9 @@ class ConductorDashboard extends StatelessWidget {
                 onPressed: () {
                   Navigator.pushReplacement(
                     context,
-                    MaterialPageRoute(builder: (_) => const ConductorLoginScreen()),
+                    MaterialPageRoute(
+                      builder: (_) => const ConductorLoginScreen(),
+                    ),
                   );
                 },
               ),
@@ -130,7 +141,7 @@ class ConductorDashboard extends StatelessWidget {
                         icon: Icons.directions_bus,
                         title: "Bus Information",
                         details: {
-                          "Bus ID": bus?.busId ?? "BUS-101",
+                          "Bus ID": bus?.id ?? "BUS-101",
                           "Route": route?.name ?? "Downtown Express",
                         },
                       ),
@@ -139,7 +150,9 @@ class ConductorDashboard extends StatelessWidget {
                         title: "Location Status",
                         details: {
                           "Current Location": "Market Square",
-                          "Next Stop": route?.nextStop ?? "University Campus",
+                          "Next Stop": route?.stops?.isNotEmpty == true
+                              ? route!.stops!.first
+                              : route?.endPoint ?? "University Campus",
                         },
                       ),
                       _buildInfoCard(
@@ -229,7 +242,10 @@ class ConductorDashboard extends StatelessWidget {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(entry.key, style: TextStyle(color: Colors.grey[600], fontSize: 14)),
+                  Text(
+                    entry.key,
+                    style: TextStyle(color: Colors.grey[600], fontSize: 14),
+                  ),
                   Text(
                     entry.value,
                     style: TextStyle(

@@ -1,67 +1,43 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:mobile_app/models/conductor_model.dart';
-import 'package:mobile_app/models/bus_model.dart';
-import 'package:mobile_app/models/route_model.dart';
+import '../../models/conductor_model.dart';
+import '../../models/bus_model.dart';
+import '../../models/route_model.dart';
 
 class ConductorAuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  /// LOGIN CONDUCTOR
-  Future<Map<String, dynamic>?> login(
-      String userId, String password) async {
+  /// Login with email and password
+  Future<Map<String, dynamic>?> login(String email, String password) async {
     try {
-      // Sign in (userId must be email in Firebase)
+      // Authenticate with Firebase Auth
       final credential = await _auth.signInWithEmailAndPassword(
-        email: userId,
+        email: email,
         password: password,
       );
 
-      final uid = credential.user!.uid;
+      final userId = credential.user!.uid;
 
-      // Verify role
-      final userDoc =
-          await _firestore.collection('users').doc(uid).get();
+      // Fetch conductor document from Firestore
+      final doc = await _firestore.collection('conductors').doc(userId).get();
+      if (!doc.exists) return null;
 
-      if (!userDoc.exists || userDoc['role'] != 'conductor') {
-        await _auth.signOut();
-        return null;
-      }
+      final conductor = Conductor.fromMap(doc.data()!, id: doc.id);
 
-      // Get conductor document
-      final conductorDoc =
-          await _firestore.collection('conductors').doc(uid).get();
-
-      if (!conductorDoc.exists) return null;
-
-      final conductor =
-          Conductor.fromMap(conductorDoc.data()!);
-
-      // Get assigned bus (optional)
       Bus? bus;
-      if (conductorDoc.data()!.containsKey('busId')) {
-        final busDoc = await _firestore
-            .collection('buses')
-            .doc(conductorDoc['busId'])
-            .get();
+      RouteModel? route;
 
-        if (busDoc.exists) {
-          bus = Bus.fromMap(busDoc.data()!);
-        }
+      // Fetch bus if linked
+      if (conductor.busId != null) {
+        final busDoc = await _firestore.collection('buses').doc(conductor.busId).get();
+        if (busDoc.exists) bus = Bus.fromMap(busDoc.data()!, id: busDoc.id);
       }
 
-      // Get assigned route (optional)
-      RouteModel? route;
-      if (conductorDoc.data()!.containsKey('routeId')) {
-        final routeDoc = await _firestore
-            .collection('routes')
-            .doc(conductorDoc['routeId'])
-            .get();
-
-        if (routeDoc.exists) {
-          route = RouteModel.fromMap(routeDoc.data()!);
-        }
+      // Fetch route if linked
+      if (conductor.routeId != null) {
+        final routeDoc = await _firestore.collection('routes').doc(conductor.routeId).get();
+        if (routeDoc.exists) route = RouteModel.fromMap(routeDoc.data()!, id: routeDoc.id);
       }
 
       return {
@@ -69,35 +45,13 @@ class ConductorAuthService {
         'bus': bus,
         'route': route,
       };
+    } on FirebaseAuthException catch (e) {
+      print('Auth Error: ${e.message}');
+      return null;
     } catch (e) {
+      print('Login Error: $e');
       return null;
     }
-  }
-
-  /// REGISTER CONDUCTOR
-  Future<UserCredential> registerConductor({
-    required String email,
-    required String password,
-  }) async {
-    final credential = await _auth.createUserWithEmailAndPassword(
-      email: email,
-      password: password,
-    );
-
-    final uid = credential.user!.uid;
-
-    await _firestore.collection('users').doc(uid).set({
-      'email': email,
-      'role': 'conductor',
-      'createdAt': Timestamp.now(),
-    });
-
-    await _firestore.collection('conductors').doc(uid).set({
-      'email': email,
-      'createdAt': Timestamp.now(),
-    });
-
-    return credential;
   }
 
   Future<void> logout() async {

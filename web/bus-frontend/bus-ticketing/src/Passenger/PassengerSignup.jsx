@@ -1,85 +1,184 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Bus } from "lucide-react";
+import { UserPlus } from "lucide-react";
 
 export default function Register() {
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
   const navigate = useNavigate();
+
+  const [form, setForm] = useState({
+    email: "",
+    password: "",
+    confirmPassword: "",
+  });
+
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const handleChange = (e) => {
+    setForm({
+      ...form,
+      [e.target.name]: e.target.value,
+    });
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setError("");
 
-    const res = await fetch("http://localhost:5000/api/passenger/register", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username, password }),
-    });
+    // ✅ Validations (unchanged)
+    if (form.password !== form.confirmPassword) {
+      setError("Passwords do not match");
+      return;
+    }
 
-    const data = await res.json();
+    if (form.password.length < 6) {
+      setError("Password must be at least 6 characters");
+      return;
+    }
 
-    if (res.ok) {
-      alert("✅ Signup Successful!\nYou can now login with your credentials.");
-      navigate("/passenger-login");     // Navigate to login after success
-    } else {
-      alert(data.message || "Signup failed");
+    if (!form.email.includes("@")) {
+      setError("Please enter a valid email");
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      // 🔌 CALL BACKEND REGISTER API
+      const res = await fetch(
+        "http://localhost:5000/api/passenger/register",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            email: form.email,
+            password: form.password,
+          }),
+        }
+      );
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.message || "Registration failed");
+      }
+
+      alert("Registration successful! Please login.");
+
+      // Redirect to login
+      navigate("/passenger-login");
+
+    } catch (error) {
+      console.error(error);
+      setError(error.message);
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <div className="flex min-h-[80vh] items-center justify-center">
-      <Card className="w-full max-w-md">
-        <CardHeader className="space-y-1 text-center">
-          <div className="mx-auto w-12 h-12 bg-blue-600 text-white rounded-2xl flex items-center justify-center">
-            <Bus className="h-7 w-7" />
+    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-zinc-50 to-zinc-100 p-6">
+      <Card className="w-full max-w-md shadow-2xl rounded-3xl border-border overflow-hidden">
+        
+        <CardHeader className="text-center pb-2">
+          <div className="mx-auto w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mb-4">
+            <UserPlus className="h-8 w-8" />
           </div>
-          <CardTitle className="text-3xl">Create Account</CardTitle>
-          <CardDescription>Join thousands of happy passengers</CardDescription>
+
+          <CardTitle className="text-3xl font-bold">
+            Register
+          </CardTitle>
+
+          <CardDescription>
+            Create your account to start booking
+          </CardDescription>
         </CardHeader>
 
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-6">
+        <CardContent className="px-8 pb-8 pt-4 space-y-6">
+          
+          {error && (
+            <p className="text-red-600 text-center text-sm">
+              {error}
+            </p>
+          )}
+
+          <form onSubmit={handleSubmit} className="space-y-5">
+
+            {/* Email */}
             <div className="space-y-2">
-              <Label htmlFor="username">Username</Label>
+              <Label htmlFor="email">Email</Label>
               <Input
-                id="username"
-                placeholder="Choose a username"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
+                id="email"
+                name="email"
+                type="email"
+                value={form.email}
+                onChange={handleChange}
+                placeholder="your.email@example.com"
+                className="h-11"
                 required
               />
             </div>
+
+            {/* Password */}
             <div className="space-y-2">
               <Label htmlFor="password">Password</Label>
               <Input
                 id="password"
+                name="password"
                 type="password"
-                placeholder="Create a strong password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                value={form.password}
+                onChange={handleChange}
+                placeholder="••••••••"
+                className="h-11"
                 required
               />
             </div>
 
-            <Button 
-              type="submit" 
-              className="w-full h-12 bg-green-600 hover:bg-green-700 text-lg cursor-pointer"
+            {/* Confirm Password */}
+            <div className="space-y-2">
+              <Label htmlFor="confirmPassword">
+                Confirm Password
+              </Label>
+              <Input
+                id="confirmPassword"
+                name="confirmPassword"
+                type="password"
+                value={form.confirmPassword}
+                onChange={handleChange}
+                placeholder="••••••••"
+                className="h-11"
+                required
+              />
+            </div>
+
+            {/* Submit */}
+            <Button
+              type="submit"
+              disabled={loading}
+              className="w-full h-11 bg-emerald-600 hover:bg-emerald-700 text-white font-medium"
             >
-              Create Account
+              {loading ? "Registering..." : "Register"}
             </Button>
           </form>
 
-          <Button 
-            variant="link" 
-            onClick={() => navigate("/passenger-login")}
-            className="w-full mt-4 cursor-pointer"
-          >
-            ← Back to Login
-          </Button>
+          {/* Login Link */}
+          <p className="text-center text-sm text-muted-foreground mt-4">
+            Already have an account?{" "}
+            <Button
+              variant="link"
+              onClick={() => navigate("/passenger-login")}
+              className="text-blue-600 hover:underline p-0"
+            >
+              Login here
+            </Button>
+          </p>
         </CardContent>
       </Card>
     </div>
