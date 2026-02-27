@@ -129,7 +129,7 @@ class _BookingConfirmedScreenState extends State<BookingConfirmedScreen> {
             onPressed: () {
               Navigator.pushAndRemoveUntil(
                 context,
-                MaterialPageRoute(builder: (_) => const PassengerLoginScreen()),
+                MaterialPageRoute(builder: (_) => const LoginScreen()),
                 (route) => false,
               );
             },

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/custom_textfield.dart';
+import '../../core/services/passenger_auth_service.dart';
+import 'passenger_login.dart';
 
 class PassengerSignUpScreen extends StatefulWidget {
   const PassengerSignUpScreen({super.key});
@@ -13,7 +15,32 @@ class _PassengerSignUpScreenState extends State<PassengerSignUpScreen> {
   final TextEditingController nameController = TextEditingController();
   final TextEditingController emailController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
-  final bool _isLoading = false;
+  bool _isLoading = false;
+
+  final PassengerAuthService _authService = PassengerAuthService();
+
+  void _signup() async {
+    setState(() => _isLoading = true);
+    try {
+      await _authService.registerPassenger(
+        email: emailController.text.trim(),
+        password: passwordController.text.trim(),
+      );
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Account created successfully!")),
+      );
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const LoginScreen()),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString()), backgroundColor: Colors.red),
+      );
+    } finally {
+      setState(() => _isLoading = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -42,23 +69,12 @@ class _PassengerSignUpScreenState extends State<PassengerSignUpScreen> {
               'assets/images/logo.png',
               height: 100,
               fit: BoxFit.contain,
-              errorBuilder: (context, error, stackTrace) => const Text(
-                "TicketGo",
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
             ),
             const SizedBox(height: 15),
             const Text(
               "Create Account",
               style: TextStyle(
-                fontSize: 28,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
-              ),
+                  fontSize: 28, fontWeight: FontWeight.bold, color: Colors.white),
             ),
             const SizedBox(height: 30),
             Expanded(
@@ -66,46 +82,25 @@ class _PassengerSignUpScreenState extends State<PassengerSignUpScreen> {
                 width: double.infinity,
                 decoration: const BoxDecoration(
                   color: Colors.white,
-                  borderRadius: BorderRadius.only(
-                    topLeft: Radius.circular(50),
-                    topRight: Radius.circular(50),
-                  ),
+                  borderRadius:
+                      BorderRadius.only(topLeft: Radius.circular(50), topRight: Radius.circular(50)),
                 ),
                 padding: const EdgeInsets.symmetric(horizontal: 35, vertical: 40),
                 child: SingleChildScrollView(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
-                        "Full Name",
-                        style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
-                      ),
+                      const Text("Full Name", style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
                       const SizedBox(height: 10),
-                      CustomTextField(
-                        controller: nameController,
-                        hint: "Full Name",
-                      ),
+                      CustomTextField(controller: nameController, hint: "Full Name"),
                       const SizedBox(height: 20),
-                      const Text(
-                        "Email",
-                        style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
-                      ),
+                      const Text("Email", style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
                       const SizedBox(height: 10),
-                      CustomTextField(
-                        controller: emailController,
-                        hint: "Email",
-                      ),
+                      CustomTextField(controller: emailController, hint: "Email"),
                       const SizedBox(height: 20),
-                      const Text(
-                        "Password",
-                        style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
-                      ),
+                      const Text("Password", style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
                       const SizedBox(height: 10),
-                      CustomTextField(
-                        controller: passwordController,
-                        hint: "Password",
-                        obscure: true,
-                      ),
+                      CustomTextField(controller: passwordController, hint: "Password", obscure: true),
                       const SizedBox(height: 40),
                       _isLoading
                           ? const Center(child: CircularProgressIndicator())
@@ -114,12 +109,7 @@ class _PassengerSignUpScreenState extends State<PassengerSignUpScreen> {
                               height: 55,
                               child: CustomButton(
                                 text: "Sign Up",
-                                onTap: () {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(content: Text("Account Created Simulated")),
-                                  );
-                                  Navigator.pop(context);
-                                },
+                                onTap: _signup,
                               ),
                             ),
                       const SizedBox(height: 20),
