@@ -8,34 +8,26 @@ import { Label } from "@/components/ui/label";
 import { Bus } from "lucide-react";
 
 export default function PassengerLogin() {
-  const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
 
   const navigate = useNavigate();
 
   const handleLogin = async () => {
-    if (!username || !password) {
-      alert("Please enter username and password");
+    if (!email || !password) {
+      alert("Please enter email and password");
       return;
     }
 
     try {
       setLoading(true);
 
-      const res = await fetch(
-        "http://localhost:5000/api/passenger/login",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            username,
-            password,
-          }),
-        }
-      );
+      const res = await fetch("http://localhost:5000/api/passenger/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
 
       const data = await res.json();
 
@@ -43,18 +35,13 @@ export default function PassengerLogin() {
         throw new Error(data.message || "Login failed");
       }
 
-      // ✅ Store token for protected routes
+      // Store the token (custom Firebase token)
       localStorage.setItem("token", data.token);
 
-      // ✅ Store passenger profile (optional but used in dashboard)
-      localStorage.setItem(
-        "passengerProfile",
-        JSON.stringify(data.passenger)
-      );
+      // Store passenger profile
+      localStorage.setItem("passengerProfile", JSON.stringify(data.passenger));
 
       alert("Login successful!");
-
-      // ✅ Redirect to dashboard
       navigate("/passenger-dashboard");
 
     } catch (error) {
@@ -66,49 +53,50 @@ export default function PassengerLogin() {
   };
 
   return (
-    <div className="flex min-h-[80vh] items-center justify-center">
-      <Card className="w-full max-w-md">
-        <CardHeader className="space-y-1 text-center">
-          <div className="mx-auto w-12 h-12 bg-blue-600 text-white rounded-2xl flex items-center justify-center">
+    <div className="flex min-h-[80vh] items-center justify-center bg-gradient-to-br from-zinc-50 to-zinc-100 p-6">
+      <Card className="w-full max-w-md shadow-2xl rounded-3xl border-border overflow-hidden">
+        
+        <CardHeader className="space-y-1 text-center pb-2">
+          <div className="mx-auto w-14 h-14 bg-blue-600 text-white rounded-2xl flex items-center justify-center mb-3">
             <Bus className="h-7 w-7" />
           </div>
-          <CardTitle className="text-3xl">
+
+          <CardTitle className="text-3xl font-bold">
             Passenger Login
           </CardTitle>
+
           <CardDescription>
             Book your bus tickets easily
           </CardDescription>
         </CardHeader>
 
-        <CardContent className="space-y-6">
-          {/* Username */}
+        <CardContent className="space-y-6 px-8 pb-8 pt-4">
+          
+          {/* Email */}
           <div className="space-y-2">
-            <Label htmlFor="username">
-              Username
-            </Label>
+            <Label htmlFor="email">Email</Label>
             <Input
-              id="username"
-              placeholder="Enter your username"
-              value={username}
-              onChange={(e) =>
-                setUsername(e.target.value)
-              }
+              id="email"
+              type="email"
+              placeholder="your.email@example.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="h-11"
+              required
             />
           </div>
 
           {/* Password */}
           <div className="space-y-2">
-            <Label htmlFor="password">
-              Password
-            </Label>
+            <Label htmlFor="password">Password</Label>
             <Input
               id="password"
               type="password"
-              placeholder="••••••••"
+              placeholder="password"
               value={password}
-              onChange={(e) =>
-                setPassword(e.target.value)
-              }
+              onChange={(e) => setPassword(e.target.value)}
+              className="h-11"
+              required
             />
           </div>
 
@@ -116,7 +104,7 @@ export default function PassengerLogin() {
           <Button
             onClick={handleLogin}
             disabled={loading}
-            className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-lg cursor-pointer"
+            className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-lg"
           >
             {loading ? "Logging in..." : "Login"}
           </Button>
@@ -126,7 +114,6 @@ export default function PassengerLogin() {
             <Button
               variant="link"
               onClick={() => navigate("/admin-login")}
-              className="cursor-pointer"
             >
               Admin Login →
             </Button>
@@ -134,11 +121,11 @@ export default function PassengerLogin() {
             <Button
               variant="link"
               onClick={() => navigate("/register")}
-              className="cursor-pointer"
             >
               Create Account
             </Button>
           </div>
+
         </CardContent>
       </Card>
     </div>

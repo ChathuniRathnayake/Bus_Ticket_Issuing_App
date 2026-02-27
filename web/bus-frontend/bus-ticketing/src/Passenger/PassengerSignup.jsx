@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { UserPlus } from "lucide-react";
 
-export default function Register() {
+export default function PassengerSignup() {
   const navigate = useNavigate();
 
   const [form, setForm] = useState({
@@ -30,7 +30,6 @@ export default function Register() {
     e.preventDefault();
     setError("");
 
-    // ✅ Validations (unchanged)
     if (form.password !== form.confirmPassword) {
       setError("Passwords do not match");
       return;
@@ -41,15 +40,9 @@ export default function Register() {
       return;
     }
 
-    if (!form.email.includes("@")) {
-      setError("Please enter a valid email");
-      return;
-    }
-
     try {
       setLoading(true);
 
-      // 🔌 CALL BACKEND REGISTER API
       const res = await fetch(
         "http://localhost:5000/api/passenger/register",
         {
@@ -71,8 +64,6 @@ export default function Register() {
       }
 
       alert("Registration successful! Please login.");
-
-      // Redirect to login
       navigate("/passenger-login");
 
     } catch (error) {
@@ -93,16 +84,16 @@ export default function Register() {
           </div>
 
           <CardTitle className="text-3xl font-bold">
-            Register
+            Create Account
           </CardTitle>
 
           <CardDescription>
-            Create your account to start booking
+            Sign up to start booking your bus tickets
           </CardDescription>
         </CardHeader>
 
         <CardContent className="px-8 pb-8 pt-4 space-y-6">
-          
+
           {error && (
             <p className="text-red-600 text-center text-sm">
               {error}
@@ -135,7 +126,7 @@ export default function Register() {
                 type="password"
                 value={form.password}
                 onChange={handleChange}
-                placeholder="••••••••"
+                placeholder="password"
                 className="h-11"
                 required
               />
@@ -152,20 +143,21 @@ export default function Register() {
                 type="password"
                 value={form.confirmPassword}
                 onChange={handleChange}
-                placeholder="••••••••"
+                placeholder="confirm password"
                 className="h-11"
                 required
               />
             </div>
 
-            {/* Submit */}
+            {/* Submit Button */}
             <Button
               type="submit"
               disabled={loading}
               className="w-full h-11 bg-emerald-600 hover:bg-emerald-700 text-white font-medium"
             >
-              {loading ? "Registering..." : "Register"}
+              {loading ? "Creating Account..." : "Sign Up"}
             </Button>
+
           </form>
 
           {/* Login Link */}
@@ -179,6 +171,7 @@ export default function Register() {
               Login here
             </Button>
           </p>
+
         </CardContent>
       </Card>
     </div>
