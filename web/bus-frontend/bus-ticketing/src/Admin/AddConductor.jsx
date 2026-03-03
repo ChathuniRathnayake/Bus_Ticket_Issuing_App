@@ -21,13 +21,11 @@ export default function AddConductor() {
     email: "",
     name: "",
     password: "",
+    busId: "",   // ✅ Added busId
   });
 
   const [loading, setLoading] = useState(false);
-
   const navigate = useNavigate();
-
-
 
   const handleChange = (e) =>
     setForm({
@@ -35,13 +33,10 @@ export default function AddConductor() {
       [e.target.name]: e.target.value,
     });
 
-
-
   const handleSubmit = async (e) => {
-
     e.preventDefault();
 
-    if (!form.email || !form.name || !form.password) {
+    if (!form.email || !form.name || !form.password || !form.busId) {
       alert("Please fill all fields");
       return;
     }
@@ -49,10 +44,7 @@ export default function AddConductor() {
     setLoading(true);
 
     try {
-
-     
       const token = localStorage.getItem("token");
-
       if (!token) {
         alert("You must login first");
         setLoading(false);
@@ -60,15 +52,13 @@ export default function AddConductor() {
         return;
       }
 
-
-
-     
       const res = await axios.post(
         "http://localhost:5000/api/conductor",
         {
           email: form.email,
           name: form.name,
           password: form.password,
+          busId: form.busId,  // ✅ Sending busId to backend
         },
         {
           headers: {
@@ -77,33 +67,24 @@ export default function AddConductor() {
         }
       );
 
-
-
       alert(res.data.message || "Conductor created successfully");
 
       setForm({
         email: "",
         name: "",
         password: "",
+        busId: "",
       });
 
       navigate("/admin-dashboard/manage-conductors");
 
     } catch (error) {
-
       console.error(error);
-
-      alert(
-        error.response?.data?.message ||
-        "Failed to create conductor"
-      );
-
+      alert(error.response?.data?.message || "Failed to create conductor");
     } finally {
       setLoading(false);
     }
   };
-
-
 
   return (
     <div className="flex min-h-[80vh] items-center justify-center bg-background/50 animate-fade-in">
@@ -126,18 +107,13 @@ export default function AddConductor() {
 
         </CardHeader>
 
-
-
         <CardContent className="px-8 space-y-6">
 
           <form onSubmit={handleSubmit} className="grid gap-4">
 
             {/* Email */}
             <div className="space-y-2">
-              <Label htmlFor="email" className="text-sm font-medium">
-                Email
-              </Label>
-
+              <Label htmlFor="email" className="text-sm font-medium">Email</Label>
               <Input
                 id="email"
                 name="email"
@@ -149,14 +125,9 @@ export default function AddConductor() {
               />
             </div>
 
-
-
             {/* Name */}
             <div className="space-y-2">
-              <Label htmlFor="name" className="text-sm font-medium">
-                Full Name
-              </Label>
-
+              <Label htmlFor="name" className="text-sm font-medium">Full Name</Label>
               <Input
                 id="name"
                 name="name"
@@ -167,14 +138,9 @@ export default function AddConductor() {
               />
             </div>
 
-
-
             {/* Password */}
             <div className="space-y-2">
-              <Label htmlFor="password" className="text-sm font-medium">
-                Password
-              </Label>
-
+              <Label htmlFor="password" className="text-sm font-medium">Password</Label>
               <Input
                 id="password"
                 name="password"
@@ -186,7 +152,18 @@ export default function AddConductor() {
               />
             </div>
 
-
+            {/* Bus ID */}
+            <div className="space-y-2">
+              <Label htmlFor="busId" className="text-sm font-medium">Bus ID</Label>
+              <Input
+                id="busId"
+                name="busId"
+                value={form.busId}
+                onChange={handleChange}
+                placeholder="Enter assigned bus ID"
+                className="h-11 transition-all focus:ring-2 focus:ring-[#318CE7]"
+              />
+            </div>
 
             {/* Buttons */}
             <div className="flex items-center gap-4 mt-6">
@@ -198,8 +175,6 @@ export default function AddConductor() {
               >
                 <ArrowLeft className="h-4 w-4" /> Back
               </Button>
-
-
 
               <Button
                 type="submit"

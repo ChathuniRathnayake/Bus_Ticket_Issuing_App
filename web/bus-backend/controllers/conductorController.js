@@ -5,13 +5,24 @@ import { admin, db } from "../config/firebase.js";
 ===================================================== */
 export const createConductor = async (req, res) => {
   try {
-    const { email, password, name } = req.body;
+   
+    const { email, password, name, busId } = req.body;
 
-    if (!email || !password || !name) {
-      return res.status(400).json({ message: "All fields are required" });
+    if (!email || !password || !name || !busId) {
+      return res.status(400).json({
+        message: "All fields including busId are required",
+      });
     }
 
     const adminId = req.user.uid;
+
+    // 🔹 Check if bus exists
+    const busDoc = await db.collection("buses").doc(busId).get();
+    if (!busDoc.exists) {
+      return res.status(400).json({
+        message: "Selected bus does not exist",
+      });
+    }
 
     // 1️⃣ Create user in Firebase Auth
     const userRecord = await admin.auth().createUser({
@@ -27,6 +38,7 @@ export const createConductor = async (req, res) => {
       email,
       name,
       role: "conductor",
+      busId,
       createdBy: adminId,
       createdAt: new Date(),
     });
@@ -36,11 +48,14 @@ export const createConductor = async (req, res) => {
       conductorId,
       name,
       email,
+      busId,
       createdBy: adminId,
       createdAt: new Date(),
     });
 
-    res.status(201).json({ message: "Conductor created successfully" });
+    res.status(201).json({
+      message: "Conductor created successfully",
+    });
 
   } catch (error) {
     console.error("Create conductor error:", error);
@@ -101,7 +116,17 @@ export const getConductorById = async (req, res) => {
 export const updateConductor = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, email, password } = req.body;
+    const { name, email, password, busId } = req.body;
+
+    // 🔹 If busId is provided, verify it exists
+    if (busId) {
+      const busDoc = await db.collection("buses").doc(busId).get();
+      if (!busDoc.exists) {
+        return res.status(400).json({
+          message: "Selected bus does not exist",
+        });
+      }
+    }
 
     // 1️⃣ Update Firebase Auth
     const updateAuthData = {};
@@ -118,6 +143,7 @@ export const updateConductor = async (req, res) => {
     await db.collection("conductors").doc(id).update({
       ...(name && { name }),
       ...(email && { email }),
+      ...(busId && { busId }),
       updatedAt: new Date(),
     });
 
@@ -125,10 +151,13 @@ export const updateConductor = async (req, res) => {
     await db.collection("users").doc(id).update({
       ...(name && { name }),
       ...(email && { email }),
+      ...(busId && { busId }),
       updatedAt: new Date(),
     });
 
-    res.status(200).json({ message: "Conductor updated successfully" });
+    res.status(200).json({
+      message: "Conductor updated successfully",
+    });
 
   } catch (error) {
     console.error("Update conductor error:", error);
@@ -151,7 +180,9 @@ export const deleteConductor = async (req, res) => {
     await db.collection("users").doc(id).delete();
     await db.collection("conductors").doc(id).delete();
 
-    res.status(200).json({ message: "Conductor deleted successfully" });
+    res.status(200).json({
+      message: "Conductor deleted successfully",
+    });
 
   } catch (error) {
     console.error("Delete conductor error:", error);

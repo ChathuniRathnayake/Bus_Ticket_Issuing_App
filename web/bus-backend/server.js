@@ -16,8 +16,8 @@ app.use(express.json());
 
 // Routes
 app.use("/api/admin", adminRoutes);
-app.use("/api/conductor", conductorRoutes); 
 app.use("/api/bus", busRoutes);
+app.use("/api/conductor", conductorRoutes);
 app.use("/api/passenger", passengerRoutes);
 app.use("/api/route", routeRoutes);
 
