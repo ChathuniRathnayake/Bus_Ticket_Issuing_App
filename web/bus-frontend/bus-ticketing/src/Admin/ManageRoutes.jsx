@@ -4,32 +4,39 @@ import axios from "axios";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow
+} from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { ArrowLeft, Pencil, Trash2, Map } from "lucide-react";
 
-export default function ManageRoutes({ routes, setRoutes }) {
+export default function ManageRoutes() {
 
   const navigate = useNavigate();
   const token = localStorage.getItem("token");
 
-  const [editIndex, setEditIndex] = useState(null);
+  const [routes, setRoutes] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [editId, setEditId] = useState(null);
+  const [search, setSearch] = useState("");
+
   const [form, setForm] = useState({
-    routeId: "",
-    routeName: "",
-    startStop: "",
-    endStop: "",
-    distance: "",
-    duration: "",
     startTime: "",
     endTime: "",
   });
 
-
-
-  // ✅ FETCH ROUTES FROM BACKEND
+  /* =====================================================
+     FETCH ROUTES
+  ===================================================== */
   const fetchRoutes = async () => {
     try {
+      setLoading(true);
+
       const res = await axios.get(
         "http://localhost:5000/api/route",
         {
@@ -42,11 +49,14 @@ export default function ManageRoutes({ routes, setRoutes }) {
     } catch (error) {
       console.error(error);
       alert(error.response?.data?.message || "Failed to fetch routes");
+    } finally {
+      setLoading(false);
     }
   };
 
-
-
+  /* =====================================================
+     INITIAL LOAD
+  ===================================================== */
   useEffect(() => {
     if (!token) {
       alert("Login required");
@@ -55,25 +65,26 @@ export default function ManageRoutes({ routes, setRoutes }) {
     }
 
     fetchRoutes();
-  }, []);
+  }, [token, navigate]);
 
-
-
-  const handleEdit = (route, index) => {
-    setEditIndex(index);
-    setForm({ ...route });
+  /* =====================================================
+     EDIT
+  ===================================================== */
+  const handleEdit = (route) => {
+    setEditId(route.id);
+    setForm({
+      startTime: route.startTime || "",
+      endTime: route.endTime || "",
+    });
   };
 
-
-
-  // ✅ UPDATE ROUTE TIME → BACKEND
-  const handleSave = async (index) => {
-
-    const route = routes[index];
-
+  /* =====================================================
+     UPDATE ROUTE
+  ===================================================== */
+  const handleSave = async (id) => {
     try {
       await axios.put(
-        `http://localhost:5000/api/route/${route.id || route.routeId}`,
+        `http://localhost:5000/api/route/${id}`,
         {
           startTime: form.startTime,
           endTime: form.endTime,
@@ -84,9 +95,8 @@ export default function ManageRoutes({ routes, setRoutes }) {
       );
 
       alert("Route updated successfully");
-
+      setEditId(null);
       fetchRoutes();
-      setEditIndex(null);
 
     } catch (error) {
       console.error(error);
@@ -94,25 +104,21 @@ export default function ManageRoutes({ routes, setRoutes }) {
     }
   };
 
-
-
-  // ✅ DELETE ROUTE → BACKEND
-  const handleDelete = async (index) => {
-
-    const route = routes[index];
-
-    if (!confirm("Delete this route?")) return;
+  /* =====================================================
+     DELETE ROUTE
+  ===================================================== */
+  const handleDelete = async (id) => {
+    if (!window.confirm("Delete this route?")) return;
 
     try {
       await axios.delete(
-        `http://localhost:5000/api/route/${route.id || route.routeId}`,
+        `http://localhost:5000/api/route/${id}`,
         {
           headers: { Authorization: `Bearer ${token}` },
         }
       );
 
       alert("Route deleted successfully");
-
       fetchRoutes();
 
     } catch (error) {
@@ -121,18 +127,25 @@ export default function ManageRoutes({ routes, setRoutes }) {
     }
   };
 
-
+  /* =====================================================
+     FILTERED ROUTES (SEARCH)
+  ===================================================== */
+  const filteredRoutes = routes.filter((r) =>
+    r.routeName?.toLowerCase().includes(search.toLowerCase()) ||
+    r.routeId?.toLowerCase().includes(search.toLowerCase())
+  );
 
   return (
     <div className="max-w-6xl mx-auto p-6 bg-background/50 animate-fade-in">
 
+      {/* Header */}
       <div className="flex items-center justify-between mb-8">
 
         <div className="flex items-center gap-4">
           <Button
             variant="ghost"
             onClick={() => navigate("/admin-dashboard")}
-            className="h-10 gap-2 hover:bg-muted transition-all duration-300 cursor-pointer"
+            className="h-10 gap-2 hover:bg-muted transition-all duration-300"
           >
             <ArrowLeft className="h-5 w-5" /> Back to Dashboard
           </Button>
@@ -144,31 +157,33 @@ export default function ManageRoutes({ routes, setRoutes }) {
 
         <Input
           placeholder="Search routes..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
           className="w-64 h-10"
         />
 
       </div>
 
-
-
       <Card className="shadow-lg rounded-2xl border-border">
 
         <CardHeader>
           <CardTitle>
-            Routes ({routes.length})
+            Routes ({filteredRoutes.length})
           </CardTitle>
         </CardHeader>
 
-
-
         <CardContent>
 
-          {routes.length === 0 ? (
+          {loading ? (
+            <p className="text-center py-12 text-muted-foreground">
+              Loading...
+            </p>
+          ) : filteredRoutes.length === 0 ? (
 
             <div className="text-center py-12">
               <Map className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
               <p className="text-muted-foreground">
-                No routes added yet. Add your first route from the dashboard.
+                No routes found.
               </p>
             </div>
 
@@ -192,14 +207,12 @@ export default function ManageRoutes({ routes, setRoutes }) {
                   </TableRow>
                 </TableHeader>
 
-
-
                 <TableBody>
 
-                  {routes.map((r, i) => (
+                  {filteredRoutes.map((r) => (
 
                     <TableRow
-                      key={i}
+                      key={r.id}
                       className="even:bg-muted/50 hover:bg-muted transition-all duration-300"
                     >
 
@@ -210,52 +223,44 @@ export default function ManageRoutes({ routes, setRoutes }) {
                       <TableCell>{r.distance}</TableCell>
                       <TableCell>{r.duration}</TableCell>
 
-
-
                       {/* Start Time */}
                       <TableCell>
-                        {editIndex === i ? (
+                        {editId === r.id ? (
                           <Input
                             type="time"
                             value={form.startTime}
                             onChange={(e) =>
                               setForm({ ...form, startTime: e.target.value })
                             }
-                            className="h-10 w-full focus:ring-emerald-500"
                           />
                         ) : (
                           r.startTime || "-"
                         )}
                       </TableCell>
 
-
-
                       {/* End Time */}
                       <TableCell>
-                        {editIndex === i ? (
+                        {editId === r.id ? (
                           <Input
                             type="time"
                             value={form.endTime}
                             onChange={(e) =>
                               setForm({ ...form, endTime: e.target.value })
                             }
-                            className="h-10 w-full focus:ring-emerald-500"
                           />
                         ) : (
                           r.endTime || "-"
                         )}
                       </TableCell>
 
-
-
                       {/* Actions */}
                       <TableCell className="text-right flex gap-2 justify-end">
 
-                        {editIndex === i ? (
+                        {editId === r.id ? (
                           <Button
                             size="sm"
-                            onClick={() => handleSave(i)}
-                            className="gap-1 bg-emerald-600 hover:bg-emerald-700 text-white transition-all duration-300 cursor-pointer"
+                            onClick={() => handleSave(r.id)}
+                            className="bg-emerald-600 hover:bg-emerald-700 text-white"
                           >
                             Save
                           </Button>
@@ -263,19 +268,18 @@ export default function ManageRoutes({ routes, setRoutes }) {
                           <Button
                             size="sm"
                             variant="outline"
-                            onClick={() => handleEdit(r, i)}
-                            className="gap-1 hover:bg-emerald-50 transition-all duration-300 cursor-pointer"
+                            onClick={() => handleEdit(r)}
                           >
-                            <Pencil className="h-4 w-4" /> Edit
+                            <Pencil className="h-4 w-4" />
                           </Button>
                         )}
 
                         <Button
                           size="sm"
-                          onClick={() => handleDelete(i)}
-                          className="gap-1 bg-red-600 hover:bg-red-700 text-white transition-all duration-300 cursor-pointer"
+                          onClick={() => handleDelete(r.id)}
+                          className="bg-red-600 hover:bg-red-700 text-white"
                         >
-                          <Trash2 className="h-4 w-4" /> Delete
+                          <Trash2 className="h-4 w-4" />
                         </Button>
 
                       </TableCell>

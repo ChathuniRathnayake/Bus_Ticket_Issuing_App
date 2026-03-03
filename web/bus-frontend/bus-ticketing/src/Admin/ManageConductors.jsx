@@ -170,7 +170,7 @@ export default function ManageConductors() {
               <Table>
                 <TableHeader>
                   <TableRow className="bg-muted/50">
-                    <TableHead>ID</TableHead>
+                    <TableHead>Email</TableHead>
                     <TableHead>Name</TableHead>
                     <TableHead>Password</TableHead>
                     <TableHead className="text-right">
@@ -186,7 +186,7 @@ export default function ManageConductors() {
                       className="even:bg-muted/50 hover:bg-muted transition-all duration-300"
                     >
                       <TableCell>
-                        {c.id || c.conductorId}
+                        {c.email}
                       </TableCell>
 
                       <TableCell>

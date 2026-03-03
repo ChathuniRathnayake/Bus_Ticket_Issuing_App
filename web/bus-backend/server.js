@@ -6,6 +6,7 @@ import adminRoutes from "./routes/adminRoutes.js";
 import busRoutes from "./routes/busRoutes.js";
 import conductorRoutes from "./routes/conductorRoutes.js";
 import passengerRoutes from "./routes/passengerRoutes.js";
+import routeRoutes from "./routes/routeRoutes.js";
 
 dotenv.config();
 
@@ -18,6 +19,11 @@ app.use("/api/admin", adminRoutes);
 app.use("/api/conductor", conductorRoutes); 
 app.use("/api/bus", busRoutes);
 app.use("/api/passenger", passengerRoutes);
+app.use("/api/route", (req, res, next) => {
+  console.log("Route endpoint hit");
+  next();
+});
+app.use("/api/route", routeRoutes);
 
 app.get("/", (req, res) => res.send("🚀 Backend running"));
 

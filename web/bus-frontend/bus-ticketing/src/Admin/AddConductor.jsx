@@ -50,7 +50,7 @@ export default function AddConductor() {
 
     try {
 
-      // ✅ Get Firebase Admin Token
+     
       const token = localStorage.getItem("token");
 
       if (!token) {
@@ -62,7 +62,7 @@ export default function AddConductor() {
 
 
 
-      // ✅ CREATE CONDUCTOR → BACKEND
+     
       const res = await axios.post(
         "http://localhost:5000/api/conductor",
         {
