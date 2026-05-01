@@ -15,6 +15,56 @@ export default function AdminLogin() {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
+  // const handleLogin = async () => {
+  //   if (!email || !password) {
+  //     alert("Please fill all fields");
+  //     return;
+  //   }
+
+  //   setLoading(true);
+
+  //   try {
+  //     // Sign in with Firebase Auth
+  //     const userCredential = await signInWithEmailAndPassword(
+  //       auth,
+  //       email,
+  //       password
+  //     );
+
+  //     // Get Firebase ID Token
+  //     const token = await userCredential.user.getIdToken();
+
+  //     // Send token to backend for admin verification
+  //     const response = await fetch(
+  //       "http://localhost:5000/api/admin/login",
+  //       {
+  //         method: "POST",
+  //         headers: {
+  //           "Content-Type": "application/json",
+  //         },
+  //         body: JSON.stringify({ idToken: token }),
+  //       }
+  //     );
+
+  //     const data = await response.json();
+
+  //     if (!response.ok) {
+  //       throw new Error(data.message);
+  //     }
+
+  //     // Store token locally
+  //     localStorage.setItem("token", token);
+
+  //     alert("Login Successful!");
+  //     navigate("/admin-dashboard");
+
+  //   } catch (error) {
+  //     alert(error.message);
+  //   }
+
+  //   setLoading(false);
+  // };
+
   const handleLogin = async () => {
     if (!email || !password) {
       alert("Please fill all fields");
@@ -24,45 +74,29 @@ export default function AdminLogin() {
     setLoading(true);
 
     try {
-      // Sign in with Firebase Auth
-      const userCredential = await signInWithEmailAndPassword(
-        auth,
-        email,
-        password
-      );
-
-      // Get Firebase ID Token
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
       const token = await userCredential.user.getIdToken();
 
-      // Send token to backend for admin verification
-      const response = await fetch(
-        "http://localhost:5000/api/admin/login",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ idToken: token }),
-        }
-      );
+      const response = await fetch("http://localhost:5000/api/admin/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ idToken: token }),
+      });
 
       const data = await response.json();
 
-      if (!response.ok) {
-        throw new Error(data.message);
-      }
+      if (!response.ok) throw new Error(data.message || "Login failed");
 
-      // Store token locally
       localStorage.setItem("token", token);
-
       alert("Login Successful!");
       navigate("/admin-dashboard");
 
     } catch (error) {
-      alert(error.message);
+      console.error(error);
+      alert(error.message || "Login failed");
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(false);
   };
 
   return (

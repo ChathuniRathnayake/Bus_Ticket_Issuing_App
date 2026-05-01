@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -7,14 +7,52 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ArrowLeft, Bus, Filter } from "lucide-react";
 
-export default function SearchBuses({ buses, routes }) {
+export default function SearchBuses() {
   const navigate = useNavigate();
 
-  // Filters
+  const [buses, setBuses] = useState([]);
+  const [routes, setRoutes] = useState([]);
+  const [loading, setLoading] = useState(true);
+
   const [startStopFilter, setStartStopFilter] = useState("");
   const [endStopFilter, setEndStopFilter] = useState("");
   const [startTimeFilter, setStartTimeFilter] = useState("");
   const [endTimeFilter, setEndTimeFilter] = useState("");
+  const [dateFilter, setDateFilter] = useState("");
+
+  const token = localStorage.getItem("token");
+
+  // Fetch buses and routes from backend
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+
+        const [busRes, routeRes] = await Promise.all([
+          fetch("http://localhost:5000/api/bus", {
+            headers: { Authorization: `Bearer ${token}` },
+          }),
+          fetch("http://localhost:5000/api/route", {
+            headers: { Authorization: `Bearer ${token}` },
+          }),
+        ]);
+
+        const busData = await busRes.json();
+        const routeData = await routeRes.json();
+
+        if (busRes.ok) setBuses(busData);
+        if (routeRes.ok) setRoutes(routeData);
+
+      } catch (error) {
+        console.error("Failed to fetch data:", error);
+        alert("Failed to load buses. Please try again.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, []);
 
   // Get only active buses
   const activeBuses = buses.filter((b) => b.status === "Active");
@@ -41,15 +79,17 @@ export default function SearchBuses({ buses, routes }) {
 
     const matchStart = !startStopFilter || route.startStop === startStopFilter;
     const matchEnd = !endStopFilter || route.endStop === endStopFilter;
+    const matchDate = !dateFilter || route.date === dateFilter;
 
-    // Time filter placeholder (add real logic when buses have times)
     let matchTime = true;
-    if (startTimeFilter || endTimeFilter) {
-      // Example: later compare route.startTime / endTime
-      // For now always true
+    if (startTimeFilter && route.startTime) {
+      matchTime = matchTime && route.startTime >= startTimeFilter;
+    }
+    if (endTimeFilter && route.endTime) {
+      matchTime = matchTime && route.endTime <= endTimeFilter;
     }
 
-    return matchStart && matchEnd && matchTime;
+    return matchStart && matchEnd && matchTime && matchDate;
   });
 
   const getRouteName = (routeId) => {
@@ -80,7 +120,7 @@ export default function SearchBuses({ buses, routes }) {
             <Filter className="h-5 w-5 text-muted-foreground" />
             <h3 className="text-lg font-semibold">Filter Buses</h3>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
             <div>
               <Label htmlFor="startStopFilter" className="text-sm font-medium">Start Stop</Label>
               <select
@@ -114,6 +154,17 @@ export default function SearchBuses({ buses, routes }) {
             </div>
 
             <div>
+              <Label htmlFor="dateFilter" className="text-sm font-medium">Travel Date</Label>
+              <Input
+                id="dateFilter"
+                type="date"
+                value={dateFilter}
+                onChange={(e) => setDateFilter(e.target.value)}
+                className="h-10"
+              />
+            </div>
+
+            <div>
               <Label htmlFor="startTime" className="text-sm font-medium">Depart After</Label>
               <Input
                 id="startTime"
@@ -141,13 +192,21 @@ export default function SearchBuses({ buses, routes }) {
       {/* Buses Table */}
       <Card className="shadow-lg rounded-2xl border-border">
         <CardHeader>
-          <CardTitle>Active Buses ({filteredBuses.length})</CardTitle>
+          <CardTitle>
+            Active Buses ({loading ? "..." : filteredBuses.length})
+          </CardTitle>
         </CardHeader>
         <CardContent>
-          {filteredBuses.length === 0 ? (
+          {loading ? (
+            <div className="text-center py-12 text-muted-foreground">
+              Loading buses...
+            </div>
+          ) : filteredBuses.length === 0 ? (
             <div className="text-center py-12">
               <Bus className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-              <p className="text-muted-foreground">No active buses match your filters or available yet.</p>
+              <p className="text-muted-foreground">
+                No active buses match your filters or available yet.
+              </p>
             </div>
           ) : (
             <div className="overflow-auto rounded-xl border border-border">
@@ -164,13 +223,16 @@ export default function SearchBuses({ buses, routes }) {
                 </TableHeader>
                 <TableBody>
                   {filteredBuses.map((b, i) => (
-                    <TableRow key={i} className="even:bg-muted/50 hover:bg-muted transition-all duration-300">
-                      <TableCell>{b.busId}</TableCell>
+                    <TableRow
+                      key={i}
+                      className="even:bg-muted/50 hover:bg-muted transition-all duration-300"
+                    >
+                      <TableCell>{b.busId || b.id}</TableCell>
                       <TableCell>{getRouteName(b.routeId)}</TableCell>
                       <TableCell>{b.totalSeats}</TableCell>
                       <TableCell>{b.busNo}</TableCell>
                       <TableCell>
-                        <span className={`px-3 py-1 rounded-full text-xs font-medium ${b.status === "Active" ? "bg-emerald-100 text-emerald-700" : "bg-zinc-100 text-zinc-700"}`}>
+                        <span className="px-3 py-1 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700">
                           {b.status}
                         </span>
                       </TableCell>
@@ -178,7 +240,11 @@ export default function SearchBuses({ buses, routes }) {
                         <Button
                           size="sm"
                           className="bg-blue-600 hover:bg-blue-700 text-white"
-                          onClick={() => navigate("/passenger-dashboard/seat-layout", { state: { bus: b } })}
+                          onClick={() =>
+                            navigate("/passenger-dashboard/seat-layout", {
+                              state: { bus: b },
+                            })
+                          }
                         >
                           Book Now
                         </Button>
