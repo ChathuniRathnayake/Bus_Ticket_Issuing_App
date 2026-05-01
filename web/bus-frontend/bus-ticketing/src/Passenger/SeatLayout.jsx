@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -63,11 +63,41 @@ export default function SeatLayout() {
     bus.hasBackFullRow === "yes" || bus.hasBackFullRow === true;
 
   // ── Seat state ───────────────────────────────────────────────────────────────
-  // TODO: replace with real booked seats fetched from backend per bus
+
   const [bookedSeats, setBookedSeats]   = useState([]);
   const [selectedSeat, setSelectedSeat] = useState(null);
   const [showConfirm, setShowConfirm]   = useState(false);
   const [lastBooked, setLastBooked]     = useState(null);
+  const [loadingSeats, setLoadingSeats] = useState(true);
+
+  useEffect(() => {
+    if (!bus) return;
+
+    const fetchBookedSeats = async () => {
+      setLoadingSeats(true);
+      try {
+        const token = localStorage.getItem("token");
+        const busId = bus.id || bus.busId;
+        const res = await fetch(`http://localhost:5000/api/ticket/bus/${busId}`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message || "Failed to load booked seats");
+
+        setBookedSeats(data.map((ticket) => ticket.seatNo));
+      } catch (error) {
+        console.error(error);
+        alert(error.message || "Error loading booked seats");
+      } finally {
+        setLoadingSeats(false);
+      }
+    };
+
+    fetchBookedSeats();
+  }, [bus]);
 
   // ── Helpers ──────────────────────────────────────────────────────────────────
   const rowChar  = (i) => String.fromCharCode(65 + i); // 0→A, 1→B, 2→C …
@@ -84,36 +114,53 @@ export default function SeatLayout() {
   };
 
   const confirmBooking = async () => {
-  try {
-    const token = localStorage.getItem("token");
+    try {
+      if (!selectedSeat) return;
 
-    const res = await fetch("http://localhost:5000/api/ticket", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({
-        busId: bus.id,        // 🔥 important
-        seatNo: selectedSeat,
+      const token = localStorage.getItem("token");
+
+      const res = await fetch("http://localhost:5000/api/ticket", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          busId: bus.id || bus.busId,
+          seatNo: selectedSeat,
+          routeId: bus.routeId,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) throw new Error(data.message || "Booking failed");
+
+      const bookingId = data.bookingId || `${bus.id || bus.busId}-${selectedSeat}-${Date.now()}`;
+      const newBooking = {
+        bookingId,
+        busId: bus.id || bus.busId,
+        busNo: bus.busNo,
         routeId: bus.routeId,
-      }),
-    });
+        seat: selectedSeat,
+        bookingDate: new Date().toISOString(),
+        status: "Confirmed",
+      };
 
-    const data = await res.json();
+      const existingBookings = JSON.parse(localStorage.getItem("userBookings")) || [];
+      const updatedBookings = [newBooking, ...existingBookings];
+      localStorage.setItem("userBookings", JSON.stringify(updatedBookings));
 
-    if (!res.ok) throw new Error(data.message);
+      setBookedSeats((prev) => [...prev, selectedSeat]);
+      setLastBooked(selectedSeat);
+      setSelectedSeat(null);
+      setShowConfirm(false);
 
-    // update UI
-    setBookedSeats((prev) => [...prev, selectedSeat]);
-    setLastBooked(selectedSeat);
-    setSelectedSeat(null);
-    setShowConfirm(false);
-
-  } catch (err) {
-    alert(err.message);
-  }
-};
+      navigate("/passenger-dashboard/my-bookings");
+    } catch (err) {
+      alert(err.message);
+    }
+  };
 
   // ── Seat counts ──────────────────────────────────────────────────────────────
   const generatedTotal =
@@ -146,6 +193,12 @@ export default function SeatLayout() {
       {lastBooked && (
         <div className="mb-4 px-4 py-3 rounded-xl bg-emerald-50 border border-emerald-300 text-emerald-700 text-sm font-medium">
           ✅ Seat <strong>{lastBooked}</strong> booked successfully!
+        </div>
+      )}
+
+      {loadingSeats && (
+        <div className="mb-4 rounded-2xl border border-slate-200 bg-white px-6 py-5 text-center text-slate-500">
+          Loading current seat reservations for this bus...
         </div>
       )}
 

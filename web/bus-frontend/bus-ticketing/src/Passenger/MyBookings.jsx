@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, Ticket, Trash2 } from "lucide-react";
+import TicketQRCode from "@/components/TicketQRCode";
 
 export default function MyBookings() {
   const navigate = useNavigate();
@@ -100,6 +101,16 @@ export default function MyBookings() {
                           <p className="font-semibold">{formatDate(booking.bookingDate)}</p>
                         </div>
                       </div>
+                    </div>
+
+                    {/* Ticket QR */}
+                    <div className="flex flex-col items-center justify-center rounded-3xl border border-slate-200 bg-slate-50 p-3 text-center">
+                      <TicketQRCode
+                        value={`Ticket ID: ${booking.bookingId}\nBus: ${booking.busNo}\nSeat: ${booking.seat}\nRoute: ${booking.routeId}\nBooked: ${formatDate(booking.bookingDate)}`}
+                        size={130}
+                        className="rounded-3xl"
+                      />
+                      <p className="mt-2 text-xs text-slate-500">Scan to view ticket details</p>
                     </div>
                   </div>
 
