@@ -7,6 +7,7 @@ class PassengerAuthService {
 
   // Register Passenger
   Future<UserCredential> registerPassenger({
+    required String name,
     required String email,
     required String password,
   }) async {
@@ -18,15 +19,20 @@ class PassengerAuthService {
     // Add user info in Firestore (users and passengers)
     final uid = credential.user!.uid;
     await _firestore.collection('users').doc(uid).set({
+      'name': name,
       'email': email,
       'role': 'passenger',
       'createdAt': Timestamp.now(),
     });
 
     await _firestore.collection('passengers').doc(uid).set({
+      'name': name,
       'email': email,
       'createdAt': Timestamp.now(),
     });
+
+    // Update display name in Firebase Auth
+    await credential.user!.updateDisplayName(name);
 
     // Send email verification
     await credential.user!.sendEmailVerification();

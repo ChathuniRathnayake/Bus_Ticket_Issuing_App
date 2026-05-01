@@ -3,6 +3,13 @@ import '../../widgets/custom_button.dart';
 import '../passenger_bottom_nav.dart';
 import '../auth/passenger_login.dart';
 import 'seat_booking_screen.dart';
+import '../../core/services/passenger_data_service.dart';
+import '../../models/halt_model.dart';
+import 'dashboard_screen.dart';
+import 'my_tickets_screen.dart';
+import 'profile_screen.dart';
+import '../../widgets/passenger_app_bar.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class BusDetailsScreen extends StatefulWidget {
   final Map<String, String> bus;
@@ -24,36 +31,73 @@ class BusDetailsScreen extends StatefulWidget {
 
 class _BusDetailsScreenState extends State<BusDetailsScreen> {
   int _selectedIndex = 1; // Assuming 'Find' section is active
+  final PassengerDataService _dataService = PassengerDataService();
+  List<HaltModel> _halts = [];
+  bool _isLoadingHalts = true;
+  String _currentLocation = "Not Available";
+  String _nextStop = "Not Available";
+
+  @override
+  void initState() {
+    super.initState();
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    await _loadHalts();
+    _listenToBusLocation();
+  }
+
+  Future<void> _loadHalts() async {
+    final routeId = widget.bus['routeId'];
+    if (routeId == null || routeId.isEmpty) {
+      setState(() => _isLoadingHalts = false);
+      return;
+    }
+
+    try {
+      final haltDatas = await _dataService.getHaltsForRoute(routeId);
+      setState(() {
+        _halts = haltDatas.map((data) => HaltModel.fromMap(data, id: data['id'])).toList();
+        _isLoadingHalts = false;
+        if (_halts.isNotEmpty) {
+          _nextStop = _halts.first.name;
+        }
+      });
+    } catch (e) {
+      print("Error loading halts: $e");
+      setState(() => _isLoadingHalts = false);
+    }
+  }
+
+  void _listenToBusLocation() {
+    final busId = widget.bus['id'];
+    if (busId == null || busId.isEmpty) return;
+
+    FirebaseFirestore.instance
+        .collection('buses')
+        .doc(busId)
+        .snapshots()
+        .listen((snapshot) {
+      if (snapshot.exists) {
+        final data = snapshot.data() as Map<String, dynamic>;
+        if (mounted) {
+          setState(() {
+            _currentLocation = data['currentLocation'] ?? "Unknown";
+            _nextStop = data['nextStop'] ?? _nextStop;
+          });
+        }
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF5F5F5),
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.account_circle, color: Colors.blue),
-            onPressed: () {
-              // Profile action
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.logout, color: Colors.red),
-            onPressed: () {
-              Navigator.pushAndRemoveUntil(
-                context,
-                MaterialPageRoute(builder: (_) => const LoginScreen()),
-                (route) => false,
-              );
-            },
-          ),
-        ],
+      appBar: const PassengerAppBar(
+        title: 'Bus Details',
+        showBackButton: true,
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
@@ -117,9 +161,24 @@ class _BusDetailsScreenState extends State<BusDetailsScreen> {
                     padding: EdgeInsets.symmetric(vertical: 12),
                     child: Divider(),
                   ),
-                  _buildInfoRow('Current Location', 'Kegalle Junction'),
+                  _buildInfoRow('Current Location', _currentLocation),
                   const SizedBox(height: 8),
-                  _buildInfoRow('Next Stop', 'Mawanella'),
+                  _buildInfoRow('Next Stop', _nextStop),
+                  if (_halts.isNotEmpty) ...[
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 12),
+                      child: Divider(),
+                    ),
+                    const Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        'Route Halts',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    _buildHaltsList(),
+                  ],
                 ],
               ),
             ),
@@ -174,8 +233,28 @@ class _BusDetailsScreenState extends State<BusDetailsScreen> {
       bottomNavigationBar: PassengerBottomNav(
         currentIndex: _selectedIndex,
         onTap: (index) {
-          setState(() => _selectedIndex = index);
-          // Navigation logic based on index
+          if (index == _selectedIndex) return;
+          
+          if (index == 0) {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (_) => const PassengerDashboard()),
+            );
+          } else if (index == 2) {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (_) => const MyTicketsScreen()),
+            );
+          } else if (index == 3) {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (_) => const ProfileScreen()),
+            );
+          } else {
+            setState(() {
+              _selectedIndex = index;
+            });
+          }
         },
       ),
     );
@@ -287,6 +366,42 @@ class _BusDetailsScreenState extends State<BusDetailsScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildHaltsList() {
+    return Column(
+      children: _halts.map((halt) {
+        final isNext = halt.name == _nextStop;
+        return Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: Row(
+            children: [
+              Icon(
+                Icons.circle,
+                size: 8,
+                color: isNext ? Colors.blue : Colors.grey[400],
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  halt.name,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: isNext ? FontWeight.bold : FontWeight.normal,
+                    color: isNext ? Colors.blue : Colors.black87,
+                  ),
+                ),
+              ),
+              if (halt.arrivalTime != null)
+                Text(
+                  halt.arrivalTime!,
+                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                ),
+            ],
+          ),
+        );
+      }).toList(),
     );
   }
 }

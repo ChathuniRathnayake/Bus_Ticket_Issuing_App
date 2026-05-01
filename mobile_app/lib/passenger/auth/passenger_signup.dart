@@ -23,6 +23,7 @@ class _PassengerSignUpScreenState extends State<PassengerSignUpScreen> {
     setState(() => _isLoading = true);
     try {
       await _authService.registerPassenger(
+        name: nameController.text.trim(),
         email: emailController.text.trim(),
         password: passwordController.text.trim(),
       );

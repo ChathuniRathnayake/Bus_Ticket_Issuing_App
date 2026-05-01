@@ -4,6 +4,10 @@ import '../passenger_bottom_nav.dart';
 import 'bus_details_screen.dart';
 import '../../core/services/passenger_data_service.dart';
 import '../../models/route_model.dart';
+import 'dashboard_screen.dart';
+import 'my_tickets_screen.dart';
+import 'profile_screen.dart';
+import '../../widgets/passenger_app_bar.dart';
 
 class BusResultsScreen extends StatefulWidget {
   final String from;
@@ -47,6 +51,7 @@ class _BusResultsScreenState extends State<BusResultsScreen> {
             'price': routePrice.toString(),
             'type': (bus['plateNumber'] ?? '').toString(),
             'id': (bus['id'] ?? '').toString(),
+            'routeId': (bus['routeId'] ?? '').toString(),
           };
         }).toList();
         _isLoading = false;
@@ -63,29 +68,9 @@ class _BusResultsScreenState extends State<BusResultsScreen> {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF5F5F5),
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        title: Text(
-          '${widget.from} to ${widget.to}',
-          style: const TextStyle(color: Colors.black, fontSize: 18),
-        ),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.logout, color: Colors.red),
-            onPressed: () {
-              Navigator.pushAndRemoveUntil(
-                context,
-                MaterialPageRoute(builder: (_) => const LoginScreen()),
-                (route) => false,
-              );
-            },
-          ),
-        ],
+      appBar: PassengerAppBar(
+        title: '${widget.from} to ${widget.to}',
+        showBackButton: true,
       ),
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -124,9 +109,28 @@ class _BusResultsScreenState extends State<BusResultsScreen> {
       bottomNavigationBar: PassengerBottomNav(
         currentIndex: _selectedIndex,
         onTap: (index) {
-          setState(() {
-            _selectedIndex = index;
-          });
+          if (index == _selectedIndex) return;
+          
+          if (index == 0) {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (_) => const PassengerDashboard()),
+            );
+          } else if (index == 2) {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (_) => const MyTicketsScreen()),
+            );
+          } else if (index == 3) {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (_) => const ProfileScreen()),
+            );
+          } else {
+            setState(() {
+              _selectedIndex = index;
+            });
+          }
         },
       ),
     );
