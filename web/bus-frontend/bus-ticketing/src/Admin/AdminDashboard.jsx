@@ -1,7 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Users, Bus, Map, ShieldCheck, LogOut } from "lucide-react";
+import { Users, Bus, Map, ShieldCheck, Calendar, LogOut } from "lucide-react";
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
@@ -28,12 +28,18 @@ export default function AdminDashboard() {
       iconText: "text-[#A0785A]",
       btn: "bg-[#A0785A] hover:bg-[#8b654b]",
     },
+    orange: {
+      iconBg: "bg-orange-100",
+      iconText: "text-orange-600",
+      btn: "bg-orange-600 hover:bg-orange-700",
+    },
   };
 
   const sections = [
     { title: "Conductors", icon: Users, color: "blue",   add: "/admin-dashboard/add-conductor", manage: "/admin-dashboard/manage-conductors" },
     { title: "Buses",      icon: Bus,    color: "violet", add: "/admin-dashboard/add-bus",      manage: "/admin-dashboard/manage-buses" },
     { title: "Routes",     icon: Map,    color: "emerald",add: "/admin-dashboard/add-route",    manage: "/admin-dashboard/manage-routes" },
+    { title: "Schedules",  icon: Calendar, color: "orange", add: "/admin-dashboard/add-schedule", manage: "/admin-dashboard/manage-schedules" },
     { title: "Admins",     icon: ShieldCheck, color: "amber", add: "/admin-dashboard/add-admin", manage: "/admin-dashboard/manage-admins" },
   ];
 

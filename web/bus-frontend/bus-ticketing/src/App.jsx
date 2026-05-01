@@ -26,6 +26,8 @@ import AddAdmin from "./Admin/AddAdmin";
 import ManageAdmins from "./Admin/ManageAdmins";
 import AddBus from "./Admin/AddBus";
 import ManageBuses from "./Admin/ManageBuses";
+import AddSchedule from "./Admin/AddSchedule";
+import ManageSchedules from "./Admin/ManageSchedules";
 
 export default function App() {
   // State + persistence
@@ -33,6 +35,7 @@ export default function App() {
   const [admins, setAdmins] = useState([{ email: "admin@example.com", password: "1234" }]);
   const [buses, setBusesState] = useState([]);
   const [routes, setRoutesState] = useState([]);
+  const [schedules, setSchedulesState] = useState([]);
 
   // Load data from localStorage on app start
   useEffect(() => {
@@ -43,6 +46,10 @@ export default function App() {
   const storedRoutes = localStorage.getItem("routes");
   if (storedRoutes) {
     setRoutesState(JSON.parse(storedRoutes));
+  }
+  const storedSchedules = localStorage.getItem("schedules");
+  if (storedSchedules) {
+    setSchedulesState(JSON.parse(storedSchedules));
   }
   // eslint-disable-next-line react-hooks/exhaustive-deps
 }, []);
@@ -56,6 +63,11 @@ export default function App() {
   const setRoutes = (newRoutes) => {
     setRoutesState(newRoutes);
     localStorage.setItem("routes", JSON.stringify(newRoutes));
+  };
+
+  const setSchedules = (newSchedules) => {
+    setSchedulesState(newSchedules);
+    localStorage.setItem("schedules", JSON.stringify(newSchedules));
   };
 
   return (
@@ -132,6 +144,16 @@ export default function App() {
           <Route 
             path="/admin-dashboard/manage-routes" 
             element={<ManageRoutes routes={routes} setRoutes={setRoutes} />} 
+          />
+
+          {/* Schedules */}
+          <Route 
+            path="/admin-dashboard/add-schedule" 
+            element={<AddSchedule buses={buses} routes={routes} schedules={schedules} setSchedules={setSchedules} />} 
+          />
+          <Route 
+            path="/admin-dashboard/manage-schedules" 
+            element={<ManageSchedules buses={buses} routes={routes} schedules={schedules} setSchedules={setSchedules} />} 
           />
         </Routes>
       </main>
