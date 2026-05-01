@@ -19,10 +19,26 @@ export default function AddRoute({ routes, setRoutes }) {
     duration: "",
     startTime: "",
     endTime: "",
+    date: "",
   });
 
   const [durationHours, setDurationHours] = useState("");
   const [durationMinutes, setDurationMinutes] = useState("");
+
+  // Auto-calculate end time based on start time + duration
+  const calculateEndTime = (startTime, durationStr) => {
+    if (!startTime || !durationStr) return "";
+    const [startHours, startMinutes] = startTime.split(":").map(Number);
+    const [durHours, durMinutes] = durationStr.split(":").map(Number);
+    let endHours = startHours + durHours;
+    let endMinutes = startMinutes + durMinutes;
+    if (endMinutes >= 60) {
+      endHours += Math.floor(endMinutes / 60);
+      endMinutes = endMinutes % 60;
+    }
+    endHours = endHours % 24;
+    return `${String(endHours).padStart(2, "0")}:${String(endMinutes).padStart(2, "0")}`;
+  };
   const [loading, setLoading] = useState(false);
 
   const navigate = useNavigate();
@@ -31,7 +47,15 @@ export default function AddRoute({ routes, setRoutes }) {
 
 
   const handleChange = (e) => {
-    setForm({ ...form, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+    setForm((prev) => {
+      const newForm = { ...prev, [name]: value };
+      // Auto-calculate end time when start time changes
+      if (name === "startTime" && newForm.duration) {
+        newForm.endTime = calculateEndTime(value, newForm.duration);
+      }
+      return newForm;
+    });
   };
 
 
@@ -40,7 +64,11 @@ export default function AddRoute({ routes, setRoutes }) {
     const hours = durationHours.trim() === "" ? "0" : durationHours;
     const minutes = durationMinutes.trim() === "" ? "0" : durationMinutes;
     const formatted = `${hours}:${minutes.padStart(2, "0")}`;
-    setForm((prev) => ({ ...prev, duration: formatted }));
+    setForm((prev) => {
+      const newForm = { ...prev, duration: formatted };
+      const calculatedEndTime = calculateEndTime(newForm.startTime, formatted);
+      return { ...newForm, endTime: calculatedEndTime };
+    });
   };
 
 
@@ -58,6 +86,7 @@ export default function AddRoute({ routes, setRoutes }) {
       duration,
       startTime,
       endTime,
+      date,
     } = form;
 
     if (
@@ -68,7 +97,8 @@ export default function AddRoute({ routes, setRoutes }) {
       !distance ||
       !duration ||
       !startTime ||
-      !endTime
+      !endTime ||
+      !date
     ) {
       return alert("Please fill all fields");
     }
@@ -105,6 +135,7 @@ export default function AddRoute({ routes, setRoutes }) {
         duration: "",
         startTime: "",
         endTime: "",
+        date: "",
       });
 
       setDurationHours("");
@@ -310,6 +341,22 @@ export default function AddRoute({ routes, setRoutes }) {
 
 
 
+            {/* Date */}
+            <div className="space-y-2">
+              <Label htmlFor="date" className="text-sm font-medium">
+                Route Date
+              </Label>
+              <Input
+                id="date"
+                name="date"
+                type="date"
+                value={form.date}
+                onChange={handleChange}
+                className="h-11 focus:ring-2 focus:ring-emerald-500"
+                required
+              />
+            </div>
+
             {/* Times */}
             <div className="grid grid-cols-2 gap-4">
 
@@ -328,14 +375,14 @@ export default function AddRoute({ routes, setRoutes }) {
 
               <div className="space-y-2">
                 <Label className="text-sm font-medium">
-                  End Time
+                  End Time (Auto-calculated)
                 </Label>
                 <Input
                   name="endTime"
                   type="time"
                   value={form.endTime}
-                  onChange={handleChange}
-                  className="h-11 focus:ring-2 focus:ring-emerald-500"
+                  readOnly
+                  className="h-11 bg-gray-50 cursor-not-allowed focus:ring-2 focus:ring-emerald-500"
                 />
               </div>
 

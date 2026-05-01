@@ -8,6 +8,7 @@ import PassengerDashboard from "./Passenger/PassengerDashboard";
 import SearchBuses from "./Passenger/SearchBuses";
 import SeatLayout from "./Passenger/SeatLayout";
 import Profile from "./Passenger/Profile";
+import MyBookings from "./Passenger/MyBookings";
 
 // Admin Components
 import AdminLogin from "./Admin/AdminLogin";
@@ -74,6 +75,10 @@ export default function App() {
           <Route 
             path="/passenger-dashboard/profile" 
             element={<Profile />} 
+          />
+          <Route 
+            path="/passenger-dashboard/my-bookings" 
+            element={<MyBookings />} 
           />
 
           {/* Admin Routes */}

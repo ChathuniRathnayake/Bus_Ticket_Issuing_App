@@ -84,6 +84,20 @@ export default function SeatLayout() {
   };
 
   const confirmBooking = () => {
+    const bookingData = {
+      bookingId: `${bus.busNo}-${selectedSeat}-${Date.now()}`,
+      busNo: bus.busNo,
+      seat: selectedSeat,
+      routeId: bus.routeId,
+      bookingDate: new Date().toISOString(),
+      status: "Confirmed"
+    };
+
+    // Save booking to localStorage
+    const existingBookings = JSON.parse(localStorage.getItem("userBookings")) || [];
+    existingBookings.push(bookingData);
+    localStorage.setItem("userBookings", JSON.stringify(existingBookings));
+
     setBookedSeats((prev) => [...prev, selectedSeat]);
     setLastBooked(selectedSeat);
     setSelectedSeat(null);

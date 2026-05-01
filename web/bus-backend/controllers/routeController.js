@@ -14,6 +14,7 @@ export const createRoute = async (req, res) => {
       duration,
       startTime,
       endTime,
+      date,
     } = req.body;
 
     if (
@@ -24,7 +25,8 @@ export const createRoute = async (req, res) => {
       !distance ||
       !duration ||
       !startTime ||
-      !endTime
+      !endTime ||
+      !date
     ) {
       return res.status(400).json({ message: "All fields are required" });
     }
@@ -44,6 +46,7 @@ export const createRoute = async (req, res) => {
       duration,
       startTime,
       endTime,
+      date,
       createdAt: new Date(),
     });
 
@@ -67,6 +70,13 @@ export const getRoutes = async (req, res) => {
       id: doc.id,
       ...doc.data(),
     }));
+
+    // Sort by date and time in ascending order
+    routes.sort((a, b) => {
+      const dateA = new Date(`${a.date}T${a.startTime}`);
+      const dateB = new Date(`${b.date}T${b.startTime}`);
+      return dateA - dateB;
+    });
 
     res.status(200).json(routes);
 
@@ -116,6 +126,7 @@ export const updateRoute = async (req, res) => {
       duration,
       startTime,
       endTime,
+      date,
     } = req.body;
 
     const routeRef = db.collection("routes").doc(id);
@@ -133,6 +144,7 @@ export const updateRoute = async (req, res) => {
       ...(duration && { duration }),
       ...(startTime && { startTime }),
       ...(endTime && { endTime }),
+      ...(date && { date }),
       updatedAt: new Date(),
     });
 

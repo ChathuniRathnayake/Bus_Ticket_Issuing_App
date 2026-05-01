@@ -18,6 +18,7 @@ import { ArrowLeft, Pencil, Trash2, Bus } from "lucide-react";
 export default function ManageBuses() {
   const navigate = useNavigate();
   const [buses, setBuses] = useState([]);
+  const [routes, setRoutes] = useState([]);
   const [loading, setLoading] = useState(false);
   const [editId, setEditId] = useState(null);
   const [form, setForm] = useState({
@@ -29,15 +30,40 @@ export default function ManageBuses() {
 
   const token = localStorage.getItem("token");
 
-  // FETCH ALL BUSES
+  // FETCH ALL BUSES AND ROUTES
   const fetchBuses = async () => {
     if (!token) return;
     try {
       setLoading(true);
-      const res = await axios.get("http://localhost:5000/api/bus", {
-        headers: { Authorization: `Bearer ${token}` },
+      const [busRes, routeRes] = await Promise.all([
+        axios.get("http://localhost:5000/api/bus", {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
+        axios.get("http://localhost:5000/api/route", {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
+      ]);
+      setRoutes(routeRes.data);
+      
+      // Merge bus data with route data and sort by date and time
+      const busesWithRoutes = busRes.data.map((bus) => {
+        const route = routeRes.data.find((r) => r.routeId === bus.routeId);
+        return {
+          ...bus,
+          routeDate: route?.date || "",
+          routeTime: route?.startTime || "",
+          routeName: route ? `${route.startStop} → ${route.endStop}` : "Unknown",
+        };
       });
-      setBuses(res.data);
+      
+      // Sort by date and time in ascending order
+      busesWithRoutes.sort((a, b) => {
+        const dateA = new Date(`${a.routeDate}T${a.routeTime}`);
+        const dateB = new Date(`${b.routeDate}T${b.routeTime}`);
+        return dateA - dateB;
+      });
+      
+      setBuses(busesWithRoutes);
     } catch (error) {
       console.error(error);
       alert(error.response?.data?.message || "Failed to fetch buses");
@@ -151,7 +177,9 @@ export default function ManageBuses() {
                   <TableRow className="bg-muted/50">
                     <TableHead>Bus ID</TableHead>
                     <TableHead>Bus Number</TableHead>
-                    <TableHead>Route ID</TableHead>
+                    <TableHead>Route</TableHead>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Time</TableHead>
                     <TableHead>Total Seats</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
@@ -177,18 +205,9 @@ export default function ManageBuses() {
                           bus.busNo
                         )}
                       </TableCell>
-                      <TableCell>
-                        {editId === bus.id ? (
-                          <Input
-                            value={form.routeId}
-                            onChange={(e) =>
-                              setForm({ ...form, routeId: e.target.value })
-                            }
-                          />
-                        ) : (
-                          bus.routeId
-                        )}
-                      </TableCell>
+                      <TableCell>{bus.routeName}</TableCell>
+                      <TableCell>{bus.routeDate}</TableCell>
+                      <TableCell>{bus.routeTime}</TableCell>
                       <TableCell>
                         {editId === bus.id ? (
                           <Input

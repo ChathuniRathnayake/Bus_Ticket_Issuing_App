@@ -18,6 +18,7 @@ export default function SearchBuses() {
   const [endStopFilter, setEndStopFilter] = useState("");
   const [startTimeFilter, setStartTimeFilter] = useState("");
   const [endTimeFilter, setEndTimeFilter] = useState("");
+  const [dateFilter, setDateFilter] = useState("");
 
   const token = localStorage.getItem("token");
 
@@ -78,6 +79,7 @@ export default function SearchBuses() {
 
     const matchStart = !startStopFilter || route.startStop === startStopFilter;
     const matchEnd = !endStopFilter || route.endStop === endStopFilter;
+    const matchDate = !dateFilter || route.date === dateFilter;
 
     let matchTime = true;
     if (startTimeFilter && route.startTime) {
@@ -87,7 +89,7 @@ export default function SearchBuses() {
       matchTime = matchTime && route.endTime <= endTimeFilter;
     }
 
-    return matchStart && matchEnd && matchTime;
+    return matchStart && matchEnd && matchTime && matchDate;
   });
 
   const getRouteName = (routeId) => {
@@ -118,7 +120,7 @@ export default function SearchBuses() {
             <Filter className="h-5 w-5 text-muted-foreground" />
             <h3 className="text-lg font-semibold">Filter Buses</h3>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
             <div>
               <Label htmlFor="startStopFilter" className="text-sm font-medium">Start Stop</Label>
               <select
@@ -149,6 +151,17 @@ export default function SearchBuses() {
                   <option key={stop} value={stop}>{stop}</option>
                 ))}
               </select>
+            </div>
+
+            <div>
+              <Label htmlFor="dateFilter" className="text-sm font-medium">Travel Date</Label>
+              <Input
+                id="dateFilter"
+                type="date"
+                value={dateFilter}
+                onChange={(e) => setDateFilter(e.target.value)}
+                className="h-10"
+              />
             </div>
 
             <div>

@@ -28,7 +28,24 @@ export default function ManageRoutes() {
   const [form, setForm] = useState({
     startTime: "",
     endTime: "",
+    date: "",
+    duration: "",
   });
+
+  // Auto-calculate end time based on start time + duration
+  const calculateEndTime = (startTime, durationStr) => {
+    if (!startTime || !durationStr) return "";
+    const [startHours, startMinutes] = startTime.split(":").map(Number);
+    const [durHours, durMinutes] = durationStr.split(":").map(Number);
+    let endHours = startHours + durHours;
+    let endMinutes = startMinutes + durMinutes;
+    if (endMinutes >= 60) {
+      endHours += Math.floor(endMinutes / 60);
+      endMinutes = endMinutes % 60;
+    }
+    endHours = endHours % 24;
+    return `${String(endHours).padStart(2, "0")}:${String(endMinutes).padStart(2, "0")}`;
+  };
 
   /* =====================================================
      FETCH ROUTES
@@ -44,7 +61,11 @@ export default function ManageRoutes() {
         }
       );
 
-      setRoutes(res.data);
+      setRoutes(res.data.sort((a, b) => {
+        const dateA = new Date(`${a.date}T${a.startTime}`);
+        const dateB = new Date(`${b.date}T${b.startTime}`);
+        return dateA - dateB;
+      }));
 
     } catch (error) {
       console.error(error);
@@ -84,6 +105,8 @@ export default function ManageRoutes() {
     setForm({
       startTime: route.startTime || "",
       endTime: route.endTime || "",
+      date: route.date || "",
+      duration: route.duration || "",
     });
   };
 
@@ -92,12 +115,15 @@ export default function ManageRoutes() {
   ===================================================== */
   const handleSave = async (id) => {
     try {
+      const updateData = {
+        startTime: form.startTime,
+        endTime: form.endTime,
+        date: form.date,
+      };
+      
       await axios.put(
         `http://localhost:5000/api/route/${id}`,
-        {
-          startTime: form.startTime,
-          endTime: form.endTime,
-        },
+        updateData,
         {
           headers: { Authorization: `Bearer ${token}` },
         }
@@ -210,6 +236,7 @@ export default function ManageRoutes() {
                     <TableHead>End Stop</TableHead>
                     <TableHead>Distance (km)</TableHead>
                     <TableHead>Duration</TableHead>
+                    <TableHead>Date</TableHead>
                     <TableHead>Start Time</TableHead>
                     <TableHead>End Time</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
@@ -232,15 +259,36 @@ export default function ManageRoutes() {
                       <TableCell>{r.distance}</TableCell>
                       <TableCell>{r.duration}</TableCell>
 
+                      {/* Date */}
+                      <TableCell>
+                        {editId === r.id ? (
+                          <Input
+                            type="date"
+                            value={form.date}
+                            onChange={(e) =>
+                              setForm({ ...form, date: e.target.value })
+                            }
+                          />
+                        ) : (
+                          r.date || "-"
+                        )}
+                      </TableCell>
+
                       {/* Start Time */}
                       <TableCell>
                         {editId === r.id ? (
                           <Input
                             type="time"
                             value={form.startTime}
-                            onChange={(e) =>
-                              setForm({ ...form, startTime: e.target.value })
-                            }
+                            onChange={(e) => {
+                              const newStartTime = e.target.value;
+                              const calculatedEndTime = calculateEndTime(newStartTime, form.duration);
+                              setForm({
+                                ...form,
+                                startTime: newStartTime,
+                                endTime: calculatedEndTime,
+                              });
+                            }}
                           />
                         ) : (
                           r.startTime || "-"
@@ -253,9 +301,8 @@ export default function ManageRoutes() {
                           <Input
                             type="time"
                             value={form.endTime}
-                            onChange={(e) =>
-                              setForm({ ...form, endTime: e.target.value })
-                            }
+                            readOnly
+                            className="bg-gray-50 cursor-not-allowed"
                           />
                         ) : (
                           r.endTime || "-"
