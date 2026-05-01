@@ -8,14 +8,31 @@ import '../models/bus_model.dart';
 import '../models/route_model.dart';
 
 class ConductorBottomNav extends StatefulWidget {
-  const ConductorBottomNav({super.key});
+  final Conductor conductor;
+  final Bus? bus;
+  final RouteModel? route;
+  final int initialIndex;
+
+  const ConductorBottomNav({
+    super.key,
+    required this.conductor,
+    this.bus,
+    this.route,
+    this.initialIndex = 0,
+  });
 
   @override
   State<ConductorBottomNav> createState() => _ConductorBottomNavState();
 }
 
 class _ConductorBottomNavState extends State<ConductorBottomNav> {
-  int _selectedIndex = 0;
+  late int _selectedIndex;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedIndex = widget.initialIndex;
+  }
 
   void _onItemTapped(int index) {
     if (_selectedIndex == index) return; // avoid reloading the same tab
@@ -23,55 +40,35 @@ class _ConductorBottomNavState extends State<ConductorBottomNav> {
 
     Widget screen;
 
-    // Dummy objects just for testing
-    final dummyConductor = Conductor(
-      id: "C001",
-      userId: "TEST123",
-      email: "test@company.com",
-      name: "kamal",
-      busId: "B001",
-      routeId: "R001",
-    );
-    final dummyBus = Bus(
-      id: "BUS-001",
-      plateNumber: "ABC-1234",
-      model: "Volvo",
-      capacity: 50,
-    );
-    final dummyRoute = RouteModel(
-      id: "R001",
-      name: "Test Route",
-      startPoint: "Origin",
-      endPoint: "Destination",
-      stops: ["Stop 1", "Stop 2", "Stop 3"],
-    );
-
     switch (index) {
       case 0:
         screen = ConductorDashboard(
-          conductor: dummyConductor,
-          bus: dummyBus,
-          route: dummyRoute,
+          conductor: widget.conductor,
+          bus: widget.bus,
+          route: widget.route,
         );
         break;
       case 1:
         screen = SeatMapScreen(
-          conductor: dummyConductor,
-          bus: dummyBus,
-          route: dummyRoute,
+          conductor: widget.conductor,
+          bus: widget.bus,
+          route: widget.route,
         );
         break;
       case 2:
-        // directly open the issue ticket screen with a placeholder seat
         screen = IssueTicketScreen(
-          seatNo: 1,
-          bus: dummyBus,
-          conductor: dummyConductor,
-          route: dummyRoute,
+          seatNo: 1, // Default seat if navigating directly from navbar
+          bus: widget.bus,
+          conductor: widget.conductor,
+          route: widget.route,
         );
         break;
       case 3:
-        screen = TripInfoScreen(conductorId: dummyConductor.userId);
+        screen = TripInfoScreen(
+          conductor: widget.conductor,
+          bus: widget.bus,
+          route: widget.route,
+        );
         break;
       default:
         return;

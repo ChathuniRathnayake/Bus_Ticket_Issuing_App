@@ -1,6 +1,6 @@
 class Conductor {
   final String id;        // Firestore document ID
-  final String userId;    // custom user identifier
+  final String conductorId;    // custom user identifier
   final String email;
   final String name;
   final String? busId;
@@ -8,7 +8,7 @@ class Conductor {
 
   Conductor({
     required this.id,
-    required this.userId,
+    required this.conductorId,
     required this.email,
     required this.name,
     this.busId,
@@ -18,7 +18,7 @@ class Conductor {
   factory Conductor.fromMap(Map<String, dynamic> map, {String? id}) {
     return Conductor(
       id: id ?? map['id'] ?? '',
-      userId: map['userId'] ?? '',
+      conductorId: map['conductorId'] ?? '',
       email: map['email'] ?? '',
       name: map['name'] ?? '',
       busId: map['busId'],
@@ -28,7 +28,7 @@ class Conductor {
 
   Map<String, dynamic> toMap() {
     return {
-      'userId': userId,
+      'conductorId': conductorId,
       'email': email,
       'name': name,
       'busId': busId,

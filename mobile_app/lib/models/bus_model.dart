@@ -2,13 +2,15 @@ class Bus {
   final String id;
   final String plateNumber;
   final String model;
-  final int capacity;
+  final String? routeId;
+  final int totalSeats;
 
   Bus({
     required this.id,
     required this.plateNumber,
     required this.model,
-    required this.capacity,
+    this.routeId,
+    required this.totalSeats,
   });
 
   factory Bus.fromMap(Map<String, dynamic> map, {String? id}) {
@@ -16,7 +18,9 @@ class Bus {
       id: id ?? map['id'] ?? '',
       plateNumber: map['plateNumber'] ?? '',
       model: map['model'] ?? '',
-      capacity: map['capacity'] ?? 0,
+      routeId: map['routeId']?.toString(),
+      totalSeats: int.tryParse(map['totalSeats']?.toString() ?? '0') ?? 
+                  int.tryParse(map['capacity']?.toString() ?? '0') ?? 0,
     );
   }
 
@@ -24,7 +28,7 @@ class Bus {
     return {
       'plateNumber': plateNumber,
       'model': model,
-      'capacity': capacity,
+      'totalSeats': totalSeats,
     };
   }
 }

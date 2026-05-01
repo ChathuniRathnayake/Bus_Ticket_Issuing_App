@@ -28,16 +28,32 @@ class ConductorAuthService {
       Bus? bus;
       RouteModel? route;
 
-      // Fetch bus if linked
+      // Fetch bus and route
       if (conductor.busId != null) {
         final busDoc = await _firestore.collection('buses').doc(conductor.busId).get();
-        if (busDoc.exists) bus = Bus.fromMap(busDoc.data()!, id: busDoc.id);
-      }
-
-      // Fetch route if linked
-      if (conductor.routeId != null) {
-        final routeDoc = await _firestore.collection('routes').doc(conductor.routeId).get();
-        if (routeDoc.exists) route = RouteModel.fromMap(routeDoc.data()!, id: routeDoc.id);
+        if (busDoc.exists) {
+          bus = Bus.fromMap(busDoc.data()!, id: busDoc.id);
+          
+          // Fetch route using bus.routeId (since conductor doesn't have it)
+          final activeRouteId = bus.routeId ?? conductor.routeId;
+          if (activeRouteId != null) {
+            // Try fetching by document ID first
+            var routeDoc = await _firestore.collection('routes').doc(activeRouteId).get();
+            if (routeDoc.exists) {
+              route = RouteModel.fromMap(routeDoc.data()!, id: routeDoc.id);
+            } else {
+              // If not found by ID, try searching by routeId field
+              final routeQuery = await _firestore
+                  .collection('routes')
+                  .where('routeId', isEqualTo: activeRouteId)
+                  .limit(1)
+                  .get();
+              if (routeQuery.docs.isNotEmpty) {
+                route = RouteModel.fromMap(routeQuery.docs.first.data(), id: routeQuery.docs.first.id);
+              }
+            }
+          }
+        }
       }
 
       return {

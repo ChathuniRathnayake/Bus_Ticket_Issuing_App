@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:mobile_app/conductor/auth/conductor_login.dart';
 import 'package:mobile_app/models/bus_model.dart';
 import 'package:mobile_app/models/conductor_model.dart';
@@ -51,37 +52,41 @@ class ConductorDashboard extends StatelessWidget {
                   size: 28,
                 ),
                 onPressed: () {
-                  Navigator.pushReplacement(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => const ConductorLoginScreen(),
-                    ),
-                  );
+                  if (Navigator.canPop(context)) {
+                    Navigator.pop(context);
+                  }
                 },
               ),
 
-              // Conductor ID pill
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 6,
-                ),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF00ACC1),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.person, size: 16, color: Colors.white),
-                    const SizedBox(width: 4),
-                    Text(
-                      conductor.userId,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
+              // Conductor Name pill
+              Expanded(
+                child: Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF00ACC1),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.person, size: 16, color: Colors.white),
+                      const SizedBox(width: 4),
+                      Flexible(
+                        child: Text(
+                          conductor.name,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
 
@@ -102,92 +107,222 @@ class ConductorDashboard extends StatelessWidget {
         ),
       ),
       body: SafeArea(
-        child: Column(
-          children: [
-            const SizedBox(height: 12),
-            // Dashboard title
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 20, vertical: 4),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  "Conductor Dashboard",
-                  style: TextStyle(
-                    fontSize: 26,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black87,
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 10),
+        child: bus == null
+            ? _buildStaticDashboard(context)
+            : StreamBuilder<DocumentSnapshot>(
+                stream: FirebaseFirestore.instance
+                    .collection('buses')
+                    .doc(bus!.id)
+                    .snapshots(),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
 
-            // Main Content Area
-            Expanded(
-              child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: Colors.grey[100],
-                  borderRadius: const BorderRadius.only(
-                    topLeft: Radius.circular(30),
-                    topRight: Radius.circular(30),
-                  ),
-                ),
-                child: SingleChildScrollView(
-                  child: Column(
-                    children: [
-                      _buildInfoCard(
-                        icon: Icons.directions_bus,
-                        title: "Bus Information",
-                        details: {
-                          "Bus ID": bus?.id ?? "BUS-101",
-                          "Route": route?.name ?? "Downtown Express",
-                        },
-                      ),
-                      _buildInfoCard(
-                        icon: Icons.location_on,
-                        title: "Location Status",
-                        details: {
-                          "Current Location": "Market Square",
-                          "Next Stop": route?.stops?.isNotEmpty == true
-                              ? route!.stops!.first
-                              : route?.endPoint ?? "University Campus",
-                        },
-                      ),
-                      _buildInfoCard(
-                        icon: Icons.airline_seat_recline_normal,
-                        title: "Seat Availability",
-                        details: {"Available": "31", "Booked": "9"},
-                        isAvailability: true,
-                      ),
-                      const SizedBox(height: 20),
-                      // Navigate to Seat Map
-                      CustomButton(
-                        text: "View Seat Map",
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => SeatMapScreen(
-                                conductor: conductor,
-                                bus: bus,
-                                route: route,
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                    ],
-                  ),
-                ),
+                  if (snapshot.hasError) {
+                    return Center(child: Text('Error: ${snapshot.error}'));
+                  }
+
+                  Map<String, dynamic>? busData;
+                  if (snapshot.hasData && snapshot.data!.exists) {
+                    busData = snapshot.data!.data() as Map<String, dynamic>?;
+                  }
+
+                  return StreamBuilder<QuerySnapshot>(
+                    stream: FirebaseFirestore.instance
+                        .collection('seats')
+                        .where('busId', isEqualTo: bus!.id)
+                        .snapshots(),
+                    builder: (context, seatsSnapshot) {
+                      final bookedCount = seatsSnapshot.hasData ? seatsSnapshot.data!.docs.length : 0;
+                      final total = bus?.totalSeats ?? int.tryParse(busData?['totalSeats']?.toString() ?? '0') ?? 40;
+                      final availableCount = (total - bookedCount).clamp(0, total);
+
+                      final currentLocation = busData?['currentLocation'] ?? "Unknown";
+                      final availableSeats = availableCount.toString();
+                      final bookedSeats = bookedCount.toString();
+
+                      final String? activeRouteId = busData?['routeId'] ?? bus?.routeId ?? route?.id ?? conductor.routeId;
+
+                      if (activeRouteId != null && activeRouteId.isNotEmpty) {
+                        return StreamBuilder<QuerySnapshot>(
+                          stream: FirebaseFirestore.instance
+                              .collection('routes')
+                              .where('routeId', isEqualTo: activeRouteId)
+                              .limit(1)
+                              .snapshots(),
+                          builder: (context, routeSnapshot) {
+                        String routeName = route?.routeName ?? "Unknown";
+                        String nextStop = busData?['nextStop'] ??
+                            (route?.stops?.isNotEmpty == true
+                                ? route!.stops!.first
+                                : route?.endStop ?? "Unknown");
+
+                        if (routeSnapshot.hasData && routeSnapshot.data!.docs.isNotEmpty) {
+                          final routeDoc = routeSnapshot.data!.docs.first;
+                          final routeData = routeDoc.data() as Map<String, dynamic>?;
+                          routeName = routeData?['routeName'] ?? 
+                                      routeData?['routeId']?.toString() ?? 
+                                      routeName;
+
+                          if (busData?['nextStop'] == null) {
+                            final List<dynamic>? stops = routeData?['stops'];
+                            if (stops != null && stops.isNotEmpty) {
+                              nextStop = stops.first.toString();
+                            } else {
+                              nextStop = routeData?['endStop'] ?? routeData?['endPoint'] ?? nextStop;
+                            }
+                          }
+                        }
+
+                        return _buildDashboardContent(
+                          context: context,
+                          currentLocation: currentLocation,
+                          nextStop: nextStop,
+                          availableSeats: availableSeats,
+                          bookedSeats: bookedSeats,
+                          routeName: routeName,
+                          routeId: activeRouteId,
+                        );
+                      },
+                    );
+                  }
+
+                  // Fallback if no route ID is found
+                  final nextStop = busData?['nextStop'] ??
+                      (route?.stops?.isNotEmpty == true
+                          ? route!.stops!.first
+                          : route?.endStop ?? "Unknown");
+                  final routeName = route?.routeName ?? "Unknown";
+
+                  return _buildDashboardContent(
+                    context: context,
+                    currentLocation: currentLocation,
+                    nextStop: nextStop,
+                    availableSeats: availableSeats,
+                    bookedSeats: bookedSeats,
+                    routeName: routeName,
+                    routeId: activeRouteId ?? "Unknown",
+                  );
+                    },
+                  );
+                },
               ),
-            ),
-          ],
-        ),
       ),
       // Bottom Navigation
-      bottomNavigationBar: const ConductorBottomNav(),
+      bottomNavigationBar: ConductorBottomNav(
+        conductor: conductor,
+        bus: bus,
+        route: route,
+        initialIndex: 0,
+      ),
+    );
+  }
+
+  Widget _buildStaticDashboard(BuildContext context) {
+    return _buildDashboardContent(
+      context: context,
+      currentLocation: "Unknown",
+      nextStop: route?.stops?.isNotEmpty == true
+          ? route!.stops!.first
+          : route?.endStop ?? "Unknown",
+      availableSeats: "0",
+      bookedSeats: "0",
+      routeName: route?.routeName ?? "Unknown",
+      routeId: route?.id ?? "Unknown",
+    );
+  }
+
+  Widget _buildDashboardContent({
+    required BuildContext context,
+    required String currentLocation,
+    required String nextStop,
+    required String availableSeats,
+    required String bookedSeats,
+    required String routeName,
+    required String routeId,
+  }) {
+    return Column(
+      children: [
+        const SizedBox(height: 12),
+        // Dashboard title
+        const Padding(
+          padding: EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              "Conductor Dashboard",
+              style: TextStyle(
+                fontSize: 26,
+                fontWeight: FontWeight.bold,
+                color: Colors.black87,
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 10),
+
+        // Main Content Area
+        Expanded(
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Colors.grey[100],
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(30),
+                topRight: Radius.circular(30),
+              ),
+            ),
+            child: SingleChildScrollView(
+              child: Column(
+                children: [
+                  _buildInfoCard(
+                    icon: Icons.directions_bus,
+                    title: "Bus Information",
+                    details: {
+                      "Bus ID": bus?.id ?? "Unknown",
+                      "Route ID": routeId,
+                      "Route Name": routeName,
+                    },
+                  ),
+                  _buildInfoCard(
+                    icon: Icons.location_on,
+                    title: "Location Status",
+                    details: {
+                      "Current Location": currentLocation,
+                      "Next Stop": nextStop,
+                    },
+                  ),
+                  _buildInfoCard(
+                    icon: Icons.airline_seat_recline_normal,
+                    title: "Seat Availability",
+                    details: {"Available": availableSeats, "Booked": bookedSeats},
+                    isAvailability: true,
+                  ),
+                  const SizedBox(height: 20),
+                  // Navigate to Seat Map
+                  CustomButton(
+                    text: "View Seat Map",
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => SeatMapScreen(
+                            conductor: conductor,
+                            bus: bus,
+                            route: route,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 
