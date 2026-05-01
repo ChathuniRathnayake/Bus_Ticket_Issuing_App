@@ -7,6 +7,7 @@ import busRoutes from "./routes/busRoutes.js";
 import conductorRoutes from "./routes/conductorRoutes.js";
 import passengerRoutes from "./routes/passengerRoutes.js";
 import routeRoutes from "./routes/routeRoutes.js";
+import ticketRoutes from "./routes/ticketRoutes.js";
 
 dotenv.config();
 
@@ -20,6 +21,7 @@ app.use("/api/bus", busRoutes);
 app.use("/api/conductor", conductorRoutes);
 app.use("/api/passenger", passengerRoutes);
 app.use("/api/route", routeRoutes);
+app.use("/api/ticket", ticketRoutes);
 
 app.get("/", (req, res) => res.send("🚀 Backend running"));
 
