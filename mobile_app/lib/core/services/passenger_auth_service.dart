@@ -38,6 +38,7 @@ class PassengerAuthService {
   Future<User?> loginPassenger({
     required String email,
     required String password,
+    bool checkEmailVerified = true,
   }) async {
     final credential = await _auth.signInWithEmailAndPassword(
       email: email,
@@ -51,7 +52,7 @@ class PassengerAuthService {
       throw Exception("Not authorized as passenger");
     }
 
-    if (!credential.user!.emailVerified) {
+    if (checkEmailVerified && !credential.user!.emailVerified) {
       throw Exception("Email not verified");
     }
 

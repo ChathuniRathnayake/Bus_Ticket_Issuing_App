@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:mobile_app/conductor/seat_map/seat_map_screen.dart';
 import '../../models/bus_model.dart';
 import '../../models/conductor_model.dart';
 import '../../models/route_model.dart';

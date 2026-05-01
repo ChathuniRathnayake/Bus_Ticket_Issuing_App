@@ -50,7 +50,7 @@ class _PassengerSignUpScreenState extends State<PassengerSignUpScreen> {
         width: double.infinity,
         decoration: const BoxDecoration(
           image: DecorationImage(
-            image: AssetImage('assets/images/auth_bg.png'),
+            image: AssetImage('assets/images/background.png'),
             fit: BoxFit.cover,
           ),
         ),

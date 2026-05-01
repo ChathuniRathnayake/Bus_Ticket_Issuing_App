@@ -4,6 +4,8 @@ import '../../widgets/custom_button.dart';
 import '../passenger_bottom_nav.dart';
 import '../auth/passenger_login.dart';
 import 'bus_results_screen.dart';
+import '../../core/services/passenger_data_service.dart';
+import '../../models/route_model.dart';
 
 class PassengerDashboard extends StatefulWidget {
   const PassengerDashboard({super.key});
@@ -18,25 +20,31 @@ class _PassengerDashboardState extends State<PassengerDashboard> {
   String? _toStop;
   int _selectedIndex = 0;
 
-  final List<String> _busStops = [
-    'Colombo',
-    'Kandy',
-    'Galle',
-    'Matara',
-    'Jaffna',
-    'Anuradhapura',
-    'Kurunegala',
-    'Ratnapura',
-    'Badulla',
-    'Trincomalee',
-  ];
+  final PassengerDataService _dataService = PassengerDataService();
+  List<String> _busStops = [];
+  List<RouteModel> _popularRoutes = [];
+  bool _isLoading = true;
 
-  final List<Map<String, String>> _popularRoutes = [
-    {'from': 'Colombo', 'to': 'Kandy', 'price': 'Rs. 450'},
-    {'from': 'Colombo', 'to': 'Galle', 'price': 'Rs. 600'},
-    {'from': 'Kandy', 'to': 'Anuradhapura', 'price': 'Rs. 550'},
-    {'from': 'Matara', 'to': 'Colombo', 'price': 'Rs. 750'},
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    try {
+      final stops = await _dataService.getBusStops();
+      final routes = await _dataService.getPopularRoutes();
+      setState(() {
+        _busStops = stops;
+        _popularRoutes = routes;
+        _isLoading = false;
+      });
+    } catch (e) {
+      print("Error loading dashboard data: $e");
+      setState(() => _isLoading = false);
+    }
+  }
 
   Future<void> _selectDate(BuildContext context) async {
     final DateTime? picked = await showDatePicker(
@@ -216,7 +224,7 @@ class _PassengerDashboardState extends State<PassengerDashboard> {
                             ),
                           ),
                         );
-                      },
+                        },
                     ),
                   ],
                 ),
@@ -235,55 +243,59 @@ class _PassengerDashboardState extends State<PassengerDashboard> {
               const SizedBox(height: 16),
               
               // Popular Routes List
-              ListView.separated(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                itemCount: _popularRoutes.length,
-                separatorBuilder: (context, index) => const SizedBox(height: 12),
-                itemBuilder: (context, index) {
-                  final route = _popularRoutes[index];
-                  return Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.blue.withOpacity(0.1)),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              '${route['from']} → ${route['to']}',
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16,
-                              ),
-                            ),
-                            const Text(
-                              'Daily Trips Available',
-                              style: TextStyle(
-                                color: Colors.grey,
-                                fontSize: 12,
-                              ),
-                            ),
-                          ],
-                        ),
-                        Text(
-                          route['price']!,
-                          style: const TextStyle(
-                            color: Colors.blue,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
+              _isLoading 
+                ? const Center(child: CircularProgressIndicator())
+                : _popularRoutes.isEmpty
+                  ? const Center(child: Text("No routes available"))
+                  : ListView.separated(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: _popularRoutes.length,
+                      separatorBuilder: (context, index) => const SizedBox(height: 12),
+                      itemBuilder: (context, index) {
+                        final route = _popularRoutes[index];
+                        return Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: Colors.blue.withOpacity(0.1)),
                           ),
-                        ),
-                      ],
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    '${route.startStop} → ${route.endStop}',
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 16,
+                                    ),
+                                  ),
+                                  const Text(
+                                    'Daily Trips Available',
+                                    style: TextStyle(
+                                      color: Colors.grey,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              Text(
+                                route.price ?? 'N/A',
+                                style: const TextStyle(
+                                  color: Colors.blue,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
                     ),
-                  );
-                },
-              ),
               const SizedBox(height: 20),
             ],
           ),

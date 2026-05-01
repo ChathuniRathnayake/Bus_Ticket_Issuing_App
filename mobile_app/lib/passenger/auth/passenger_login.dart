@@ -5,6 +5,7 @@ import '../../widgets/custom_textfield.dart';
 import 'passenger_signup.dart';
 import 'forgot_password.dart';
 import '../dashboard/dashboard_screen.dart';
+import '../../core/services/passenger_auth_service.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -22,8 +23,7 @@ class _PassengerLoginScreenState
       TextEditingController();
 
   bool _isLoading = false;
-
-  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final PassengerAuthService _authService = PassengerAuthService();
 
   Future<void> _login() async {
     final email = emailController.text.trim();
@@ -42,28 +42,11 @@ class _PassengerLoginScreenState
     try {
       setState(() => _isLoading = true);
 
-      final credential =
-          await _auth.signInWithEmailAndPassword(
+      await _authService.loginPassenger(
         email: email,
         password: password,
+        checkEmailVerified: false, // Set to true if you want to enforce verification
       );
-
-      // Email verification check
-      /*
-      if (!credential.user!.emailVerified) {
-        await _auth.signOut();
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content:
-                Text("Please verify your email before login."),
-            backgroundColor: Colors.orange,
-          ),
-        );
-
-        setState(() => _isLoading = false);
-        return;
-      }*/
 
       // Success → Go to Dashboard
       Navigator.pushReplacement(
@@ -72,27 +55,24 @@ class _PassengerLoginScreenState
           builder: (_) => const PassengerDashboard(),
         ),
       );
-    } on FirebaseAuthException catch (e) {
+    } catch (e) {
       String message = "Login failed";
-
-      if (e.code == 'user-not-found') {
-        message = "No user found with this email";
-      } else if (e.code == 'wrong-password') {
-        message = "Incorrect password";
-      } else if (e.code == 'invalid-email') {
-        message = "Invalid email format";
+      
+      if (e is FirebaseAuthException) {
+        if (e.code == 'user-not-found') {
+          message = "No user found with this email";
+        } else if (e.code == 'wrong-password') {
+          message = "Incorrect password";
+        } else if (e.code == 'invalid-email') {
+          message = "Invalid email format";
+        }
+      } else {
+        message = e.toString().replaceAll("Exception: ", "");
       }
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(message),
-          backgroundColor: Colors.red,
-        ),
-      );
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Something went wrong"),
           backgroundColor: Colors.red,
         ),
       );
@@ -137,7 +117,6 @@ class _PassengerLoginScreenState
                 ),
 
                 const SizedBox(height: 40),
-
                 // White Card
                 Container(
                   width: double.infinity,

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import '../auth/passenger_login.dart';
 import '../passenger_bottom_nav.dart';
 import 'bus_details_screen.dart';
+import '../../core/services/passenger_data_service.dart';
+import '../../models/route_model.dart';
 
 class BusResultsScreen extends StatefulWidget {
   final String from;
@@ -21,36 +23,43 @@ class BusResultsScreen extends StatefulWidget {
 
 class _BusResultsScreenState extends State<BusResultsScreen> {
   int _selectedIndex = 1; // "Find" tab active by default
+  final PassengerDataService _dataService = PassengerDataService();
+  List<Map<String, String>> _availableBuses = [];
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadBuses();
+  }
+
+  Future<void> _loadBuses() async {
+    try {
+      final buses = await _dataService.getBusesForRoute(widget.from, widget.to);
+      final routes = await _dataService.searchRoutes(widget.from, widget.to);
+      final routePrice = routes.isNotEmpty ? routes.first.price ?? "Rs. 0" : "Rs. 0";
+
+      setState(() {
+        _availableBuses = buses.map((bus) {
+          return <String, String>{
+            'busName': (bus['model'] ?? 'Unknown Bus').toString(),
+            'time': 'Scheduled', // You might want to add a time field to your bus/schedule model
+            'price': routePrice.toString(),
+            'type': (bus['plateNumber'] ?? '').toString(),
+            'id': (bus['id'] ?? '').toString(),
+          };
+        }).toList();
+        _isLoading = false;
+      });
+    } catch (e) {
+      print("Error loading buses: $e");
+      setState(() => _isLoading = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    // Mock data for display
-    final List<Map<String, String>> availableBuses = [
-      {
-        'busName': 'Express Line 502',
-        'time': '08:30 AM',
-        'price': 'Rs. 450.00',
-        'type': 'Luxury A/C',
-      },
-      {
-        'busName': 'Intercity 104',
-        'time': '10:15 AM',
-        'price': 'Rs. 380.00',
-        'type': 'Semi-Luxury',
-      },
-      {
-        'busName': 'Super Line 205',
-        'time': '01:45 PM',
-        'price': 'Rs. 500.00',
-        'type': 'Luxury A/C',
-      },
-      {
-        'busName': 'Night Express 301',
-        'time': '08:00 PM',
-        'price': 'Rs. 650.00',
-        'type': 'Super Luxury',
-      },
-    ];
+
 
     return Scaffold(
       backgroundColor: const Color(0xFFF5F5F5),
@@ -97,14 +106,18 @@ class _BusResultsScreenState extends State<BusResultsScreen> {
           ),
           const Divider(height: 1),
           Expanded(
-            child: ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: availableBuses.length,
-              itemBuilder: (context, index) {
-                final bus = availableBuses[index];
-                return _buildBusCard(context, bus);
-              },
-            ),
+            child: _isLoading 
+              ? const Center(child: CircularProgressIndicator())
+              : _availableBuses.isEmpty
+                ? const Center(child: Text("No buses available for this route"))
+                : ListView.builder(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: _availableBuses.length,
+                    itemBuilder: (context, index) {
+                      final bus = _availableBuses[index];
+                      return _buildBusCard(context, bus);
+                    },
+                  ),
           ),
         ],
       ),
@@ -118,7 +131,6 @@ class _BusResultsScreenState extends State<BusResultsScreen> {
       ),
     );
   }
-
   Widget _buildBusCard(BuildContext context, Map<String, String> bus) {
     return Container(
       margin: const EdgeInsets.only(bottom: 16),

@@ -4,6 +4,7 @@ class RouteModel {
   final String startStop;
   final String endStop;
   final List<String>? stops;
+  final String? price;
 
   RouteModel({
     required this.id,
@@ -11,6 +12,7 @@ class RouteModel {
     required this.startStop,
     required this.endStop,
     this.stops,
+    this.price,
   });
 
   factory RouteModel.fromMap(Map<String, dynamic> map, {String? id}) {
@@ -20,6 +22,7 @@ class RouteModel {
       startStop: map['startStop'] ?? map['startPoint'] ?? '',
       endStop: map['endStop'] ?? map['endPoint'] ?? '',
       stops: map['stops'] != null ? List<String>.from(map['stops']) : null,
+      price: map['price']?.toString(),
     );
   }
 
@@ -29,6 +32,7 @@ class RouteModel {
       'startStop': startStop,
       'endStop': endStop,
       'stops': stops,
+      'price': price,
     };
   }
 }
