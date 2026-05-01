@@ -8,6 +8,7 @@ import '../../core/services/passenger_data_service.dart';
 import '../../models/route_model.dart';
 import 'my_tickets_screen.dart';
 import 'profile_screen.dart';
+import 'route_details_screen.dart';
 import '../../models/halt_model.dart';
 import '../../widgets/passenger_app_bar.dart';
 
@@ -264,7 +265,7 @@ class _PassengerDashboardState extends State<PassengerDashboard> {
               const SizedBox(height: 32),
               
               const Text(
-                'Popular Routes',
+                'Available Routes',
                 style: TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
@@ -289,38 +290,84 @@ class _PassengerDashboardState extends State<PassengerDashboard> {
                           padding: const EdgeInsets.all(16),
                           decoration: BoxDecoration(
                             color: Colors.white,
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: Colors.blue.withOpacity(0.1)),
+                            borderRadius: BorderRadius.circular(16),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.05),
+                                blurRadius: 10,
+                                offset: const Offset(0, 5),
+                              ),
+                            ],
                           ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          child: Column(
                             children: [
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                 children: [
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          route.routeName,
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 16,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Row(
+                                          children: [
+                                            const Icon(Icons.location_on, size: 14, color: Colors.green),
+                                            const SizedBox(width: 4),
+                                            Expanded(
+                                              child: Text(
+                                                '${route.startStop} → ${route.endStop}',
+                                                style: TextStyle(
+                                                  color: Colors.grey[600],
+                                                  fontSize: 12,
+                                                ),
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ],
+                                    ),
+                                  ),
                                   Text(
-                                    '${route.startStop} → ${route.endStop}',
+                                    route.price ?? 'N/A',
                                     style: const TextStyle(
+                                      color: Colors.blue,
                                       fontWeight: FontWeight.bold,
                                       fontSize: 16,
                                     ),
                                   ),
-                                  const Text(
-                                    'Daily Trips Available',
-                                    style: TextStyle(
-                                      color: Colors.grey,
-                                      fontSize: 12,
+                                ],
+                              ),
+                              const SizedBox(height: 12),
+                              const Divider(),
+                              const SizedBox(height: 8),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.end,
+                                children: [
+                                  TextButton.icon(
+                                    onPressed: () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (_) => RouteDetailsScreen(route: route),
+                                        ),
+                                      );
+                                    },
+                                    icon: const Icon(Icons.info_outline, size: 18),
+                                    label: const Text('View Details'),
+                                    style: TextButton.styleFrom(
+                                      foregroundColor: Colors.blue,
+                                      padding: const EdgeInsets.symmetric(horizontal: 16),
                                     ),
                                   ),
                                 ],
-                              ),
-                              Text(
-                                route.price ?? 'N/A',
-                                style: const TextStyle(
-                                  color: Colors.blue,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 16,
-                                ),
                               ),
                             ],
                           ),

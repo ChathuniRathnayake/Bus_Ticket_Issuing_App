@@ -70,22 +70,35 @@ class PassengerDataService {
   // Search routes based on from and to halts
   Future<List<RouteModel>> searchRoutes(String from, String to) async {
     try {
-      // 1. Get routeIds that pass through 'from'
+      final Set<String> matchingRouteIds = {};
+
+      // 1. Direct match with startStop and endStop in 'routes' collection
+      final directMatchSnapshot = await _firestore
+          .collection('routes')
+          .where('startStop', isEqualTo: from)
+          .where('endStop', isEqualTo: to)
+          .get();
+      
+      for (var doc in directMatchSnapshot.docs) {
+        matchingRouteIds.add(doc.id);
+      }
+
+      // 2. Search via 'halts' collection for intermediate halts
+      // Get routeIds that pass through 'from'
       final fromSnapshot = await _firestore.collection('halts').where('name', isEqualTo: from).get();
       final fromRoutes = fromSnapshot.docs.map((doc) => {
         'routeId': (doc.data()['routeId'] ?? '').toString(),
         'order': int.tryParse(doc.data()['order']?.toString() ?? '0') ?? 0
       }).toList();
 
-      // 2. Get routeIds that pass through 'to'
+      // Get routeIds that pass through 'to'
       final toSnapshot = await _firestore.collection('halts').where('name', isEqualTo: to).get();
       final toRoutes = toSnapshot.docs.map((doc) => {
         'routeId': (doc.data()['routeId'] ?? '').toString(),
         'order': int.tryParse(doc.data()['order']?.toString() ?? '0') ?? 0
       }).toList();
 
-      // 3. Find matching routeIds where fromOrder < toOrder
-      final matchingRouteIds = <String>[];
+      // Find matching routeIds where fromOrder < toOrder
       for (var f in fromRoutes) {
         for (var t in toRoutes) {
           if (f['routeId'] == t['routeId'] && (f['order'] as int) < (t['order'] as int)) {
@@ -94,17 +107,9 @@ class PassengerDataService {
         }
       }
 
-      if (matchingRouteIds.isEmpty) {
-        // Fallback to legacy search in case halts are not populated for a route
-        final snapshot = await _firestore
-            .collection('routes')
-            .where('startStop', isEqualTo: from)
-            .where('endStop', isEqualTo: to)
-            .get();
-        return snapshot.docs.map((doc) => RouteModel.fromMap(doc.data(), id: doc.id)).toList();
-      }
+      if (matchingRouteIds.isEmpty) return [];
 
-      // 4. Fetch the actual route documents
+      // 3. Fetch the actual route documents
       // Note: whereIn is limited to 30 items
       final routesSnapshot = await _firestore
           .collection('routes')
@@ -113,32 +118,36 @@ class PassengerDataService {
       
       return routesSnapshot.docs.map((doc) => RouteModel.fromMap(doc.data(), id: doc.id)).toList();
     } catch (e) {
-      print("Error searching routes via halts: $e");
+      print("Error searching routes via halts and direct match: $e");
       return [];
     }
   }
 
-  // Get buses assigned to a specific route
+  // Get buses assigned to specific routes matching from and to
   Future<List<Map<String, dynamic>>> getBusesForRoute(String from, String to) async {
     try {
-      // First find the route ID
       final routes = await searchRoutes(from, to);
       if (routes.isEmpty) return [];
 
-      final routeId = routes.first.id;
+      final List<Map<String, dynamic>> allBuses = [];
 
-      // Then find buses for that route
-      final snapshot = await _firestore
-          .collection('buses')
-          .where('routeId', isEqualTo: routeId)
-          .get();
+      for (var route in routes) {
+        final snapshot = await _firestore
+            .collection('buses')
+            .where('routeId', isEqualTo: route.id)
+            .get();
+        
+        for (var doc in snapshot.docs) {
+          final data = doc.data();
+          data['id'] = doc.id;
+          data['routeId'] = route.id;
+          data['routeName'] = route.routeName;
+          data['price'] = route.price;
+          allBuses.add(data);
+        }
+      }
       
-      return snapshot.docs.map((doc) {
-        final data = doc.data();
-        data['id'] = doc.id;
-        data['routeId'] = routeId; // Ensure routeId is included
-        return data;
-      }).toList();
+      return allBuses;
     } catch (e) {
       print("Error fetching buses for route: $e");
       return [];

@@ -46,10 +46,10 @@ class _BusResultsScreenState extends State<BusResultsScreen> {
       setState(() {
         _availableBuses = buses.map((bus) {
           return <String, String>{
-            'busName': (bus['model'] ?? 'Unknown Bus').toString(),
-            'time': 'Scheduled', // You might want to add a time field to your bus/schedule model
-            'price': routePrice.toString(),
-            'type': (bus['plateNumber'] ?? '').toString(),
+            'busName': (bus['routeName'] ?? bus['model'] ?? 'Unknown Route').toString(),
+            'time': 'Scheduled',
+            'price': (bus['price'] ?? routePrice).toString(),
+            'type': (bus['plateNumber'] ?? bus['model'] ?? '').toString(),
             'id': (bus['id'] ?? '').toString(),
             'routeId': (bus['routeId'] ?? '').toString(),
           };

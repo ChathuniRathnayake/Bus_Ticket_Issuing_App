@@ -93,4 +93,18 @@ class PassengerAuthService {
     if (user == null) throw Exception("No logged in user");
     await user.sendEmailVerification();
   }
+
+  // Get current passenger profile data
+  Future<Map<String, dynamic>?> getPassengerProfile() async {
+    final user = _auth.currentUser;
+    if (user == null) return null;
+    
+    try {
+      final doc = await _firestore.collection('passengers').doc(user.uid).get();
+      return doc.data();
+    } catch (e) {
+      print("Error fetching passenger profile: $e");
+      return null;
+    }
+  }
 }
