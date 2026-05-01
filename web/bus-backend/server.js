@@ -9,6 +9,7 @@ import passengerRoutes from "./routes/passengerRoutes.js";
 import routeRoutes from "./routes/routeRoutes.js";
 import ticketRoutes from "./routes/ticketRoutes.js";
 import scheduleRoutes from "./routes/scheduleRoutes.js";
+import bookingRoutes from "./routes/bookingRoutes.js";
 
 dotenv.config();
 
@@ -24,6 +25,7 @@ app.use("/api/passenger", passengerRoutes);
 app.use("/api/route", routeRoutes);
 app.use("/api/ticket", ticketRoutes);
 app.use("/api/schedule", scheduleRoutes);
+app.use("/api/booking", bookingRoutes);
 
 app.get("/", (req, res) => res.send("🚀 Backend running"));
 

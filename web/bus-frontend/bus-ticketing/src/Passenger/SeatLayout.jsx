@@ -47,8 +47,6 @@ export default function SeatLayout() {
     );
   }
 
-  // ── Read EXACT layout fields saved by admin ──────────────────────────────────
-  // All values are stored as strings in Firestore, so parseInt() them safely.
   const leftSeatsPerRow  = parseInt(bus.leftColumns)  || 2;
   const rightSeatsPerRow = parseInt(bus.rightColumns) || 2;
   const leftRows         = parseInt(bus.leftRows)     || 10;
@@ -56,14 +54,12 @@ export default function SeatLayout() {
   const backRowSeats     = parseInt(bus.backRowSeats) || 5;
   const totalSeats       = parseInt(bus.totalSeats)   || 52;
 
-  // Admin saves "yes" / "no" as strings — handle robustly
   const hasFrontSingle =
     bus.hasFrontSingle === "yes" || bus.hasFrontSingle === true;
   const hasBackFullRow =
     bus.hasBackFullRow === "yes" || bus.hasBackFullRow === true;
 
   // ── Seat state ───────────────────────────────────────────────────────────────
-
   const [bookedSeats, setBookedSeats]   = useState([]);
   const [selectedSeat, setSelectedSeat] = useState(null);
   const [showConfirm, setShowConfirm]   = useState(false);
@@ -72,21 +68,16 @@ export default function SeatLayout() {
 
   useEffect(() => {
     if (!bus) return;
-
     const fetchBookedSeats = async () => {
       setLoadingSeats(true);
       try {
         const token = localStorage.getItem("token");
         const busId = bus.id || bus.busId;
         const res = await fetch(`http://localhost:5000/api/ticket/bus/${busId}`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
+          headers: { Authorization: `Bearer ${token}` },
         });
-
         const data = await res.json();
         if (!res.ok) throw new Error(data.message || "Failed to load booked seats");
-
         setBookedSeats(data.map((ticket) => ticket.seatNo));
       } catch (error) {
         console.error(error);
@@ -95,13 +86,38 @@ export default function SeatLayout() {
         setLoadingSeats(false);
       }
     };
-
     fetchBookedSeats();
   }, [bus]);
 
-  // ── Helpers ──────────────────────────────────────────────────────────────────
-  const rowChar  = (i) => String.fromCharCode(65 + i); // 0→A, 1→B, 2→C …
+  // ── Seat number helpers ───────────────────────────────────────────────────────
+  // Seats are numbered sequentially left-to-right across the full row, top-to-bottom.
+  // F1 (conductor) is seat "C" (a special label kept separate).
+  // Back seats follow the last main-row seat number.
 
+  const seatsPerRow = leftSeatsPerRow + rightSeatsPerRow;
+
+  /**
+   * Returns the numeric seat label (as a string) for a given row and column index.
+   * colIndex: 0-based across the full row (left cols first, then right cols).
+   */
+  const getSeatNumber = (rowIdx, colIndex) => {
+    return String(rowIdx * seatsPerRow + colIndex + 1);
+  };
+
+  /**
+   * Returns the numeric label for a back-row seat.
+   * Back seats continue after the last numbered main seat.
+   */
+  const getBackSeatNumber = (backColIndex) => {
+    const mainRows = Math.max(leftRows, rightRows);
+    const lastMainSeat = mainRows * seatsPerRow;
+    return String(lastMainSeat + backColIndex + 1);
+  };
+
+  // Conductor seat label
+  const conductorSeatLabel = "C";
+
+  // ── Seat status ───────────────────────────────────────────────────────────────
   const seatStatus = (seat) => {
     if (bookedSeats.includes(seat)) return "booked";
     if (selectedSeat === seat)      return "selected";
@@ -109,16 +125,13 @@ export default function SeatLayout() {
   };
 
   const handleSeatClick = (seat) => {
-    // click same seat → deselect; click another → select it
     setSelectedSeat((prev) => (prev === seat ? null : seat));
   };
 
   const confirmBooking = async () => {
     try {
       if (!selectedSeat) return;
-
       const token = localStorage.getItem("token");
-
       const res = await fetch("http://localhost:5000/api/ticket", {
         method: "POST",
         headers: {
@@ -131,9 +144,7 @@ export default function SeatLayout() {
           routeId: bus.routeId,
         }),
       });
-
       const data = await res.json();
-
       if (!res.ok) throw new Error(data.message || "Booking failed");
 
       const bookingId = data.bookingId || `${bus.id || bus.busId}-${selectedSeat}-${Date.now()}`;
@@ -148,21 +159,19 @@ export default function SeatLayout() {
       };
 
       const existingBookings = JSON.parse(localStorage.getItem("userBookings")) || [];
-      const updatedBookings = [newBooking, ...existingBookings];
-      localStorage.setItem("userBookings", JSON.stringify(updatedBookings));
+      localStorage.setItem("userBookings", JSON.stringify([newBooking, ...existingBookings]));
 
       setBookedSeats((prev) => [...prev, selectedSeat]);
       setLastBooked(selectedSeat);
       setSelectedSeat(null);
       setShowConfirm(false);
-
       navigate("/passenger-dashboard/my-bookings");
     } catch (err) {
       alert(err.message);
     }
   };
 
-  // ── Seat counts ──────────────────────────────────────────────────────────────
+  // ── Seat counts ───────────────────────────────────────────────────────────────
   const generatedTotal =
     leftRows  * leftSeatsPerRow +
     rightRows * rightSeatsPerRow +
@@ -172,7 +181,7 @@ export default function SeatLayout() {
   const availableCount = generatedTotal - bookedSeats.length;
   const maxRows        = Math.max(leftRows, rightRows);
 
-  // ── Render ───────────────────────────────────────────────────────────────────
+  // ── Render ────────────────────────────────────────────────────────────────────
   return (
     <div className="max-w-5xl mx-auto p-6 animate-fade-in">
 
@@ -222,14 +231,13 @@ export default function SeatLayout() {
           {/* ════════════════ BUS SHELL ════════════════ */}
           <div className="border-4 border-gray-300 rounded-3xl bg-gray-50 px-6 pt-4 pb-6 overflow-x-auto">
 
-            {/* ── FRONT ROW: Driver  +  (optional) Conductor seat ── */}
+            {/* ── FRONT ROW: Driver + (optional) Conductor seat ── */}
             <div className="flex items-end justify-between pb-4 mb-4 border-b-2 border-dashed border-gray-300">
 
               {/* Driver */}
               <div className="flex flex-col items-center gap-1">
                 <span className="text-[10px] text-gray-400 font-semibold uppercase tracking-widest">Driver</span>
                 <div className="w-11 h-12 rounded-t-2xl rounded-b-md border-2 border-gray-400 bg-gray-200 flex items-center justify-center">
-                  {/* steering wheel */}
                   <svg className="w-7 h-7 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <circle cx="12" cy="12" r="9"/>
                     <circle cx="12" cy="12" r="3"/>
@@ -246,21 +254,25 @@ export default function SeatLayout() {
                 ——— FRONT ———
               </span>
 
-              {/* Conductor / front single seat */}
+              {/* Conductor seat */}
               <div className="flex flex-col items-center gap-1 min-w-[44px]">
                 {hasFrontSingle ? (
                   <>
                     <span className="text-[10px] text-gray-400 font-semibold uppercase tracking-widest">Conductor</span>
-                    <SeatBtn label="F1" status={seatStatus("F1")} onClick={handleSeatClick} />
+                    {/* Label "C" for conductor; seatNo sent to backend is also "C" */}
+                    <SeatBtn
+                      label={conductorSeatLabel}
+                      status={seatStatus(conductorSeatLabel)}
+                      onClick={handleSeatClick}
+                    />
                   </>
                 ) : (
-                  // invisible spacer so driver stays left-aligned
                   <div className="w-11 h-12 opacity-0" />
                 )}
               </div>
             </div>
 
-            {/* ── MIDDLE: Left side | Aisle | Right side ── */}
+            {/* ── MIDDLE: Left | Aisle | Right ── */}
             <div className="flex gap-0 justify-center min-w-max mx-auto">
 
               {/* LEFT */}
@@ -273,8 +285,16 @@ export default function SeatLayout() {
                     <div key={`L${rowIdx}`} className="flex gap-1">
                       {rowIdx < leftRows
                         ? Array.from({ length: leftSeatsPerRow }).map((_, col) => {
-                            const seat = `${rowChar(rowIdx)}${col + 1}`;
-                            return <SeatBtn key={seat} label={seat} status={seatStatus(seat)} onClick={handleSeatClick} />;
+                            // colIndex 0-based across full row for left side: 0, 1, …
+                            const seat = getSeatNumber(rowIdx, col);
+                            return (
+                              <SeatBtn
+                                key={seat}
+                                label={seat}
+                                status={seatStatus(seat)}
+                                onClick={handleSeatClick}
+                              />
+                            );
                           })
                         : Array.from({ length: leftSeatsPerRow }).map((_, col) => (
                             <div key={`gl${rowIdx}${col}`} className="w-11 h-12" />
@@ -287,8 +307,10 @@ export default function SeatLayout() {
 
               {/* AISLE */}
               <div className="flex items-center justify-center w-14 mx-2">
-                <span className="text-[9px] font-semibold text-gray-300 tracking-[0.35em] uppercase"
-                  style={{ writingMode: "vertical-rl" }}>
+                <span
+                  className="text-[9px] font-semibold text-gray-300 tracking-[0.35em] uppercase"
+                  style={{ writingMode: "vertical-rl" }}
+                >
                   AISLE
                 </span>
               </div>
@@ -303,8 +325,16 @@ export default function SeatLayout() {
                     <div key={`R${rowIdx}`} className="flex gap-1">
                       {rowIdx < rightRows
                         ? Array.from({ length: rightSeatsPerRow }).map((_, col) => {
-                            const seat = `${rowChar(rowIdx)}${leftSeatsPerRow + col + 1}`;
-                            return <SeatBtn key={seat} label={seat} status={seatStatus(seat)} onClick={handleSeatClick} />;
+                            // colIndex continues after left seats: leftSeatsPerRow, leftSeatsPerRow+1, …
+                            const seat = getSeatNumber(rowIdx, leftSeatsPerRow + col);
+                            return (
+                              <SeatBtn
+                                key={seat}
+                                label={seat}
+                                status={seatStatus(seat)}
+                                onClick={handleSeatClick}
+                              />
+                            );
                           })
                         : Array.from({ length: rightSeatsPerRow }).map((_, col) => (
                             <div key={`gr${rowIdx}${col}`} className="w-11 h-12" />
@@ -317,7 +347,7 @@ export default function SeatLayout() {
 
             </div>{/* end middle */}
 
-            {/* ── BACK ROW (full width) ── */}
+            {/* ── BACK ROW ── */}
             {hasBackFullRow && (
               <div className="mt-5 pt-4 border-t-2 border-dashed border-gray-300">
                 <p className="text-[10px] text-gray-400 font-semibold tracking-widest text-center mb-3 uppercase">
@@ -325,8 +355,15 @@ export default function SeatLayout() {
                 </p>
                 <div className="flex justify-center gap-1 flex-wrap">
                   {Array.from({ length: backRowSeats }).map((_, col) => {
-                    const seat = `Back${col + 1}`;
-                    return <SeatBtn key={seat} label={seat} status={seatStatus(seat)} onClick={handleSeatClick} />;
+                    const seat = getBackSeatNumber(col);
+                    return (
+                      <SeatBtn
+                        key={seat}
+                        label={seat}
+                        status={seatStatus(seat)}
+                        onClick={handleSeatClick}
+                      />
+                    );
                   })}
                 </div>
               </div>
@@ -343,7 +380,7 @@ export default function SeatLayout() {
           <div className="mt-6 flex items-center justify-between flex-wrap gap-4">
             <p className="text-sm text-muted-foreground">
               {selectedSeat
-                ? <>Selected: <span className="font-semibold text-blue-700 bg-blue-100 px-2 py-0.5 rounded-md">{selectedSeat}</span></>
+                ? <>Selected: <span className="font-semibold text-blue-700 bg-blue-100 px-2 py-0.5 rounded-md">Seat {selectedSeat}</span></>
                 : "Click an available seat to select it"}
             </p>
             <Button
@@ -367,7 +404,6 @@ export default function SeatLayout() {
             </CardHeader>
             <CardContent className="p-6 space-y-6">
               <div className="text-center space-y-3">
-                {/* mini seat preview */}
                 <div className="w-14 h-16 rounded-t-2xl rounded-b-md border-2 border-blue-400 bg-blue-50 mx-auto flex items-center justify-center relative">
                   <span className="absolute top-1 left-1 right-1 h-4 rounded-t-xl bg-blue-200" />
                   <span className="relative z-10 text-blue-700 font-bold text-xs">{selectedSeat}</span>

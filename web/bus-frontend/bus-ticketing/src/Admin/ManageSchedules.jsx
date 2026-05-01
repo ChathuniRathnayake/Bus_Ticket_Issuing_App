@@ -15,10 +15,17 @@ import {
 } from "@/components/ui/table";
 import { ArrowLeft, Pencil, Trash2, Calendar } from "lucide-react";
 
-export default function ManageSchedules({ buses, routes, schedules, setSchedules }) {
+export default function ManageSchedules() {
   const navigate = useNavigate();
+
+  const [schedules, setSchedules] = useState([]);
+  const [filteredSchedules, setFilteredSchedules] = useState([]);
+  const [buses, setBuses] = useState([]);
+  const [routes, setRoutes] = useState([]);
+
   const [loading, setLoading] = useState(false);
   const [editId, setEditId] = useState(null);
+
   const [form, setForm] = useState({
     scheduleId: "",
     busId: "",
@@ -27,69 +34,76 @@ export default function ManageSchedules({ buses, routes, schedules, setSchedules
     departureTime: "",
     status: "",
   });
-  const [filteredSchedules, setFilteredSchedules] = useState([]);
 
   const token = localStorage.getItem("token");
 
-  // FETCH ALL SCHEDULES
-  const fetchSchedules = async () => {
-    if (!token) return;
-    try {
-      setLoading(true);
-      const res = await axios.get("http://localhost:5000/api/schedule", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
-      // Merge schedule data with bus and route data
-      const schedulesWithDetails = res.data.map((schedule) => {
-        const bus = buses.find((b) => b.busId === schedule.busId);
-        const route = routes.find((r) => r.routeId === schedule.routeId);
-
-        return {
-          ...schedule,
-          busNo: bus?.busNo || "Unknown",
-          routeName: route ? `${route.startStop} → ${route.endStop}` : "Unknown",
-          routeDistance: route?.distance || "",
-          routeDuration: route?.duration || "",
-        };
-      });
-
-      // Sort by date and time in ascending order
-      schedulesWithDetails.sort((a, b) => {
-        const dateA = new Date(`${a.date}T${a.departureTime}`);
-        const dateB = new Date(`${b.date}T${b.departureTime}`);
-        return dateA - dateB;
-      });
-
-      setSchedules(schedulesWithDetails);
-      setFilteredSchedules(schedulesWithDetails);
-    } catch (error) {
-      console.error(error);
-      alert(error.response?.data?.message || "Failed to fetch schedules");
-    } finally {
-      setLoading(false);
-    }
-  };
-
+  // 🔥 FETCH EVERYTHING (FIXED)
   useEffect(() => {
-    const token = localStorage.getItem("token");
+    const loadData = async () => {
+      try {
+        if (!token) {
+          navigate("/admin-login");
+          return;
+        }
 
-    if (!token) {
-      alert("Session expired. Please login again.");
-      navigate("/admin-login");
-      return;
-    }
+        setLoading(true);
 
-    // Optional: Check if token looks valid (basic check)
-    if (token.length < 100) {
-      alert("Invalid token. Please login again.");
-      navigate("/admin-login");
-      return;
-    }
+        const [scheduleRes, busRes, routeRes] = await Promise.all([
+          axios.get("http://localhost:5000/api/schedule", {
+            headers: { Authorization: `Bearer ${token}` },
+          }),
+          axios.get("http://localhost:5000/api/bus", {
+            headers: { Authorization: `Bearer ${token}` },
+          }),
+          axios.get("http://localhost:5000/api/route", {
+            headers: { Authorization: `Bearer ${token}` },
+          }),
+        ]);
 
-    fetchSchedules();
-  }, [navigate, buses, routes]);
+        const busesData = busRes.data;
+        const routesData = routeRes.data;
 
+        setBuses(busesData);
+        setRoutes(routesData);
+
+        const enrichedSchedules = scheduleRes.data.map((schedule) => {
+          const bus = busesData.find((b) => b.id === schedule.busId);
+          const route = routesData.find(
+            (r) => r.routeId === schedule.routeId || r.id === schedule.routeId
+          );
+
+          return {
+            ...schedule,
+            busNo: bus?.busNo || "Unknown",
+            routeName: route
+              ? `${route.startStop} → ${route.endStop}`
+              : "Unknown",
+            routeDistance: route?.distance || "-",
+            routeDuration: route?.duration || "-",
+          };
+        });
+
+        enrichedSchedules.sort((a, b) => {
+          const dateA = new Date(`${a.date}T${a.departureTime}`);
+          const dateB = new Date(`${b.date}T${b.departureTime}`);
+          return dateA - dateB;
+        });
+
+        setSchedules(enrichedSchedules);
+        setFilteredSchedules(enrichedSchedules);
+
+      } catch (error) {
+        console.error(error);
+        alert("Failed to load schedules");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadData();
+  }, []);
+
+  // EDIT
   const handleEdit = (schedule) => {
     setEditId(schedule.id);
     setForm({
@@ -102,6 +116,7 @@ export default function ManageSchedules({ buses, routes, schedules, setSchedules
     });
   };
 
+  // SAVE
   const handleSave = async (id) => {
     try {
       await axios.put(
@@ -109,34 +124,36 @@ export default function ManageSchedules({ buses, routes, schedules, setSchedules
         form,
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      fetchSchedules();
+
       setEditId(null);
+
+      // refresh
+      window.location.reload();
     } catch (error) {
       console.error(error);
-      alert(error.response?.data?.message || "Failed to update schedule");
+      alert("Failed to update schedule");
     }
   };
 
+  // DELETE
   const handleDelete = async (id) => {
-    if (!confirm("Delete this schedule?")) return;
+    if (!window.confirm("Delete this schedule?")) return;
 
     try {
       await axios.delete(`http://localhost:5000/api/schedule/${id}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      fetchSchedules();
+
+      window.location.reload();
     } catch (error) {
       console.error(error);
-      alert(error.response?.data?.message || "Failed to delete schedule");
+      alert("Failed to delete schedule");
     }
   };
 
-  const handleSelectChange = (name, value) => {
-    setForm((prev) => ({ ...prev, [name]: value }));
-  };
-
   return (
-    <div className="max-w-6xl mx-auto p-6 bg-background/50 animate-fade-in">
+    <div className="max-w-6xl mx-auto p-6 animate-fade-in">
+      {/* HEADER */}
       <div className="flex items-center justify-between mb-8">
         <Button
           variant="ghost"
@@ -145,102 +162,81 @@ export default function ManageSchedules({ buses, routes, schedules, setSchedules
         >
           <ArrowLeft className="h-5 w-5" /> Back
         </Button>
-        <h2 className="text-3xl font-bold tracking-tight">Manage Schedules</h2>
+
+        <h2 className="text-3xl font-bold">Manage Schedules</h2>
+
         <Input
           placeholder="Search schedules..."
-          className="w-64 h-10"
+          className="w-64"
           onChange={(e) => {
-            const query = e.target.value.toLowerCase();
+            const q = e.target.value.toLowerCase();
             setFilteredSchedules(
               schedules.filter((s) =>
-                s.scheduleId.toLowerCase().includes(query) ||
-                s.busNo.toLowerCase().includes(query) ||
-                s.routeName.toLowerCase().includes(query) ||
-                s.date.includes(query) ||
-                s.departureTime.includes(query)
+                s.scheduleId?.toLowerCase().includes(q) ||
+                s.busNo?.toLowerCase().includes(q) ||
+                s.routeName?.toLowerCase().includes(q)
               )
             );
           }}
         />
       </div>
 
-      <Card className="shadow-lg rounded-2xl border-border">
+      <Card>
         <CardHeader>
           <CardTitle>Schedules ({filteredSchedules.length})</CardTitle>
         </CardHeader>
 
         <CardContent>
           {loading ? (
-            <p className="text-center py-12">Loading...</p>
+            <p className="text-center py-10">Loading...</p>
           ) : filteredSchedules.length === 0 ? (
-            <div className="text-center py-12">
-              <Calendar className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-              <p>No schedules found.</p>
+            <div className="text-center py-10">
+              <Calendar className="mx-auto mb-4 opacity-50" />
+              <p>No schedules found</p>
             </div>
           ) : (
-            <div className="overflow-auto rounded-xl border border-border">
+            <div className="overflow-auto">
               <Table>
                 <TableHeader>
-                  <TableRow className="bg-muted/50">
-                    <TableHead>Schedule ID</TableHead>
+                  <TableRow>
+                    <TableHead>ID</TableHead>
                     <TableHead>Bus</TableHead>
                     <TableHead>Route</TableHead>
                     <TableHead>Date</TableHead>
-                    <TableHead>Departure Time</TableHead>
-                    <TableHead>Distance</TableHead>
-                    <TableHead>Duration</TableHead>
+                    <TableHead>Time</TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
+                    <TableHead></TableHead>
                   </TableRow>
                 </TableHeader>
 
                 <TableBody>
-                  {filteredSchedules.map((schedule) => (
-                    <TableRow
-                      key={schedule.id}
-                      className="even:bg-muted/50 hover:bg-muted"
-                    >
-                      <TableCell>{schedule.scheduleId}</TableCell>
+                  {filteredSchedules.map((s) => (
+                    <TableRow key={s.id}>
+                      <TableCell>{s.scheduleId}</TableCell>
+
                       <TableCell>
-                        {editId === schedule.id ? (
+                        {editId === s.id ? (
                           <select
-                            name="busId"
                             value={form.busId}
-                            onChange={(e) => setForm({ ...form, busId: e.target.value })}
-                            className="w-full h-10 px-3 rounded-md border border-input bg-background text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                            onChange={(e) =>
+                              setForm({ ...form, busId: e.target.value })
+                            }
                           >
-                            <option value="">-- Select Bus --</option>
-                            {buses.map((bus) => (
-                              <option key={bus.busId} value={bus.busId}>
-                                {bus.busNo} (ID: {bus.busId})
+                            {buses.map((b) => (
+                              <option key={b.id} value={b.id}>
+                                {b.busNo}
                               </option>
                             ))}
                           </select>
                         ) : (
-                          `${schedule.busNo} (${schedule.busId})`
+                          `${s.busNo}`
                         )}
                       </TableCell>
+
+                      <TableCell>{s.routeName}</TableCell>
+
                       <TableCell>
-                        {editId === schedule.id ? (
-                          <select
-                            name="routeId"
-                            value={form.routeId}
-                            onChange={(e) => setForm({ ...form, routeId: e.target.value })}
-                            className="w-full h-10 px-3 rounded-md border border-input bg-background text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                          >
-                            <option value="">-- Select Route --</option>
-                            {routes.map((route) => (
-                              <option key={route.routeId} value={route.routeId}>
-                                {route.routeName} ({route.startStop} → {route.endStop})
-                              </option>
-                            ))}
-                          </select>
-                        ) : (
-                          schedule.routeName
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {editId === schedule.id ? (
+                        {editId === s.id ? (
                           <Input
                             type="date"
                             value={form.date}
@@ -249,70 +245,43 @@ export default function ManageSchedules({ buses, routes, schedules, setSchedules
                             }
                           />
                         ) : (
-                          new Date(schedule.date).toLocaleDateString()
+                          s.date
                         )}
                       </TableCell>
+
                       <TableCell>
-                        {editId === schedule.id ? (
+                        {editId === s.id ? (
                           <Input
                             type="time"
                             value={form.departureTime}
                             onChange={(e) =>
-                              setForm({ ...form, departureTime: e.target.value })
+                              setForm({
+                                ...form,
+                                departureTime: e.target.value,
+                              })
                             }
                           />
                         ) : (
-                          schedule.departureTime
+                          s.departureTime
                         )}
                       </TableCell>
-                      <TableCell>{schedule.routeDistance} km</TableCell>
-                      <TableCell>{schedule.routeDuration}</TableCell>
-                      <TableCell>
-                        {editId === schedule.id ? (
-                          <select
-                            name="status"
-                            value={form.status}
-                            onChange={(e) => setForm({ ...form, status: e.target.value })}
-                            className="w-full h-10 px-3 rounded-md border border-input bg-background text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                          >
-                            <option value="Active">Active</option>
-                            <option value="Inactive">Inactive</option>
-                            <option value="Cancelled">Cancelled</option>
-                          </select>
+
+                      <TableCell>{s.status}</TableCell>
+
+                      <TableCell className="flex gap-2">
+                        {editId === s.id ? (
+                          <Button onClick={() => handleSave(s.id)}>Save</Button>
                         ) : (
-                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                            schedule.status === 'Active' ? 'bg-green-100 text-green-800' :
-                            schedule.status === 'Inactive' ? 'bg-yellow-100 text-yellow-800' :
-                            'bg-red-100 text-red-800'
-                          }`}>
-                            {schedule.status}
-                          </span>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-right flex gap-2 justify-end">
-                        {editId === schedule.id ? (
-                          <Button
-                            size="sm"
-                            onClick={() => handleSave(schedule.id)}
-                            className="bg-blue-600 text-white"
-                          >
-                            Save
-                          </Button>
-                        ) : (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleEdit(schedule)}
-                          >
-                            <Pencil className="h-4 w-4" /> Edit
+                          <Button onClick={() => handleEdit(s)}>
+                            <Pencil size={16} />
                           </Button>
                         )}
+
                         <Button
-                          size="sm"
-                          onClick={() => handleDelete(schedule.id)}
                           className="bg-red-600 text-white"
+                          onClick={() => handleDelete(s.id)}
                         >
-                          <Trash2 className="h-4 w-4" /> Delete
+                          <Trash2 size={16} />
                         </Button>
                       </TableCell>
                     </TableRow>

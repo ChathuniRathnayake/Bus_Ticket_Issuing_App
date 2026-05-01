@@ -61,6 +61,7 @@ export const createSchedule = async (req, res) => {
     }
 
     await db.collection("schedules").doc(scheduleId).set({
+      scheduleId,
       busId,
       routeId,
       date,
