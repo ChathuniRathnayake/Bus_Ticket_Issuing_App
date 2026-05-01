@@ -113,6 +113,17 @@ export default function PassengerDashboard() {
     }
   }, [navigate, darkMode]);
 
+  // ── Keep bookings in sync when localStorage changes (e.g. after cancellation) ──
+  useEffect(() => {
+    const syncBookings = () => {
+      const savedBookings = JSON.parse(localStorage.getItem("userBookings")) || [];
+      setBookings(savedBookings);
+    };
+
+    window.addEventListener("storage", syncBookings);
+    return () => window.removeEventListener("storage", syncBookings);
+  }, []);
+
   const handleLogout = () => {
     localStorage.removeItem("token");
     localStorage.removeItem("passengerProfile");
@@ -127,7 +138,7 @@ export default function PassengerDashboard() {
         <div className="flex justify-between items-start mb-10">
           <div>
             <h1 className="text-5xl font-bold tracking-tight text-foreground">
-              Welcom Back, {profile?.firstName ? profile.firstName : "Traveler"}!
+              Welcome Back, {profile?.firstName ? profile.firstName : "Traveler"}!
             </h1>
             <p className="text-xl text-muted-foreground mt-2">
               Where are you heading today?
@@ -140,8 +151,6 @@ export default function PassengerDashboard() {
               <Switch checked={darkMode} onCheckedChange={setDarkMode} />
               <Moon className="h-5 w-5 text-blue-500" />
             </div>
-
-            
           </div>
         </div>
 
@@ -159,12 +168,15 @@ export default function PassengerDashboard() {
             </CardContent>
           </Card>
 
+          {/* ── TOTAL BOOKINGS: now reads live from bookings state ── */}
           <Card className="bg-gradient-to-br from-emerald-600 to-emerald-700 text-white border-0 shadow-xl">
             <CardContent className="p-8">
               <div className="flex justify-between items-start">
                 <div>
                   <p className="text-emerald-100 text-sm font-medium">TOTAL BOOKINGS</p>
-                  <p className="text-5xl font-bold mt-3">14</p>
+                  <p className="text-5xl font-bold mt-3">
+                    {String(bookings.length).padStart(2, "0")}
+                  </p>
                 </div>
                 <Ticket className="h-12 w-12 opacity-80" />
               </div>
@@ -203,7 +215,7 @@ export default function PassengerDashboard() {
 
           <Card 
             className="group cursor-pointer hover:shadow-2xl transition-all duration-300 border border-violet-200 hover:border-violet-400"
-            onClick={() => navigate("/passenger-dashboard/my-bookings")} // You can create this later
+            onClick={() => navigate("/passenger-dashboard/my-bookings")}
           >
             <CardContent className="p-8 flex flex-col items-center text-center">
               <div className="w-20 h-20 bg-violet-100 dark:bg-violet-950 rounded-3xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
