@@ -4,6 +4,9 @@ import '../passenger_bottom_nav.dart';
 import 'bus_details_screen.dart';
 import '../../core/services/passenger_data_service.dart';
 import '../../models/route_model.dart';
+import 'dashboard_screen.dart';
+import 'my_tickets_screen.dart';
+import 'profile_screen.dart';
 
 class BusResultsScreen extends StatefulWidget {
   final String from;
@@ -47,6 +50,7 @@ class _BusResultsScreenState extends State<BusResultsScreen> {
             'price': routePrice.toString(),
             'type': (bus['plateNumber'] ?? '').toString(),
             'id': (bus['id'] ?? '').toString(),
+            'routeId': (bus['routeId'] ?? '').toString(),
           };
         }).toList();
         _isLoading = false;
@@ -124,9 +128,28 @@ class _BusResultsScreenState extends State<BusResultsScreen> {
       bottomNavigationBar: PassengerBottomNav(
         currentIndex: _selectedIndex,
         onTap: (index) {
-          setState(() {
-            _selectedIndex = index;
-          });
+          if (index == _selectedIndex) return;
+          
+          if (index == 0) {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (_) => const PassengerDashboard()),
+            );
+          } else if (index == 2) {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (_) => const MyTicketsScreen()),
+            );
+          } else if (index == 3) {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (_) => const ProfileScreen()),
+            );
+          } else {
+            setState(() {
+              _selectedIndex = index;
+            });
+          }
         },
       ),
     );

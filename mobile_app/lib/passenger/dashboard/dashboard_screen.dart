@@ -6,6 +6,9 @@ import '../auth/passenger_login.dart';
 import 'bus_results_screen.dart';
 import '../../core/services/passenger_data_service.dart';
 import '../../models/route_model.dart';
+import 'my_tickets_screen.dart';
+import 'profile_screen.dart';
+import '../../models/halt_model.dart';
 
 class PassengerDashboard extends StatefulWidget {
   const PassengerDashboard({super.key});
@@ -21,7 +24,6 @@ class _PassengerDashboardState extends State<PassengerDashboard> {
   int _selectedIndex = 0;
 
   final PassengerDataService _dataService = PassengerDataService();
-  List<String> _busStops = [];
   List<RouteModel> _popularRoutes = [];
   bool _isLoading = true;
 
@@ -33,10 +35,8 @@ class _PassengerDashboardState extends State<PassengerDashboard> {
 
   Future<void> _loadData() async {
     try {
-      final stops = await _dataService.getBusStops();
       final routes = await _dataService.getPopularRoutes();
       setState(() {
-        _busStops = stops;
         _popularRoutes = routes;
         _isLoading = false;
       });
@@ -60,10 +60,45 @@ class _PassengerDashboardState extends State<PassengerDashboard> {
     }
   }
 
+  Widget _buildLoadingDropdown(String hint) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF0F7FF),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(hint, style: const TextStyle(color: Colors.grey)),
+          const SizedBox(
+            width: 16,
+            height: 16,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _onItemTapped(int index) {
-    setState(() {
-      _selectedIndex = index;
-    });
+    if (index == _selectedIndex) return;
+    
+    if (index == 2) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const MyTicketsScreen()),
+      );
+    } else if (index == 3) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const ProfileScreen()),
+      );
+    } else {
+      setState(() {
+        _selectedIndex = index;
+      });
+    }
   }
 
   @override
@@ -157,54 +192,74 @@ class _PassengerDashboardState extends State<PassengerDashboard> {
                     const SizedBox(height: 16),
                     
                     // From Dropdown
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF0F7FF),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: DropdownButtonHideUnderline(
-                        child: DropdownButton<String>(
-                          value: _fromStop,
-                          hint: const Text('From'),
-                          isExpanded: true,
-                          items: _busStops.map((String stop) {
-                            return DropdownMenuItem<String>(
-                              value: stop,
-                              child: Text(stop),
-                            );
-                          }).toList(),
-                          onChanged: (value) {
-                            setState(() => _fromStop = value);
-                          },
-                        ),
-                      ),
+                    StreamBuilder<List<String>>(
+                      stream: _dataService.getBusStopsStream(),
+                      builder: (context, snapshot) {
+                        final stops = snapshot.data ?? [];
+                        if (snapshot.connectionState == ConnectionState.waiting && stops.isEmpty) {
+                          return _buildLoadingDropdown('From');
+                        }
+                        
+                        return Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF0F7FF),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: DropdownButtonHideUnderline(
+                            child: DropdownButton<String>(
+                              value: (stops.contains(_fromStop)) ? _fromStop : null,
+                              hint: const Text('From'),
+                              isExpanded: true,
+                              items: stops.map((String stop) {
+                                return DropdownMenuItem<String>(
+                                  value: stop,
+                                  child: Text(stop),
+                                );
+                              }).toList(),
+                              onChanged: (value) {
+                                setState(() => _fromStop = value);
+                              },
+                            ),
+                          ),
+                        );
+                      },
                     ),
                     const SizedBox(height: 16),
                     
                     // To Dropdown
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF0F7FF),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: DropdownButtonHideUnderline(
-                        child: DropdownButton<String>(
-                          value: _toStop,
-                          hint: const Text('To'),
-                          isExpanded: true,
-                          items: _busStops.map((String stop) {
-                            return DropdownMenuItem<String>(
-                              value: stop,
-                              child: Text(stop),
-                            );
-                          }).toList(),
-                          onChanged: (value) {
-                            setState(() => _toStop = value);
-                          },
-                        ),
-                      ),
+                    StreamBuilder<List<String>>(
+                      stream: _dataService.getBusStopsStream(),
+                      builder: (context, snapshot) {
+                        final stops = snapshot.data ?? [];
+                        if (snapshot.connectionState == ConnectionState.waiting && stops.isEmpty) {
+                          return _buildLoadingDropdown('To');
+                        }
+
+                        return Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF0F7FF),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: DropdownButtonHideUnderline(
+                            child: DropdownButton<String>(
+                              value: (stops.contains(_toStop)) ? _toStop : null,
+                              hint: const Text('To'),
+                              isExpanded: true,
+                              items: stops.map((String stop) {
+                                return DropdownMenuItem<String>(
+                                  value: stop,
+                                  child: Text(stop),
+                                );
+                              }).toList(),
+                              onChanged: (value) {
+                                setState(() => _toStop = value);
+                              },
+                            ),
+                          ),
+                        );
+                      },
                     ),
                     const SizedBox(height: 24),
                     
