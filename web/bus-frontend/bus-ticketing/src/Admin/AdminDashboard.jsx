@@ -52,13 +52,7 @@ export default function AdminDashboard() {
           <h1 className="text-4xl font-bold tracking-tight text-foreground">Admin Dashboard</h1>
           <p className="text-lg text-muted-foreground mt-2">Real-time Bus Ticketing System</p>
         </div>
-        <Button 
-          variant="outline" 
-          onClick={() => navigate("/admin-login")} 
-          className="h-11 gap-2 hover:bg-red-50 hover:shadow-md transition-all duration-300 cursor-pointer border-red-200 text-red-700"
-        >
-          <LogOut className="h-4 w-4" /> Logout
-        </Button>
+        
       </div>
 
       {/* Cards */}

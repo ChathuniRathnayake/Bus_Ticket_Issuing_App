@@ -127,7 +127,7 @@ export default function PassengerDashboard() {
         <div className="flex justify-between items-start mb-10">
           <div>
             <h1 className="text-5xl font-bold tracking-tight text-foreground">
-              Good morning, {profile?.firstName ? profile.firstName : "Traveler"}!
+              Welcom Back, {profile?.firstName ? profile.firstName : "Traveler"}!
             </h1>
             <p className="text-xl text-muted-foreground mt-2">
               Where are you heading today?
@@ -141,13 +141,7 @@ export default function PassengerDashboard() {
               <Moon className="h-5 w-5 text-blue-500" />
             </div>
 
-            <Button 
-              variant="outline" 
-              onClick={handleLogout}
-              className="gap-2 hover:bg-red-50 hover:text-red-600"
-            >
-              <LogOut className="h-4 w-4" /> Logout
-            </Button>
+            
           </div>
         </div>
 

@@ -1,15 +1,15 @@
+// src/Passenger/Profile.jsx
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-
-import { ArrowLeft, User, Save, Upload } from "lucide-react";
+import { ArrowLeft, User, Save, Camera } from "lucide-react";
 
 export default function Profile() {
   const navigate = useNavigate();
+  const token = localStorage.getItem("token");
 
   const [profile, setProfile] = useState({
     firstName: "",
@@ -19,265 +19,175 @@ export default function Profile() {
     profilePic: "",
   });
 
-  const token = localStorage.getItem("token");
+  const [saving, setSaving] = useState(false);
 
-  // =========================
-  // LOAD PROFILE FROM BACKEND
-  // =========================
+  // Load profile
   useEffect(() => {
     if (!token) {
       navigate("/passenger-login");
       return;
     }
 
-    const fetchProfile = async () => {
-      try {
-        const res = await fetch(
-          "http://localhost:5000/api/passenger/profile",
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          }
-        );
-
-        const data = await res.json();
-
-        if (!res.ok) {
-          throw new Error(data.message);
-        }
-
-        setProfile(data);
-
-        // Cache locally for dashboard use
-        localStorage.setItem(
-          "passengerProfile",
-          JSON.stringify(data)
-        );
-
-      } catch (error) {
-        console.error(error);
-        alert("Failed to load profile");
-      }
-    };
-
-    fetchProfile();
+    const savedProfile = localStorage.getItem("passengerProfile");
+    if (savedProfile) {
+      setProfile(JSON.parse(savedProfile));
+    }
   }, [token, navigate]);
 
-  // =========================
-  // HANDLE INPUT CHANGE
-  // =========================
   const handleChange = (e) => {
     const { name, value } = e.target;
-
-    setProfile((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
+    setProfile((prev) => ({ ...prev, [name]: value }));
   };
 
-  // =========================
-  // IMAGE UPLOAD (BASE64)
-  // =========================
   const handleImageUpload = (e) => {
     const file = e.target.files[0];
     if (!file) return;
 
     const reader = new FileReader();
-
     reader.onloadend = () => {
       setProfile((prev) => ({
         ...prev,
         profilePic: reader.result,
       }));
     };
-
     reader.readAsDataURL(file);
   };
 
-  // =========================
-  // SAVE PROFILE TO BACKEND
-  // =========================
   const handleSave = async () => {
+    if (!profile.firstName && !profile.lastName) {
+      alert("Please fill at least your name");
+      return;
+    }
+
+    setSaving(true);
+
     try {
-      const res = await fetch(
-        "http://localhost:5000/api/passenger/profile",
-        {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify(profile),
-        }
-      );
+      // Save to localStorage
+      localStorage.setItem("passengerProfile", JSON.stringify(profile));
 
-      const data = await res.json();
+      alert("✅ Profile updated successfully!");
 
-      if (!res.ok) {
-        throw new Error(data.message);
-      }
-
-      // Update cache
-      localStorage.setItem(
-        "passengerProfile",
-        JSON.stringify(profile)
-      );
-
-      alert("Profile saved successfully!");
+      // Automatically navigate to dashboard after save
+      setTimeout(() => {
+        navigate("/passenger-dashboard");
+      }, 800); // Small delay so user can see the success message
 
     } catch (error) {
-      console.error(error);
-      alert("Failed to save profile");
+      alert("Failed to save profile. Please try again.");
+    } finally {
+      setSaving(false);
     }
   };
 
   return (
-    <div className="max-w-4xl mx-auto p-6 bg-background/50 animate-fade-in">
-      
-      {/* Header */}
-      <div className="flex items-center gap-4 mb-8">
+    <div className="min-h-screen bg-gradient-to-br from-zinc-50 via-blue-50 to-violet-50 dark:from-zinc-950 dark:to-zinc-900 p-6">
+      <div className="max-w-4xl mx-auto">
+        
         <Button
           variant="ghost"
           onClick={() => navigate("/passenger-dashboard")}
-          className="h-10 gap-2 hover:bg-muted transition-all duration-300 cursor-pointer"
+          className="mb-6 gap-2 hover:bg-muted"
         >
-          <ArrowLeft className="h-5 w-5" />
-          Back to Dashboard
+          <ArrowLeft className="h-5 w-5" /> Back to Dashboard
         </Button>
 
-        <h2 className="text-3xl font-bold tracking-tight">
-          My Profile
-        </h2>
-      </div>
-
-      <Card className="shadow-lg rounded-2xl border-border">
-        <CardHeader>
-          <CardTitle className="text-2xl">
-            Personal Information
-          </CardTitle>
-
-          <CardDescription>
-            Update your profile details
-          </CardDescription>
-        </CardHeader>
-
-        <CardContent className="space-y-8 pt-6">
-
-          {/* Profile Picture */}
-          <div className="flex flex-col items-center sm:flex-row sm:items-start gap-6">
-            
-            <div className="relative w-32 h-32">
+        <Card className="shadow-xl border-0">
+          <CardHeader className="text-center pb-8">
+            <div className="mx-auto w-24 h-24 bg-gradient-to-br from-blue-100 to-violet-100 dark:from-zinc-800 dark:to-zinc-700 rounded-full flex items-center justify-center mb-4 relative overflow-hidden">
               {profile.profilePic ? (
                 <img
                   src={profile.profilePic}
                   alt="Profile"
-                  className="w-full h-full rounded-full object-cover border-4 border-background shadow-lg"
+                  className="w-24 h-24 rounded-full object-cover border-4 border-white dark:border-zinc-800"
                 />
               ) : (
-                <div className="w-full h-full rounded-full bg-muted flex items-center justify-center border-4 border-background shadow-lg">
-                  <User className="w-16 h-16 text-muted-foreground" />
-                </div>
+                <User className="w-12 h-12 text-blue-600 dark:text-blue-400" />
               )}
+
+              <label 
+                htmlFor="profile-upload"
+                className="absolute bottom-1 right-1 bg-white dark:bg-zinc-700 p-2 rounded-full shadow cursor-pointer hover:bg-blue-50 transition-colors"
+              >
+                <Camera className="h-5 w-5 text-blue-600" />
+              </label>
+              <input
+                id="profile-upload"
+                type="file"
+                accept="image/*"
+                onChange={handleImageUpload}
+                className="hidden"
+              />
             </div>
 
-            <div className="flex-1 space-y-4">
-              <Label htmlFor="profilePic">
-                Profile Picture
-              </Label>
+            <CardTitle className="text-3xl font-bold">My Profile</CardTitle>
+            <p className="text-muted-foreground mt-1">Update your personal information</p>
+          </CardHeader>
 
-              <div className="flex items-center gap-4 flex-wrap">
-                
-                <label
-                  htmlFor="profilePic"
-                  className="cursor-pointer px-4 py-2 bg-muted hover:bg-muted/80 rounded-md transition-colors flex items-center gap-2"
-                >
-                  <Upload className="h-4 w-4" />
-                  Upload Photo
-                </label>
-
+          <CardContent className="px-8 pb-10 space-y-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <Label htmlFor="firstName">First Name</Label>
                 <Input
-                  id="profilePic"
-                  type="file"
-                  accept="image/*"
-                  onChange={handleImageUpload}
-                  className="hidden"
+                  id="firstName"
+                  name="firstName"
+                  value={profile.firstName}
+                  onChange={handleChange}
+                  placeholder="Enter first name"
+                  className="h-12"
                 />
+              </div>
 
-                {profile.profilePic && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() =>
-                      setProfile((prev) => ({
-                        ...prev,
-                        profilePic: "",
-                      }))
-                    }
-                  >
-                    Remove
-                  </Button>
-                )}
+              <div className="space-y-2">
+                <Label htmlFor="lastName">Last Name</Label>
+                <Input
+                  id="lastName"
+                  name="lastName"
+                  value={profile.lastName}
+                  onChange={handleChange}
+                  placeholder="Enter last name"
+                  className="h-12"
+                />
+              </div>
+
+              <div className="space-y-2 md:col-span-2">
+                <Label htmlFor="email">Email Address</Label>
+                <Input
+                  id="email"
+                  name="email"
+                  type="email"
+                  value={profile.email}
+                  disabled
+                  className="h-12 bg-muted cursor-not-allowed"
+                />
+              </div>
+
+              <div className="space-y-2 md:col-span-2">
+                <Label htmlFor="phone">Phone Number</Label>
+                <Input
+                  id="phone"
+                  name="phone"
+                  type="tel"
+                  value={profile.phone}
+                  onChange={handleChange}
+                  placeholder="+94 71 234 5678"
+                  className="h-12"
+                />
               </div>
             </div>
-          </div>
 
-          {/* Form */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-
-            <div className="space-y-2">
-              <Label>First Name</Label>
-              <Input
-                name="firstName"
-                value={profile.firstName}
-                onChange={handleChange}
-                className="h-11"
-              />
+            {/* Save Button */}
+            <div className="flex justify-end pt-6">
+              <Button 
+                onClick={handleSave} 
+                disabled={saving}
+                className="bg-blue-600 hover:bg-blue-700 px-10 py-6 text-lg font-medium min-w-[180px]"
+              >
+                {saving ? "Saving Changes..." : "Save & Return to Dashboard"}
+              </Button>
             </div>
-
-            <div className="space-y-2">
-              <Label>Last Name</Label>
-              <Input
-                name="lastName"
-                value={profile.lastName}
-                onChange={handleChange}
-                className="h-11"
-              />
-            </div>
-
-            <div className="space-y-2 md:col-span-2">
-              <Label>Email</Label>
-              <Input
-                value={profile.email}
-                disabled
-                className="h-11"
-              />
-            </div>
-
-            <div className="space-y-2 md:col-span-2">
-              <Label>Phone</Label>
-              <Input
-                name="phone"
-                value={profile.phone}
-                onChange={handleChange}
-                className="h-11"
-              />
-            </div>
-          </div>
-
-          {/* Save */}
-          <div className="flex justify-end mt-8">
-            <Button
-              onClick={handleSave}
-              className="bg-emerald-600 hover:bg-emerald-700 px-8 py-6 text-lg font-medium"
-            >
-              <Save className="mr-2 h-5 w-5" />
-              Save Profile
-            </Button>
-          </div>
-
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }
