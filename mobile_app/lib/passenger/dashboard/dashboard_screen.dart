@@ -9,6 +9,7 @@ import '../../models/route_model.dart';
 import 'my_tickets_screen.dart';
 import 'profile_screen.dart';
 import '../../models/halt_model.dart';
+import '../../widgets/passenger_app_bar.dart';
 
 class PassengerDashboard extends StatefulWidget {
   const PassengerDashboard({super.key});
@@ -104,33 +105,8 @@ class _PassengerDashboardState extends State<PassengerDashboard> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F5F5),
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.account_circle, color: Colors.blue),
-            onPressed: () {
-              // Profile action
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.logout, color: Colors.red),
-            onPressed: () {
-              Navigator.pushAndRemoveUntil(
-                context,
-                MaterialPageRoute(builder: (_) => const LoginScreen()),
-                (route) => false,
-              );
-            },
-          ),
-        ],
-      ),
+      backgroundColor: const Color(0xFFF5F7FB),
+      appBar: const PassengerAppBar(title: 'TicketGo'),
       body: SingleChildScrollView(
         child: Padding(
           padding: const EdgeInsets.all(16.0),

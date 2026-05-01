@@ -3,6 +3,7 @@ import '../passenger_bottom_nav.dart';
 import 'dashboard_screen.dart';
 import 'my_tickets_screen.dart';
 import '../auth/passenger_login.dart';
+import '../../widgets/passenger_app_bar.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -18,23 +19,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF5F5F5),
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        title: const Text('Profile', style: TextStyle(color: Colors.black)),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.logout, color: Colors.red),
-            onPressed: () {
-              Navigator.pushAndRemoveUntil(
-                context,
-                MaterialPageRoute(builder: (_) => const LoginScreen()),
-                (route) => false,
-              );
-            },
-          ),
-        ],
-      ),
+      appBar: const PassengerAppBar(title: 'Profile'),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(

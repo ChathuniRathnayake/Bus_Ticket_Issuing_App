@@ -7,6 +7,7 @@ import '../../models/route_model.dart';
 import 'dashboard_screen.dart';
 import 'my_tickets_screen.dart';
 import 'profile_screen.dart';
+import '../../widgets/passenger_app_bar.dart';
 
 class BusResultsScreen extends StatefulWidget {
   final String from;
@@ -67,29 +68,9 @@ class _BusResultsScreenState extends State<BusResultsScreen> {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF5F5F5),
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        title: Text(
-          '${widget.from} to ${widget.to}',
-          style: const TextStyle(color: Colors.black, fontSize: 18),
-        ),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.logout, color: Colors.red),
-            onPressed: () {
-              Navigator.pushAndRemoveUntil(
-                context,
-                MaterialPageRoute(builder: (_) => const LoginScreen()),
-                (route) => false,
-              );
-            },
-          ),
-        ],
+      appBar: PassengerAppBar(
+        title: '${widget.from} to ${widget.to}',
+        showBackButton: true,
       ),
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

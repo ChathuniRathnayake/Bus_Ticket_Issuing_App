@@ -8,6 +8,7 @@ import '../../models/halt_model.dart';
 import 'dashboard_screen.dart';
 import 'my_tickets_screen.dart';
 import 'profile_screen.dart';
+import '../../widgets/passenger_app_bar.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class BusDetailsScreen extends StatefulWidget {
@@ -94,31 +95,9 @@ class _BusDetailsScreenState extends State<BusDetailsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF5F5F5),
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.account_circle, color: Colors.blue),
-            onPressed: () {
-              // Profile action
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.logout, color: Colors.red),
-            onPressed: () {
-              Navigator.pushAndRemoveUntil(
-                context,
-                MaterialPageRoute(builder: (_) => const LoginScreen()),
-                (route) => false,
-              );
-            },
-          ),
-        ],
+      appBar: const PassengerAppBar(
+        title: 'Bus Details',
+        showBackButton: true,
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
