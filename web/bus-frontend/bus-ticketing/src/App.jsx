@@ -1,6 +1,10 @@
 import { useState, useEffect } from "react";
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 
+// Layout Components
+import Header from "./Header";
+import Footer from "./Footer";
+
 // Passenger Components
 import PassengerLogin from "./Passenger/PassengerLogin";
 import Register from "./Passenger/PassengerSignup"; // or PassengerSignup if you named it that
@@ -9,6 +13,7 @@ import SearchBuses from "./Passenger/SearchBuses";
 import SeatLayout from "./Passenger/SeatLayout";
 import Profile from "./Passenger/Profile";
 import MyBookings from "./Passenger/MyBookings";
+import TicketInfo from "./Passenger/TicketInfo";
 
 // Admin Components
 import AdminLogin from "./Admin/AdminLogin";
@@ -55,9 +60,12 @@ export default function App() {
 
   return (
     <Router>
-      <div className="min-h-screen bg-zinc-50 p-6">
-        <Routes>
-          {/* Default redirect */}
+      <div className="flex min-h-screen flex-col bg-zinc-50">
+        <Header />
+
+        <main className="flex-1 px-6 py-6">
+          <Routes>
+            {/* Default redirect */}
           <Route path="/" element={<Navigate to="/passenger-login" />} />
 
           {/* Passenger Routes */}
@@ -80,6 +88,7 @@ export default function App() {
             path="/passenger-dashboard/my-bookings" 
             element={<MyBookings />} 
           />
+          <Route path="/ticket" element={<TicketInfo />} />
 
           {/* Admin Routes */}
           <Route path="/admin-login" element={<AdminLogin />} />
@@ -125,7 +134,10 @@ export default function App() {
             element={<ManageRoutes routes={routes} setRoutes={setRoutes} />} 
           />
         </Routes>
-      </div>
-    </Router>
+      </main>
+
+      <Footer />
+    </div>
+  </Router>
   );
 }

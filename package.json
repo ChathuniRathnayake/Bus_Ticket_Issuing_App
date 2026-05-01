@@ -17,5 +17,8 @@
   "bugs": {
     "url": "https://github.com/ChathuniRathnayake/Bus_Ticket_Issuing_App/issues"
   },
-  "homepage": "https://github.com/ChathuniRathnayake/Bus_Ticket_Issuing_App#readme"
+  "homepage": "https://github.com/ChathuniRathnayake/Bus_Ticket_Issuing_App#readme",
+  "dependencies": {
+    "qrcode": "^1.5.4"
+  }
 }
