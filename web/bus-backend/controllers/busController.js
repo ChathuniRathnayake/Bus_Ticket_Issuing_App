@@ -3,7 +3,22 @@ import { db } from "../config/firebase.js";
 // CREATE BUS
 export const createBus = async (req, res) => {
   try {
-    const { busId, routeId, busNo, totalSeats, status } = req.body;
+    const {
+      busId,
+      routeId,
+      busNo,
+      totalSeats,
+      status,
+
+      // 🔥 NEW layout fields from frontend
+      leftColumns,
+      rightColumns,
+      leftRows,
+      rightRows,
+      backRowSeats,
+      hasFrontSingle,
+      hasBackFullRow
+    } = req.body;
 
     if (!busId || !routeId || !busNo || !totalSeats) {
       return res.status(400).json({
@@ -11,26 +26,34 @@ export const createBus = async (req, res) => {
       });
     }
 
-    // Check if route exists
     const routeDoc = await db.collection("routes").doc(routeId).get();
     if (!routeDoc.exists)
       return res.status(400).json({ message: "Route does not exist" });
 
-    // Check if busId already exists
     const busDoc = await db.collection("buses").doc(busId).get();
     if (busDoc.exists)
       return res.status(400).json({ message: "Bus ID already exists" });
 
-    // Use busId as document ID
+    // ✅ SAVE layout properly
     await db.collection("buses").doc(busId).set({
       busNo,
       routeId,
       totalSeats: Number(totalSeats),
       status: status || "Active",
+
+      leftColumns,
+      rightColumns,
+      leftRows,
+      rightRows,
+      backRowSeats,
+      hasFrontSingle,
+      hasBackFullRow,
+
       createdAt: new Date(),
     });
 
     res.status(201).json({ message: "Bus created successfully", busId });
+
   } catch (error) {
     console.error("Create Bus Error:", error);
     res.status(500).json({ message: "Server error" });
