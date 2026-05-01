@@ -83,26 +83,37 @@ export default function SeatLayout() {
     setSelectedSeat((prev) => (prev === seat ? null : seat));
   };
 
-  const confirmBooking = () => {
-    const bookingData = {
-      bookingId: `${bus.busNo}-${selectedSeat}-${Date.now()}`,
-      busNo: bus.busNo,
-      seat: selectedSeat,
-      routeId: bus.routeId,
-      bookingDate: new Date().toISOString(),
-      status: "Confirmed"
-    };
+  const confirmBooking = async () => {
+  try {
+    const token = localStorage.getItem("token");
 
-    // Save booking to localStorage
-    const existingBookings = JSON.parse(localStorage.getItem("userBookings")) || [];
-    existingBookings.push(bookingData);
-    localStorage.setItem("userBookings", JSON.stringify(existingBookings));
+    const res = await fetch("http://localhost:5000/api/ticket", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        busId: bus.id,        // 🔥 important
+        seatNo: selectedSeat,
+        routeId: bus.routeId,
+      }),
+    });
 
+    const data = await res.json();
+
+    if (!res.ok) throw new Error(data.message);
+
+    // update UI
     setBookedSeats((prev) => [...prev, selectedSeat]);
     setLastBooked(selectedSeat);
     setSelectedSeat(null);
     setShowConfirm(false);
-  };
+
+  } catch (err) {
+    alert(err.message);
+  }
+};
 
   // ── Seat counts ──────────────────────────────────────────────────────────────
   const generatedTotal =
