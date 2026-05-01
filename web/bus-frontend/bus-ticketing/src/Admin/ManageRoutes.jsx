@@ -58,14 +58,23 @@ export default function ManageRoutes() {
      INITIAL LOAD
   ===================================================== */
   useEffect(() => {
+    const token = localStorage.getItem("token");
+    
     if (!token) {
-      alert("Login required");
+      alert("Session expired. Please login again.");
+      navigate("/admin-login");
+      return;
+    }
+
+    // Optional: Check if token looks valid (basic check)
+    if (token.length < 100) {
+      alert("Invalid token. Please login again.");
       navigate("/admin-login");
       return;
     }
 
     fetchRoutes();
-  }, [token, navigate]);
+  }, [navigate]);
 
   /* =====================================================
      EDIT

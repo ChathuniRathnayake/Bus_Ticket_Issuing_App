@@ -4,6 +4,35 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
 
+// ─── Single seat button ────────────────────────────────────────────────────────
+function SeatBtn({ label, status, onClick }) {
+  const isBooked   = status === "booked";
+  const isSelected = status === "selected";
+
+  let colorClass;
+  if (isBooked)
+    colorClass = "bg-red-100 border-red-400 text-red-500 cursor-not-allowed opacity-75";
+  else if (isSelected)
+    colorClass = "bg-blue-100 border-blue-500 text-blue-700 scale-105 shadow-lg";
+  else
+    colorClass =
+      "bg-emerald-50 border-emerald-400 text-emerald-700 hover:bg-emerald-200 hover:scale-105 cursor-pointer active:scale-95";
+
+  return (
+    <button
+      onClick={() => !isBooked && onClick(label)}
+      disabled={isBooked}
+      title={label}
+      className={`relative w-11 h-12 rounded-t-2xl rounded-b-md border-2 flex flex-col items-center justify-end pb-1 text-[10px] font-bold shadow-sm transition-all duration-200 select-none ${colorClass}`}
+    >
+      {/* headrest */}
+      <span className={`absolute top-1 left-1 right-1 h-4 rounded-t-xl ${isBooked ? "bg-red-200" : isSelected ? "bg-blue-200" : "bg-emerald-200"}`} />
+      <span className="relative z-10 leading-none">{label}</span>
+    </button>
+  );
+}
+
+// ─── Main component ────────────────────────────────────────────────────────────
 export default function SeatLayout() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -12,292 +41,279 @@ export default function SeatLayout() {
   if (!bus) {
     return (
       <div className="text-center py-20">
-        No bus selected.{" "}
+        <p className="text-muted-foreground mb-4">No bus selected.</p>
         <Button onClick={() => navigate(-1)}>Go Back</Button>
       </div>
     );
   }
 
-  // Layout configuration from bus object
-  const leftSeatsPerRow = parseInt(bus.leftColumns) || 2;
+  // ── Read EXACT layout fields saved by admin ──────────────────────────────────
+  // All values are stored as strings in Firestore, so parseInt() them safely.
+  const leftSeatsPerRow  = parseInt(bus.leftColumns)  || 2;
   const rightSeatsPerRow = parseInt(bus.rightColumns) || 2;
-  const leftRows = parseInt(bus.leftRows) || 10;
-  const rightRows = parseInt(bus.rightRows) || 10;
-  const hasFrontSingle = bus.hasFrontSingle === "yes";
-  const hasBackFullRow = bus.hasBackFullRow === "yes";
-  const backRowSeats = parseInt(bus.backRowSeats) || 5;
+  const leftRows         = parseInt(bus.leftRows)     || 10;
+  const rightRows        = parseInt(bus.rightRows)    || 10;
+  const backRowSeats     = parseInt(bus.backRowSeats) || 5;
+  const totalSeats       = parseInt(bus.totalSeats)   || 52;
 
-  const totalSeats = parseInt(bus.totalSeats) || 52;
+  // Admin saves "yes" / "no" as strings — handle robustly
+  const hasFrontSingle =
+    bus.hasFrontSingle === "yes" || bus.hasFrontSingle === true;
+  const hasBackFullRow =
+    bus.hasBackFullRow === "yes" || bus.hasBackFullRow === true;
 
-  // Booked seats state
-  const [bookedSeats, setBookedSeats] = useState(["A1", "A2", "B5", "C3", "F8"]);
+  // ── Seat state ───────────────────────────────────────────────────────────────
+  // TODO: replace with real booked seats fetched from backend per bus
+  const [bookedSeats, setBookedSeats]   = useState([]);
+  const [selectedSeat, setSelectedSeat] = useState(null);
+  const [showConfirm, setShowConfirm]   = useState(false);
+  const [lastBooked, setLastBooked]     = useState(null);
 
-  // Confirmation popup
-  const [confirmAction, setConfirmAction] = useState(null);
+  // ── Helpers ──────────────────────────────────────────────────────────────────
+  const rowChar  = (i) => String.fromCharCode(65 + i); // 0→A, 1→B, 2→C …
 
-  const toggleSeat = (seat) => {
-    const isBooked = bookedSeats.includes(seat);
-    setConfirmAction({ seat, action: isBooked ? "cancel" : "book" });
+  const seatStatus = (seat) => {
+    if (bookedSeats.includes(seat)) return "booked";
+    if (selectedSeat === seat)      return "selected";
+    return "available";
+  };
+
+  const handleSeatClick = (seat) => {
+    // click same seat → deselect; click another → select it
+    setSelectedSeat((prev) => (prev === seat ? null : seat));
   };
 
   const confirmBooking = () => {
-    if (confirmAction?.action === "book") {
-      setBookedSeats((prev) => [...prev, confirmAction.seat]);
-    } else if (confirmAction?.action === "cancel") {
-      setBookedSeats((prev) => prev.filter(s => s !== confirmAction.seat));
-    }
-    setConfirmAction(null);
+    setBookedSeats((prev) => [...prev, selectedSeat]);
+    setLastBooked(selectedSeat);
+    setSelectedSeat(null);
+    setShowConfirm(false);
   };
 
-  const cancelAction = () => setConfirmAction(null);
+  // ── Seat counts ──────────────────────────────────────────────────────────────
+  const generatedTotal =
+    leftRows  * leftSeatsPerRow +
+    rightRows * rightSeatsPerRow +
+    (hasFrontSingle ? 1 : 0) +
+    (hasBackFullRow ? backRowSeats : 0);
 
-  const getSeatStatus = (seat) => (bookedSeats.includes(seat) ? "booked" : "available");
+  const availableCount = generatedTotal - bookedSeats.length;
+  const maxRows        = Math.max(leftRows, rightRows);
 
-  // Generate all seats
-  const generateSeats = () => {
-    const seats = [];
-
-    if (hasFrontSingle) {
-      seats.push({ label: "F1", status: getSeatStatus("F1"), type: "front" });
-    }
-
-    const maxRows = Math.max(leftRows, rightRows);
-
-    for (let r = 1; r <= maxRows; r++) {
-      const rowLabel = String.fromCharCode(64 + r);
-
-      // Left side
-      if (r <= leftRows) {
-        for (let c = 1; c <= leftSeatsPerRow; c++) {
-          const seat = `${rowLabel}${c}`;
-          seats.push({ label: seat, status: getSeatStatus(seat), side: "left" });
-        }
-      }
-
-      // Right side
-      if (r <= rightRows) {
-        for (let c = 1; c <= rightSeatsPerRow; c++) {
-          const seat = `${rowLabel}${leftSeatsPerRow + c}`;
-          seats.push({ label: seat, status: getSeatStatus(seat), side: "right" });
-        }
-      }
-    }
-
-    if (hasBackFullRow) {
-      for (let c = 1; c <= backRowSeats; c++) {
-        const seat = `Back${c}`;
-        seats.push({ label: seat, status: getSeatStatus(seat), type: "back" });
-      }
-    }
-
-    return seats;
-  };
-
-  const allSeats = generateSeats();
-  const availableCount = allSeats.filter(s => s.status === "available").length;
-
+  // ── Render ───────────────────────────────────────────────────────────────────
   return (
-    <div className="max-w-6xl mx-auto p-6 bg-background/50 animate-fade-in">
+    <div className="max-w-5xl mx-auto p-6 animate-fade-in">
+
       {/* Header */}
-      <div className="flex items-center gap-4 mb-8">
-        <Button
-          variant="ghost"
-          onClick={() => navigate(-1)}
-          className="h-10 gap-2 hover:bg-muted transition-all duration-300 cursor-pointer"
-        >
+      <div className="flex items-center gap-4 mb-6">
+        <Button variant="ghost" onClick={() => navigate(-1)} className="h-10 gap-2 hover:bg-muted cursor-pointer">
           <ArrowLeft className="h-5 w-5" /> Back to Buses
         </Button>
-        <h2 className="text-3xl font-bold tracking-tight">
-          Seat Layout - {bus.busNo} ({bus.totalSeats} seats)
-        </h2>
+        <div>
+          <h2 className="text-2xl font-bold">Seat Layout — {bus.busNo}</h2>
+          <p className="text-sm text-muted-foreground">
+            Route: {bus.routeId} &nbsp;|&nbsp; Total seats: {totalSeats}
+          </p>
+        </div>
       </div>
 
-      <Card className="shadow-lg rounded-2xl border-border">
-        <CardHeader>
-          <CardTitle>
-            {bus.busNo} • Route: {bus.routeId} • {bus.totalSeats} Seats
-          </CardTitle>
-        </CardHeader>
+      {/* Success banner */}
+      {lastBooked && (
+        <div className="mb-4 px-4 py-3 rounded-xl bg-emerald-50 border border-emerald-300 text-emerald-700 text-sm font-medium">
+          ✅ Seat <strong>{lastBooked}</strong> booked successfully!
+        </div>
+      )}
 
-        <CardContent>
-          {/* Legend */}
-          <div className="mb-6">
-            <p className="text-sm text-muted-foreground mb-2">Legend:</p>
-            <div className="flex gap-6">
-              <div className="flex items-center gap-2">
-                <div className="w-6 h-6 bg-green-200 border border-green-500 rounded" />
-                <span>Available</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-6 h-6 bg-red-200 border border-red-500 rounded" />
-                <span>Booked</span>
-              </div>
-            </div>
+      {/* Legend */}
+      <div className="flex gap-3 mb-6 flex-wrap">
+        {[
+          { color: "emerald", label: `Available: ${availableCount}` },
+          { color: "red",     label: `Booked: ${bookedSeats.length}` },
+          { color: "blue",    label: `Selected: ${selectedSeat ?? "None"}` },
+        ].map(({ color, label }) => (
+          <div key={label} className={`flex items-center gap-2 px-4 py-2 rounded-full bg-${color}-50 border border-${color}-200 text-${color}-700 text-sm font-medium`}>
+            <span className={`w-3 h-3 rounded-sm bg-${color}-400 inline-block`} />
+            {label}
           </div>
+        ))}
+      </div>
 
-          {/* Confirmation Popup */}
-          {confirmAction && (
-            <div className="fixed inset-0 flex items-center justify-center bg-black/30 backdrop-blur-md z-50">
-              <Card className="w-full max-w-sm mx-4 bg-white shadow-2xl border border-gray-200 rounded-xl overflow-hidden">
-                <CardHeader className="bg-gray-50 border-b">
-                  <CardTitle className="text-xl">
-                    {confirmAction.action === "book" ? "Book Seat" : "Cancel Booking"}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="p-6 space-y-6">
-                  <p className="text-center text-lg font-medium">
-                    {confirmAction.action === "book"
-                      ? `Confirm booking seat ${confirmAction.seat}?`
-                      : `Cancel booking for seat ${confirmAction.seat}?`}
-                  </p>
-                  <div className="flex gap-4 justify-center">
-                    <Button variant="outline" onClick={cancelAction} className="min-w-[100px]">
-                      No
-                    </Button>
-                    <Button
-                      onClick={confirmBooking}
-                      className={`min-w-[100px] ${
-                        confirmAction.action === "book" ? "bg-blue-600 hover:bg-blue-700" : "bg-red-600 hover:bg-red-700"
-                      }`}
-                    >
-                      Yes
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          )}
+      <Card className="shadow-lg rounded-2xl">
+        <CardContent className="p-6">
 
-          {/* Seat Grid */}
-          <div className="max-w-5xl mx-auto mb-10">
-            {/* Front single seat */}
-            {bus.hasFrontSingle === "yes" && (
-              <div className="mb-10 text-center">
-                <button
-                  onClick={() => toggleSeat("F1")}
-                  disabled={getSeatStatus("F1") === "booked"}
-                  className={`w-20 h-16 rounded-xl font-semibold text-base border-2 shadow transition-all duration-300 cursor-pointer
-                    ${getSeatStatus("F1") === "available"
-                      ? "bg-green-50 hover:bg-green-100 border-green-500 text-green-800"
-                      : "bg-red-50 border-red-500 text-red-800 cursor-not-allowed"}`}
-                >
-                  F1 (Front)
-                </button>
+          {/* ════════════════ BUS SHELL ════════════════ */}
+          <div className="border-4 border-gray-300 rounded-3xl bg-gray-50 px-6 pt-4 pb-6 overflow-x-auto">
+
+            {/* ── FRONT ROW: Driver  +  (optional) Conductor seat ── */}
+            <div className="flex items-end justify-between pb-4 mb-4 border-b-2 border-dashed border-gray-300">
+
+              {/* Driver */}
+              <div className="flex flex-col items-center gap-1">
+                <span className="text-[10px] text-gray-400 font-semibold uppercase tracking-widest">Driver</span>
+                <div className="w-11 h-12 rounded-t-2xl rounded-b-md border-2 border-gray-400 bg-gray-200 flex items-center justify-center">
+                  {/* steering wheel */}
+                  <svg className="w-7 h-7 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <circle cx="12" cy="12" r="9"/>
+                    <circle cx="12" cy="12" r="3"/>
+                    <line x1="12" y1="3"  x2="12" y2="9"/>
+                    <line x1="12" y1="15" x2="12" y2="21"/>
+                    <line x1="3"  y1="12" x2="9"  y2="12"/>
+                    <line x1="15" y1="12" x2="21" y2="12"/>
+                  </svg>
+                </div>
               </div>
-            )}
 
-            {/* Normal rows with labels and aisle */}
-            <div className="flex justify-center gap-12">
-              {/* LEFT SIDE */}
+              {/* Center label */}
+              <span className="text-xs text-gray-400 font-medium tracking-widest uppercase self-center">
+                ——— FRONT ———
+              </span>
+
+              {/* Conductor / front single seat */}
+              <div className="flex flex-col items-center gap-1 min-w-[44px]">
+                {hasFrontSingle ? (
+                  <>
+                    <span className="text-[10px] text-gray-400 font-semibold uppercase tracking-widest">Conductor</span>
+                    <SeatBtn label="F1" status={seatStatus("F1")} onClick={handleSeatClick} />
+                  </>
+                ) : (
+                  // invisible spacer so driver stays left-aligned
+                  <div className="w-11 h-12 opacity-0" />
+                )}
+              </div>
+            </div>
+
+            {/* ── MIDDLE: Left side | Aisle | Right side ── */}
+            <div className="flex gap-0 justify-center min-w-max mx-auto">
+
+              {/* LEFT */}
               <div className="flex flex-col items-center">
-                <h3 className="text-lg font-semibold mb-3 text-gray-700">LEFT SIDE</h3>
-                <div className="space-y-4">
-                  {Array.from({ length: leftRows }).map((_, rowIndex) => {
-                    const rowLabel = String.fromCharCode(65 + rowIndex);
-                    return (
-                      <div key={`left-${rowIndex}`} className="flex gap-2">
-                        {Array.from({ length: leftSeatsPerRow }).map((_, col) => {
-                          const seat = `${rowLabel}${col + 1}`;
-                          const status = getSeatStatus(seat);
-                          return (
-                            <button
-                              key={seat}
-                              onClick={() => toggleSeat(seat)}
-                              disabled={status === "booked"}
-                              className={`w-14 h-14 rounded-xl font-semibold text-base border-2 shadow-sm transition-all duration-300 cursor-pointer
-                                ${status === "available"
-                                  ? "bg-green-50 hover:bg-green-100 border-green-500 text-green-800 hover:shadow-md"
-                                  : "bg-red-50 border-red-500 text-red-800 cursor-not-allowed"}`}
-                            >
-                              {seat}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    );
-                  })}
+                <span className="text-[10px] font-semibold text-gray-400 tracking-widest mb-2 uppercase">
+                  Left ({leftSeatsPerRow}/row × {leftRows} rows)
+                </span>
+                <div className="flex flex-col gap-1.5">
+                  {Array.from({ length: maxRows }).map((_, rowIdx) => (
+                    <div key={`L${rowIdx}`} className="flex gap-1">
+                      {rowIdx < leftRows
+                        ? Array.from({ length: leftSeatsPerRow }).map((_, col) => {
+                            const seat = `${rowChar(rowIdx)}${col + 1}`;
+                            return <SeatBtn key={seat} label={seat} status={seatStatus(seat)} onClick={handleSeatClick} />;
+                          })
+                        : Array.from({ length: leftSeatsPerRow }).map((_, col) => (
+                            <div key={`gl${rowIdx}${col}`} className="w-11 h-12" />
+                          ))
+                      }
+                    </div>
+                  ))}
                 </div>
               </div>
 
               {/* AISLE */}
-              <div className="flex flex-col justify-center">
-                <div className="w-24 h-full flex items-center justify-center">
-                  <span className="text-gray-400 font-medium text-sm rotate-90 tracking-widest">
-                    AISLE
-                  </span>
-                </div>
+              <div className="flex items-center justify-center w-14 mx-2">
+                <span className="text-[9px] font-semibold text-gray-300 tracking-[0.35em] uppercase"
+                  style={{ writingMode: "vertical-rl" }}>
+                  AISLE
+                </span>
               </div>
 
-              {/* RIGHT SIDE */}
+              {/* RIGHT */}
               <div className="flex flex-col items-center">
-                <h3 className="text-lg font-semibold mb-3 text-gray-700">RIGHT SIDE</h3>
-                <div className="space-y-4">
-                  {Array.from({ length: rightRows }).map((_, rowIndex) => {
-                    const rowLabel = String.fromCharCode(65 + rowIndex);
-                    return (
-                      <div key={`right-${rowIndex}`} className="flex gap-2">
-                        {Array.from({ length: rightSeatsPerRow }).map((_, col) => {
-                          const seat = `${rowLabel}${leftSeatsPerRow + col + 1}`;
-                          const status = getSeatStatus(seat);
-                          return (
-                            <button
-                              key={seat}
-                              onClick={() => toggleSeat(seat)}
-                              disabled={status === "booked"}
-                              className={`w-14 h-14 rounded-xl font-semibold text-base border-2 shadow-sm transition-all duration-300 cursor-pointer
-                                ${status === "available"
-                                  ? "bg-green-50 hover:bg-green-100 border-green-500 text-green-800 hover:shadow-md"
-                                  : "bg-red-50 border-red-500 text-red-800 cursor-not-allowed"}`}
-                            >
-                              {seat}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    );
-                  })}
+                <span className="text-[10px] font-semibold text-gray-400 tracking-widest mb-2 uppercase">
+                  Right ({rightSeatsPerRow}/row × {rightRows} rows)
+                </span>
+                <div className="flex flex-col gap-1.5">
+                  {Array.from({ length: maxRows }).map((_, rowIdx) => (
+                    <div key={`R${rowIdx}`} className="flex gap-1">
+                      {rowIdx < rightRows
+                        ? Array.from({ length: rightSeatsPerRow }).map((_, col) => {
+                            const seat = `${rowChar(rowIdx)}${leftSeatsPerRow + col + 1}`;
+                            return <SeatBtn key={seat} label={seat} status={seatStatus(seat)} onClick={handleSeatClick} />;
+                          })
+                        : Array.from({ length: rightSeatsPerRow }).map((_, col) => (
+                            <div key={`gr${rowIdx}${col}`} className="w-11 h-12" />
+                          ))
+                      }
+                    </div>
+                  ))}
                 </div>
               </div>
-            </div>
 
-            {/* Back row */}
-            {bus.hasBackFullRow === "yes" && (
-              <div className="mt-10">
-                <p className="text-sm text-muted-foreground mb-3 text-center font-medium">Back Row</p>
-                <div className="flex justify-center gap-2 flex-wrap bg-gray-50/50 p-4 rounded-lg border border-gray-200">
-                  {Array.from({ length: parseInt(bus.backRowSeats || 5) }).map((_, col) => {
+            </div>{/* end middle */}
+
+            {/* ── BACK ROW (full width) ── */}
+            {hasBackFullRow && (
+              <div className="mt-5 pt-4 border-t-2 border-dashed border-gray-300">
+                <p className="text-[10px] text-gray-400 font-semibold tracking-widest text-center mb-3 uppercase">
+                  Back Row — {backRowSeats} seats
+                </p>
+                <div className="flex justify-center gap-1 flex-wrap">
+                  {Array.from({ length: backRowSeats }).map((_, col) => {
                     const seat = `Back${col + 1}`;
-                    const status = getSeatStatus(seat);
-                    return (
-                      <button
-                        key={seat}
-                        onClick={() => toggleSeat(seat)}
-                        disabled={status === "booked"}
-                        className={`w-14 h-14 rounded-xl font-semibold text-base border-2 shadow-sm transition-all duration-300 cursor-pointer
-                          ${status === "available"
-                            ? "bg-green-50 hover:bg-green-100 border-green-500 text-green-800 hover:shadow-md"
-                            : "bg-red-50 border-red-500 text-red-800 cursor-not-allowed"}`}
-                      >
-                        {seat}
-                      </button>
-                    );
+                    return <SeatBtn key={seat} label={seat} status={seatStatus(seat)} onClick={handleSeatClick} />;
                   })}
                 </div>
               </div>
             )}
 
-            {/* Summary */}
-            <div className="text-center mt-12">
-              <p className="text-2xl font-bold mb-6">
-                Available Seats: {availableCount} / {totalSeats}
-              </p>
-              <Button className="bg-blue-600 hover:bg-blue-700 px-10 py-6 text-lg font-semibold">
-                Confirm Booking (Coming Soon)
-              </Button>
-            </div>
+            {/* Rear label */}
+            <p className="text-center mt-4 text-xs text-gray-400 font-medium tracking-widest uppercase">
+              ——— REAR ———
+            </p>
+
+          </div>{/* end bus shell */}
+
+          {/* ── Action bar ── */}
+          <div className="mt-6 flex items-center justify-between flex-wrap gap-4">
+            <p className="text-sm text-muted-foreground">
+              {selectedSeat
+                ? <>Selected: <span className="font-semibold text-blue-700 bg-blue-100 px-2 py-0.5 rounded-md">{selectedSeat}</span></>
+                : "Click an available seat to select it"}
+            </p>
+            <Button
+              disabled={!selectedSeat}
+              onClick={() => setShowConfirm(true)}
+              className="bg-blue-600 hover:bg-blue-700 px-8 py-5 text-base font-semibold disabled:opacity-40 cursor-pointer"
+            >
+              {selectedSeat ? `Book Seat ${selectedSeat}` : "Select a Seat"}
+            </Button>
           </div>
+
         </CardContent>
       </Card>
+
+      {/* ── Confirmation modal ── */}
+      {showConfirm && (
+        <div className="fixed inset-0 flex items-center justify-center bg-black/40 backdrop-blur-sm z-50">
+          <Card className="w-full max-w-sm mx-4 shadow-2xl rounded-2xl overflow-hidden">
+            <CardHeader className="bg-gray-50 border-b pb-4 pt-5 px-6">
+              <CardTitle className="text-xl text-center">Confirm Booking</CardTitle>
+            </CardHeader>
+            <CardContent className="p-6 space-y-6">
+              <div className="text-center space-y-3">
+                {/* mini seat preview */}
+                <div className="w-14 h-16 rounded-t-2xl rounded-b-md border-2 border-blue-400 bg-blue-50 mx-auto flex items-center justify-center relative">
+                  <span className="absolute top-1 left-1 right-1 h-4 rounded-t-xl bg-blue-200" />
+                  <span className="relative z-10 text-blue-700 font-bold text-xs">{selectedSeat}</span>
+                </div>
+                <p className="text-lg font-semibold">
+                  Book seat <strong className="text-blue-700">{selectedSeat}</strong>?
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  Bus: {bus.busNo} &nbsp;|&nbsp; Route: {bus.routeId}
+                </p>
+              </div>
+              <div className="flex gap-3">
+                <Button variant="outline" onClick={() => setShowConfirm(false)} className="flex-1 h-11 cursor-pointer">
+                  Cancel
+                </Button>
+                <Button onClick={confirmBooking} className="flex-1 h-11 bg-blue-600 hover:bg-blue-700 text-white cursor-pointer">
+                  Yes, Book It
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
     </div>
   );
 }

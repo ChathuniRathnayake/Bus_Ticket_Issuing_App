@@ -47,13 +47,23 @@ export default function ManageBuses() {
   };
 
   useEffect(() => {
+    const token = localStorage.getItem("token");
+    
     if (!token) {
-      alert("You must login first");
+      alert("Session expired. Please login again.");
       navigate("/admin-login");
       return;
     }
+
+    // Optional: Check if token looks valid (basic check)
+    if (token.length < 100) {
+      alert("Invalid token. Please login again.");
+      navigate("/admin-login");
+      return;
+    }
+
     fetchBuses();
-  }, [token, navigate]);
+  }, [navigate]);
 
   const handleEdit = (bus) => {
     setEditId(bus.id);

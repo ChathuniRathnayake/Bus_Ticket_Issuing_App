@@ -65,7 +65,7 @@ export default function App() {
           <Route path="/passenger-dashboard" element={<PassengerDashboard />} />
           <Route 
             path="/passenger-dashboard/search-buses" 
-            element={<SearchBuses buses={buses} routes={routes} />} 
+            element={<SearchBuses />} 
           />
           <Route 
             path="/passenger-dashboard/seat-layout" 
