@@ -8,6 +8,16 @@ node_modules/
 dist/
 build/
 
+# Dependencies
+node_modules/
+
+# Env
+.env
+
+# Build
+dist/
+build/
+
 # Logs
 logs/
 *.log

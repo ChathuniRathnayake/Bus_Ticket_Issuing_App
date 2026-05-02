@@ -1,7 +1,13 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,6 +17,7 @@ export default function PassengerSignup() {
   const navigate = useNavigate();
 
   const [form, setForm] = useState({
+    name: "",   
     email: "",
     password: "",
     confirmPassword: "",
@@ -40,6 +47,11 @@ export default function PassengerSignup() {
       return;
     }
 
+    if (!form.name.trim()) {
+      setError("Name is required");
+      return;
+    }
+
     try {
       setLoading(true);
 
@@ -51,6 +63,7 @@ export default function PassengerSignup() {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
+            name: form.name,   
             email: form.email,
             password: form.password,
           }),
@@ -77,7 +90,7 @@ export default function PassengerSignup() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-zinc-50 to-zinc-100 p-6">
       <Card className="w-full max-w-md shadow-2xl rounded-3xl border-border overflow-hidden">
-        
+
         <CardHeader className="text-center pb-2">
           <div className="mx-auto w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mb-4">
             <UserPlus className="h-8 w-8" />
@@ -101,6 +114,21 @@ export default function PassengerSignup() {
           )}
 
           <form onSubmit={handleSubmit} className="space-y-5">
+
+            {/* Name */}
+            <div className="space-y-2">
+              <Label htmlFor="name">Name</Label>
+              <Input
+                id="name"
+                name="name"
+                type="text"
+                value={form.name}
+                onChange={handleChange}
+                placeholder="John Doe"
+                className="h-11"
+                required
+              />
+            </div>
 
             {/* Email */}
             <div className="space-y-2">

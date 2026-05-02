@@ -12,8 +12,7 @@ export default function Profile() {
   const token = localStorage.getItem("token");
 
   const [profile, setProfile] = useState({
-    firstName: "",
-    lastName: "",
+    name: "",
     email: "",
     phone: "",
     profilePic: "",
@@ -54,7 +53,7 @@ export default function Profile() {
   };
 
   const handleSave = async () => {
-    if (!profile.firstName && !profile.lastName) {
+    if (!profile.name) {
       alert("Please fill at least your name");
       return;
     }
@@ -65,7 +64,7 @@ export default function Profile() {
       // Save to localStorage
       localStorage.setItem("passengerProfile", JSON.stringify(profile));
 
-      alert("✅ Profile updated successfully!");
+      alert("Profile updated successfully!");
 
       // Automatically navigate to dashboard after save
       setTimeout(() => {
@@ -126,28 +125,18 @@ export default function Profile() {
           <CardContent className="px-8 pb-10 space-y-8">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
-                <Label htmlFor="firstName">First Name</Label>
+                <Label htmlFor="name">Name</Label>
                 <Input
-                  id="firstName"
-                  name="firstName"
-                  value={profile.firstName}
+                  id="name"
+                  name="name"
+                  value={profile.name}
                   onChange={handleChange}
-                  placeholder="Enter first name"
+                  placeholder="Enter name"
                   className="h-12"
                 />
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="lastName">Last Name</Label>
-                <Input
-                  id="lastName"
-                  name="lastName"
-                  value={profile.lastName}
-                  onChange={handleChange}
-                  placeholder="Enter last name"
-                  className="h-12"
-                />
-              </div>
+             
 
               <div className="space-y-2 md:col-span-2">
                 <Label htmlFor="email">Email Address</Label>

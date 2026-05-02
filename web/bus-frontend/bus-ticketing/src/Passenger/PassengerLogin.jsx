@@ -1,7 +1,15 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { signInWithEmailAndPassword } from "firebase/auth";
+import { auth } from "../firebase";
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -23,27 +31,32 @@ export default function PassengerLogin() {
     try {
       setLoading(true);
 
-      const res = await fetch("http://localhost:5000/api/passenger/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
-      });
+      // 🔥 Firebase Authentication (NOT backend)
+      const userCredential = await signInWithEmailAndPassword(
+        auth,
+        email,
+        password,
+      );
 
-      const data = await res.json();
+      const user = userCredential.user;
 
-      if (!res.ok) {
-        throw new Error(data.message || "Login failed");
-      }
+      // 🔑 Get Firebase ID token
+      const token = await user.getIdToken();
 
-      // Store the token (custom Firebase token)
-      localStorage.setItem("token", data.token);
+      // Store token
+      localStorage.setItem("token", token);
 
-      // Store passenger profile
-      localStorage.setItem("passengerProfile", JSON.stringify(data.passenger));
+      // Optional user info
+      localStorage.setItem(
+        "user",
+        JSON.stringify({
+          uid: user.uid,
+          email: user.email,
+        }),
+      );
 
       alert("Login successful!");
       navigate("/passenger-dashboard");
-
     } catch (error) {
       console.error(error);
       alert(error.message);
@@ -51,27 +64,20 @@ export default function PassengerLogin() {
       setLoading(false);
     }
   };
-
   return (
     <div className="flex min-h-[80vh] items-center justify-center bg-gradient-to-br from-zinc-50 to-zinc-100 p-6">
       <Card className="w-full max-w-md shadow-2xl rounded-3xl border-border overflow-hidden">
-        
         <CardHeader className="space-y-1 text-center pb-2">
           <div className="mx-auto w-14 h-14 bg-blue-600 text-white rounded-2xl flex items-center justify-center mb-3">
             <Bus className="h-7 w-7" />
           </div>
 
-          <CardTitle className="text-3xl font-bold">
-            Passenger Login
-          </CardTitle>
+          <CardTitle className="text-3xl font-bold">Passenger Login</CardTitle>
 
-          <CardDescription>
-            Book your bus tickets easily
-          </CardDescription>
+          <CardDescription>Book your bus tickets easily</CardDescription>
         </CardHeader>
 
         <CardContent className="space-y-6 px-8 pb-8 pt-4">
-          
           {/* Email */}
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
@@ -111,21 +117,14 @@ export default function PassengerLogin() {
 
           {/* Links */}
           <div className="flex justify-between pt-2">
-            <Button
-              variant="link"
-              onClick={() => navigate("/admin-login")}
-            >
+            <Button variant="link" onClick={() => navigate("/admin-login")}>
               Admin Login →
             </Button>
 
-            <Button
-              variant="link"
-              onClick={() => navigate("/register")}
-            >
+            <Button variant="link" onClick={() => navigate("/register")}>
               Create Account
             </Button>
           </div>
-
         </CardContent>
       </Card>
     </div>
