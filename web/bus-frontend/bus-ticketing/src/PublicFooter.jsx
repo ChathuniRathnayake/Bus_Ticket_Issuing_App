@@ -22,15 +22,12 @@ export default function PublicFooter() {
 
           {/* Column 2: About / Public info only — NO protected links here */}
           <div>
-            <h3 className="text-white font-semibold mb-4">About</h3>
+            <h3 className="text-white font-semibold mb-4">Quick Links</h3>
             <ul className="space-y-2 text-blue-100 text-sm">
-              <li>
-                <span className="text-blue-100">
-                  🔒 Please login to search buses or view bookings
-                </span>
-              </li>
-              <li><a href="#" className="hover:text-white transition-colors">Contact Us</a></li>
-              <li><a href="#" className="hover:text-white transition-colors">Terms &amp; Conditions</a></li>
+              <li><a href="/#about" className="hover:text-white transition-colors">About Us</a></li>
+              <li><a href="/#how-it-works" className="hover:text-white transition-colors">How To Use</a></li>
+              <li><a href="/#terms" className="hover:text-white transition-colors">Terms &amp; Conditions</a></li>
+              <li><a href="/#contact" className="hover:text-white transition-colors">Contact Us</a></li>
             </ul>
           </div>
 

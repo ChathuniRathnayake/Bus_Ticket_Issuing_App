@@ -46,6 +46,10 @@ export default function PassengerLogin() {
       // Store token
       localStorage.setItem("token", token);
 
+      // 🎫 Remember the role, so the Header knows who you are
+      // no matter which page you're on (including Home).
+      localStorage.setItem("userRole", "passenger");
+
       // Optional user info
       localStorage.setItem(
         "user",

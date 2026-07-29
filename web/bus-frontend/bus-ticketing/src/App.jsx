@@ -1,5 +1,11 @@
 import { useState, useEffect } from "react";
-import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from "react-router-dom";
+import { BrowserRouter as Router, Routes, Route, useLocation } from "react-router-dom";
+
+// Public Pages
+import Home from "./Home";
+
+// Route Guard
+import ProtectedRoute from "./ProtectedRoute";
 
 // Layout Components
 import Header from "./Header";
@@ -65,83 +71,153 @@ function AppContent({
 
       <main className="flex-1 px-6 py-6">
         <Routes>
-          {/* Default redirect */}
-          <Route path="/" element={<Navigate to="/passenger-login" />} />
+          {/* Default: public Home page (no login required) */}
+          <Route path="/" element={<Home />} />
 
           {/* Passenger Routes */}
           <Route path="/passenger-login" element={<PassengerLogin />} />
           <Route path="/register" element={<Register />} />
-          <Route path="/passenger-dashboard" element={<PassengerDashboard />} />
+          <Route
+            path="/passenger-dashboard"
+            element={
+              <ProtectedRoute requiredRole="passenger">
+                <PassengerDashboard />
+              </ProtectedRoute>
+            }
+          />
           <Route
             path="/passenger-dashboard/search-buses"
-            element={<SearchBuses />}
+            element={
+              <ProtectedRoute requiredRole="passenger">
+                <SearchBuses />
+              </ProtectedRoute>
+            }
           />
           <Route
             path="/passenger-dashboard/seat-layout"
-            element={<SeatLayout />}
+            element={
+              <ProtectedRoute requiredRole="passenger">
+                <SeatLayout />
+              </ProtectedRoute>
+            }
           />
           <Route
             path="/passenger-dashboard/profile"
-            element={<Profile />}
+            element={
+              <ProtectedRoute requiredRole="passenger">
+                <Profile />
+              </ProtectedRoute>
+            }
           />
           <Route
             path="/passenger-dashboard/my-bookings"
-            element={<MyBookings />}
+            element={
+              <ProtectedRoute requiredRole="passenger">
+                <MyBookings />
+              </ProtectedRoute>
+            }
           />
           <Route path="/ticket" element={<TicketInfo />} />
 
           {/* Admin Routes */}
           <Route path="/admin-login" element={<AdminLogin />} />
-          <Route path="/admin-dashboard" element={<AdminDashboard />} />
+          <Route
+            path="/admin-dashboard"
+            element={
+              <ProtectedRoute requiredRole="admin">
+                <AdminDashboard />
+              </ProtectedRoute>
+            }
+          />
 
           {/* Conductors */}
           <Route
             path="/admin-dashboard/add-conductor"
-            element={<AddConductor conductors={conductors} setConductors={setConductors} />}
+            element={
+              <ProtectedRoute requiredRole="admin">
+                <AddConductor conductors={conductors} setConductors={setConductors} />
+              </ProtectedRoute>
+            }
           />
           <Route
             path="/admin-dashboard/manage-conductors"
-            element={<ManageConductors conductors={conductors} setConductors={setConductors} />}
+            element={
+              <ProtectedRoute requiredRole="admin">
+                <ManageConductors conductors={conductors} setConductors={setConductors} />
+              </ProtectedRoute>
+            }
           />
 
           {/* Admins */}
           <Route
             path="/admin-dashboard/add-admin"
-            element={<AddAdmin admins={admins} setAdmins={setAdmins} />}
+            element={
+              <ProtectedRoute requiredRole="admin">
+                <AddAdmin admins={admins} setAdmins={setAdmins} />
+              </ProtectedRoute>
+            }
           />
           <Route
             path="/admin-dashboard/manage-admins"
-            element={<ManageAdmins admins={admins} setAdmins={setAdmins} />}
+            element={
+              <ProtectedRoute requiredRole="admin">
+                <ManageAdmins admins={admins} setAdmins={setAdmins} />
+              </ProtectedRoute>
+            }
           />
 
           {/* Buses */}
           <Route
             path="/admin-dashboard/add-bus"
-            element={<AddBus buses={buses} setBuses={setBuses} routes={routes} />}
+            element={
+              <ProtectedRoute requiredRole="admin">
+                <AddBus buses={buses} setBuses={setBuses} routes={routes} />
+              </ProtectedRoute>
+            }
           />
           <Route
             path="/admin-dashboard/manage-buses"
-            element={<ManageBuses buses={buses} setBuses={setBuses} routes={routes} />}
+            element={
+              <ProtectedRoute requiredRole="admin">
+                <ManageBuses buses={buses} setBuses={setBuses} routes={routes} />
+              </ProtectedRoute>
+            }
           />
 
           {/* Routes */}
           <Route
             path="/admin-dashboard/add-route"
-            element={<AddRoute routes={routes} setRoutes={setRoutes} />}
+            element={
+              <ProtectedRoute requiredRole="admin">
+                <AddRoute routes={routes} setRoutes={setRoutes} />
+              </ProtectedRoute>
+            }
           />
           <Route
             path="/admin-dashboard/manage-routes"
-            element={<ManageRoutes routes={routes} setRoutes={setRoutes} />}
+            element={
+              <ProtectedRoute requiredRole="admin">
+                <ManageRoutes routes={routes} setRoutes={setRoutes} />
+              </ProtectedRoute>
+            }
           />
 
           {/* Schedules */}
           <Route
             path="/admin-dashboard/add-schedule"
-            element={<AddSchedule buses={buses} routes={routes} schedules={schedules} setSchedules={setSchedules} />}
+            element={
+              <ProtectedRoute requiredRole="admin">
+                <AddSchedule buses={buses} routes={routes} schedules={schedules} setSchedules={setSchedules} />
+              </ProtectedRoute>
+            }
           />
           <Route
             path="/admin-dashboard/manage-schedules"
-            element={<ManageSchedules buses={buses} routes={routes} schedules={schedules} setSchedules={setSchedules} />}
+            element={
+              <ProtectedRoute requiredRole="admin">
+                <ManageSchedules buses={buses} routes={routes} schedules={schedules} setSchedules={setSchedules} />
+              </ProtectedRoute>
+            }
           />
         </Routes>
       </main>
