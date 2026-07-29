@@ -1,67 +1,36 @@
-// src/components/Footer.jsx
-import { useNavigate } from "react-router-dom";
-
-export default function Footer() {
-  const navigate = useNavigate();
-
-  // 🔑 Check if the user is actually logged in
-  const token = localStorage.getItem("token");
-
-  // This function runs when someone clicks a Quick Link.
-  // If they are NOT logged in, we send them to login instead
-  // of letting them jump straight to a protected page.
-  const handleProtectedLink = (e, path) => {
-    e.preventDefault();
-    if (!token) {
-      navigate("/passenger-login");
-      return;
-    }
-    navigate(path);
-  };
-
+// src/components/PublicFooter.jsx
+export default function PublicFooter() {
   return (
     <footer className="bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-600 dark:from-zinc-800 dark:to-zinc-900 border-t border-blue-700 dark:border-zinc-700 mt-auto">
       <div className="max-w-7xl mx-auto px-6 py-10">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          
+
           {/* Column 1: Logo + About */}
           <div>
             <div className="flex items-center gap-3 mb-4">
-              <img 
-                src="/src/assets/logo.png" 
-                alt="TicketGo Logo" 
+              <img
+                src="/src/assets/logo.png"
+                alt="TicketGo Logo"
                 className="h-11 w-auto object-contain"
               />
             </div>
             <p className="text-blue-100 text-sm leading-relaxed">
-              TicketGo is a modern real-time bus ticketing platform designed to make 
+              TicketGo is a modern real-time bus ticketing platform designed to make
               travel booking simple, fast, and reliable for passengers across Sri Lanka.
             </p>
           </div>
 
-          {/* Column 2: Quick Links */}
+          {/* Column 2: About / Public info only — NO protected links here */}
           <div>
-            <h3 className="text-white font-semibold mb-4">Quick Links</h3>
+            <h3 className="text-white font-semibold mb-4">About</h3>
             <ul className="space-y-2 text-blue-100 text-sm">
               <li>
-                <a
-                  href="/passenger-dashboard/search-buses"
-                  onClick={(e) => handleProtectedLink(e, "/passenger-dashboard/search-buses")}
-                  className="hover:text-white transition-colors"
-                >
-                  Search Buses
-                </a>
-              </li>
-              <li>
-                <a
-                  href="/passenger-dashboard/my-bookings"
-                  onClick={(e) => handleProtectedLink(e, "/passenger-dashboard/my-bookings")}
-                  className="hover:text-white transition-colors"
-                >
-                  My Bookings
-                </a>
+                <span className="text-blue-100">
+                  🔒 Please login to search buses or view bookings
+                </span>
               </li>
               <li><a href="#" className="hover:text-white transition-colors">Contact Us</a></li>
+              <li><a href="#" className="hover:text-white transition-colors">Terms &amp; Conditions</a></li>
             </ul>
           </div>
 
@@ -76,7 +45,7 @@ export default function Footer() {
                   Sri Lanka
                 </div>
               </div>
-              
+
               <div className="flex items-center gap-3">
                 <span>📞</span>
                 <a href="tel:+94712345678" className="hover:text-white transition-colors">
