@@ -35,6 +35,7 @@ import AddBus from "./Admin/AddBus";
 import ManageBuses from "./Admin/ManageBuses";
 import AddSchedule from "./Admin/AddSchedule";
 import ManageSchedules from "./Admin/ManageSchedules";
+import ManageBookings from "./Admin/ManageBookings";
 
 // 🚧 Pages that are "public" — anyone can see them WITHOUT logging in.
 // On these pages we show the decorative PublicFooter instead of the
@@ -216,6 +217,16 @@ function AppContent({
             element={
               <ProtectedRoute requiredRole="admin">
                 <ManageSchedules buses={buses} routes={routes} schedules={schedules} setSchedules={setSchedules} />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Bookings (view-only) */}
+          <Route
+            path="/admin-dashboard/manage-bookings"
+            element={
+              <ProtectedRoute requiredRole="admin">
+                <ManageBookings />
               </ProtectedRoute>
             }
           />

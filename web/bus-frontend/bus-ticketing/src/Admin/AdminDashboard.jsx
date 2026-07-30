@@ -1,7 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Users, Bus, Map, ShieldCheck, Calendar, LogOut } from "lucide-react";
+import { Users, Bus, Map, ShieldCheck, Calendar, Ticket, LogOut } from "lucide-react";
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
@@ -33,6 +33,11 @@ export default function AdminDashboard() {
       iconText: "text-orange-600",
       btn: "bg-orange-600 hover:bg-orange-700",
     },
+    rose: {
+      iconBg: "bg-rose-100",
+      iconText: "text-rose-600",
+      btn: "bg-rose-600 hover:bg-rose-700",
+    },
   };
 
   const sections = [
@@ -41,6 +46,8 @@ export default function AdminDashboard() {
     { title: "Routes",     icon: Map,    color: "emerald",add: "/admin-dashboard/add-route",    manage: "/admin-dashboard/manage-routes" },
     { title: "Schedules",  icon: Calendar, color: "orange", add: "/admin-dashboard/add-schedule", manage: "/admin-dashboard/manage-schedules" },
     { title: "Admins",     icon: ShieldCheck, color: "amber", add: "/admin-dashboard/add-admin", manage: "/admin-dashboard/manage-admins" },
+    // 🎫 Bookings: no "add" — an admin can only VIEW bookings, not create one manually
+    { title: "Bookings",   icon: Ticket, color: "rose", manage: "/admin-dashboard/manage-bookings" },
   ];
 
   return (
@@ -59,6 +66,7 @@ export default function AdminDashboard() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {sections.map((sec, i) => {
           const styles = colorStyles[sec.color];
+          const hasAdd = Boolean(sec.add);
 
           return (
             <Card 
@@ -75,19 +83,21 @@ export default function AdminDashboard() {
                 </CardDescription>
               </CardHeader>
 
-              <CardContent className="grid grid-cols-2 gap-3 pt-2 pb-6">
-                <Button 
-                  onClick={() => navigate(sec.add)} 
-                  variant="outline" 
-                  className="h-12 gap-2 hover:bg-muted transition-all duration-300 cursor-pointer font-medium"
-                >
-                  + Add New
-                </Button>
+              <CardContent className={`grid ${hasAdd ? "grid-cols-2" : "grid-cols-1"} gap-3 pt-2 pb-6`}>
+                {hasAdd && (
+                  <Button 
+                    onClick={() => navigate(sec.add)} 
+                    variant="outline" 
+                    className="h-12 gap-2 hover:bg-muted transition-all duration-300 cursor-pointer font-medium"
+                  >
+                    + Add New
+                  </Button>
+                )}
                 <Button 
                   onClick={() => navigate(sec.manage)} 
                   className={`h-12 text-white transition-all duration-300 cursor-pointer font-medium ${styles.btn}`}
                 >
-                  Manage All
+                  {hasAdd ? "Manage All" : "View All Bookings"}
                 </Button>
               </CardContent>
             </Card>

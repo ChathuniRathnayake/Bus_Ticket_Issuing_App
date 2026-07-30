@@ -1,7 +1,7 @@
 // src/components/Header.jsx
 import { useNavigate, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { LogOut, Bus, Users, Map, ShieldCheck, Home as HomeIcon } from "lucide-react";
+import { LogOut, Bus, Users, Map, ShieldCheck, Ticket, Home as HomeIcon } from "lucide-react";
 
 // Pages where a logged-OUT visitor should see ONLY a "Home" link
 // (no About / Contact clutter — they're here to log in, not browse).
@@ -148,6 +148,12 @@ export default function Header() {
                     className="hover:text-blue-200 transition-colors flex items-center gap-1"
                   >
                     <ShieldCheck className="h-4 w-4" /> Admins
+                  </button>
+                  <button
+                    onClick={() => navigate("/admin-dashboard/manage-bookings")}
+                    className="hover:text-blue-200 transition-colors flex items-center gap-1"
+                  >
+                    <Ticket className="h-4 w-4" /> Bookings
                   </button>
                 </>
               )}
