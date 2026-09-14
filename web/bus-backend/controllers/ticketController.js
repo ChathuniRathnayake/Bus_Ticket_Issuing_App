@@ -51,7 +51,7 @@ export const getBookedSeatsByBus = async (req, res) => {
     const ticketsSnap = await db
       .collection("tickets")
       .where("busId", "==", busId)
-      .where("status", "==", "booked")
+      .where("status", "in", ["BOOKED", "booked", "PENDING_PAYMENT"])
       .get();
 
     const tickets = ticketsSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
@@ -69,7 +69,7 @@ export const getUserTickets = async (req, res) => {
     const ticketsSnap = await db
       .collection("tickets")
       .where("userId", "==", userId)
-      .where("status", "==", "booked")
+      .where("status", "in", ["BOOKED", "booked"])
       .get();
 
     const tickets = ticketsSnap.docs.map((doc) => ({ bookingId: doc.id, ...doc.data() }));
