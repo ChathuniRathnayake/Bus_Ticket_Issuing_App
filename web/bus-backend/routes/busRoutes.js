@@ -2,6 +2,7 @@ import express from "express";
 import {
   createBus,
   getBuses,
+  getAvailableBuses,
   getBusById,
   updateBus,
   deleteBus,
@@ -14,6 +15,7 @@ const router = express.Router();
 // All bus routes require admin authentication
 router.post("/", verifyToken, verifyAdmin, createBus);
 router.get("/", verifyToken, verifyAdmin, getBuses);
+router.get("/available", verifyToken, getAvailableBuses);
 router.get("/:busId", verifyToken, verifyAdmin, getBusById);
 router.put("/:busId", verifyToken, verifyAdmin, updateBus);
 router.delete("/:busId", verifyToken, verifyAdmin, deleteBus);

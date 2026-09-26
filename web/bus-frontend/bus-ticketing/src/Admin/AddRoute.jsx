@@ -24,6 +24,7 @@ export default function AddRoute({ routes, setRoutes }) {
 
   const [durationHours, setDurationHours] = useState("");
   const [durationMinutes, setDurationMinutes] = useState("");
+  const [intermediateStopsText, setIntermediateStopsText] = useState("");
 
   // Auto-calculate end time based on start time + duration
   const calculateEndTime = (startTime, durationStr) => {
@@ -111,10 +112,23 @@ export default function AddRoute({ routes, setRoutes }) {
     setLoading(true);
 
     try {
+      const stops = [
+        { name: startStop, stopType: "terminal", boardingAllowed: true, alightingAllowed: false },
+        ...intermediateStopsText.split("\n").map((line) => line.trim()).filter(Boolean).map((line) => {
+          const [name, stopType = "normal_road_waypoint", boarding = "false", alighting = "false"] = line.split("|").map((part) => part.trim());
+          return {
+            name,
+            stopType,
+            boardingAllowed: boarding.toLowerCase() === "true" && stopType !== "expressway_interchange" && stopType !== "expressway_segment",
+            alightingAllowed: alighting.toLowerCase() === "true" && stopType !== "expressway_interchange" && stopType !== "expressway_segment",
+          };
+        }),
+        { name: endStop, stopType: "terminal", boardingAllowed: false, alightingAllowed: true },
+      ];
      
       const res = await axios.post(
         "http://localhost:5000/api/route",
-        form,
+        { ...form, stops },
         {
           headers: { Authorization: `Bearer ${token}` },
         }
@@ -140,6 +154,7 @@ export default function AddRoute({ routes, setRoutes }) {
 
       setDurationHours("");
       setDurationMinutes("");
+      setIntermediateStopsText("");
 
       navigate("/admin-dashboard/manage-routes");
 
@@ -275,6 +290,20 @@ export default function AddRoute({ routes, setRoutes }) {
             </div>
 
 
+
+            <div className="space-y-2">
+              <Label htmlFor="intermediateStops">Ordered intermediate stops</Label>
+              <textarea
+                id="intermediateStops"
+                value={intermediateStopsText}
+                onChange={(event) => setIntermediateStopsText(event.target.value)}
+                placeholder={"One per line: Stop name | normal_road_waypoint | true | true\nInterchange | expressway_interchange | false | false"}
+                className="min-h-28 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              />
+              <p className="text-xs text-muted-foreground">
+                Format: name | type | boarding allowed | alighting allowed. Verify passenger permissions against the operator service; interchanges cannot be stops.
+              </p>
+            </div>
 
             {/* Distance */}
             <div className="space-y-2">

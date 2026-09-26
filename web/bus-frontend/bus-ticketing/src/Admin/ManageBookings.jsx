@@ -107,8 +107,8 @@ export default function ManageBookings() {
   };
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     fetchData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // 🔎 Search across booking id, bus number, route name, seat, passenger id

@@ -13,6 +13,7 @@ export default function SearchBuses() {
 
   const [buses, setBuses] = useState([]);
   const [routes, setRoutes] = useState([]);
+  const [schedules, setSchedules] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const [startStopFilter, setStartStopFilter] = useState("");
@@ -28,23 +29,34 @@ export default function SearchBuses() {
     const fetchData = async () => {
       try {
         setLoading(true);
-        const [busRes, routeRes] = await Promise.all([
-          fetch("http://localhost:5000/api/bus", {
+        const [busRes, routeRes, scheduleRes] = await Promise.all([
+          fetch("http://localhost:5000/api/bus/available", {
             headers: { Authorization: `Bearer ${token}` },
           }),
-          fetch("http://localhost:5000/api/route", {
+          fetch("http://localhost:5000/api/route/available", {
+            headers: { Authorization: `Bearer ${token}` },
+          }),
+          fetch("http://localhost:5000/api/schedule/available", {
             headers: { Authorization: `Bearer ${token}` },
           }),
         ]);
 
-        const busData = await busRes.json();
-        const routeData = await routeRes.json();
+        const [busData, routeData, scheduleData] = await Promise.all([
+          busRes.json(),
+          routeRes.json(),
+          scheduleRes.json(),
+        ]);
 
-        if (busRes.ok) setBuses(busData);
-        if (routeRes.ok) setRoutes(routeData);
+        if (!busRes.ok) throw new Error(busData.message || "Failed to load buses");
+        if (!routeRes.ok) throw new Error(routeData.message || "Failed to load routes");
+        if (!scheduleRes.ok) throw new Error(scheduleData.message || "Failed to load schedules");
+
+        setBuses(busData);
+        setRoutes(routeData);
+        setSchedules(scheduleData);
       } catch (error) {
         console.error("Failed to fetch data:", error);
-        alert("Failed to load buses. Please try again.");
+        alert(error.message || "Failed to load available buses. Please try again.");
       } finally {
         setLoading(false);
       }
@@ -53,35 +65,76 @@ export default function SearchBuses() {
     fetchData();
   }, [token]);
 
-  const activeBuses = buses.filter((b) => b.status === "Active");
+  const activeTrips = schedules
+    .filter((schedule) => schedule.status === "Active")
+    .map((schedule) => {
+      const bus = buses.find((item) => (item.id || item.busId) === schedule.busId);
+      const route = routes.find((item) => item.routeId === schedule.routeId);
+      if (!bus || bus.status !== "Active" || !route) return null;
+
+      return {
+        ...bus,
+        scheduleId: schedule.scheduleId || schedule.id,
+        routeId: schedule.routeId,
+        tripDate: schedule.date,
+        departureTime: schedule.departureTime,
+        route,
+      };
+    })
+    .filter(Boolean);
+
+  const getStops = (route) => {
+    if (Array.isArray(route?.stops) && route.stops.length > 0) {
+      return route.stops.map((stop, sequence) => typeof stop === "string"
+        ? { stopId: `${route.routeId}-${sequence}`, name: stop, sequence, boardingAllowed: sequence === 0, alightingAllowed: sequence === route.stops.length - 1 }
+        : { ...stop, sequence: Number.isInteger(stop.sequence) ? stop.sequence : sequence });
+    }
+    return [
+      { stopId: `${route?.routeId}-origin`, name: route?.startStop, sequence: 0, boardingAllowed: true, alightingAllowed: false },
+      { stopId: `${route?.routeId}-destination`, name: route?.endStop, sequence: 1, boardingAllowed: false, alightingAllowed: true },
+    ];
+  };
 
   const availableStartStops = useMemo(() => {
-    const stops = activeBuses
-      .map((b) => routes.find((r) => r.routeId === b.routeId)?.startStop)
-      .filter(Boolean);
+    const stops = activeTrips.flatMap((trip) => getStops(trip.route)
+      .filter((stop) => stop.boardingAllowed === true)
+      .map((stop) => stop.name)
+      .filter(Boolean));
     return [...new Set(stops)].sort();
-  }, [activeBuses, routes]);
+  }, [activeTrips]);
 
   const availableEndStops = useMemo(() => {
-    const stops = activeBuses
-      .map((b) => routes.find((r) => r.routeId === b.routeId)?.endStop)
-      .filter(Boolean);
+    const stops = activeTrips.flatMap((trip) => getStops(trip.route)
+      .filter((stop) => stop.alightingAllowed === true)
+      .map((stop) => stop.name)
+      .filter(Boolean));
     return [...new Set(stops)].sort();
-  }, [activeBuses, routes]);
+  }, [activeTrips]);
 
-  const filteredBuses = activeBuses.filter((b) => {
-    const route = routes.find((r) => r.routeId === b.routeId);
-    if (!route) return false;
-
-    const matchStart = !startStopFilter || route.startStop === startStopFilter;
-    const matchEnd = !endStopFilter || route.endStop === endStopFilter;
-    const matchDate = !dateFilter || route.date === dateFilter;
+  const filteredBuses = activeTrips.filter((b) => {
+    const route = b.route;
+    const stops = getStops(route);
+    const boardingStop = startStopFilter
+      ? stops.find((stop) => stop.boardingAllowed === true && stop.name === startStopFilter)
+      : null;
+    const dropStop = endStopFilter
+      ? stops.find((stop) => stop.alightingAllowed === true && stop.name === endStopFilter
+        && (!boardingStop || stop.sequence > boardingStop.sequence))
+      : null;
+    const matchStart = !startStopFilter || Boolean(boardingStop);
+    const matchEnd = !endStopFilter || Boolean(dropStop);
+    const matchDate = !dateFilter || b.tripDate === dateFilter;
 
     let matchTime = true;
-    if (startTimeFilter && route.startTime) matchTime = matchTime && route.startTime >= startTimeFilter;
-    if (endTimeFilter && route.endTime) matchTime = matchTime && route.endTime <= endTimeFilter;
+    if (startTimeFilter && b.departureTime) matchTime = matchTime && b.departureTime >= startTimeFilter;
+    if (endTimeFilter && (route.endTime || b.departureTime)) {
+      matchTime = matchTime && (route.endTime || b.departureTime) <= endTimeFilter;
+    }
 
-    return matchStart && matchEnd && matchTime && matchDate;
+    if (!matchStart || !matchEnd || !matchTime || !matchDate) return false;
+    b.boardingStop = boardingStop || stops.find((stop) => stop.boardingAllowed === true) || null;
+    b.dropStop = dropStop || stops.find((stop) => stop.alightingAllowed === true) || null;
+    return true;
   });
 
   const getRouteName = (routeId) => {
@@ -195,7 +248,8 @@ export default function SearchBuses() {
           ) : filteredBuses.length === 0 ? (
             <div className="text-center py-20">
               <Bus className="mx-auto h-16 w-16 text-slate-300 mb-4" />
-              <p className="text-xl text-gray-600">No buses found for your filters</p>
+              <p className="text-xl text-gray-600">No scheduled buses match these filters</p>
+              <p className="mt-2 text-sm text-slate-500">Clear a filter or choose another travel date to see more trips.</p>
             </div>
           ) : (
             <div className="overflow-auto rounded-2xl border border-slate-100">
@@ -212,13 +266,13 @@ export default function SearchBuses() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredBuses.map((b, i) => (
-                    <TableRow key={i} className="hover:bg-blue-50/50 transition-all">
+                  {filteredBuses.map((b) => (
+                    <TableRow key={b.scheduleId} className="hover:bg-blue-50/50 transition-all">
                       <TableCell className="font-medium">{b.busId || b.id}</TableCell>
                       <TableCell className="font-medium">{getRouteName(b.routeId)}</TableCell>
-                      <TableCell>{routes.find(r => r.routeId === b.routeId)?.date}</TableCell>
+                      <TableCell>{b.tripDate}</TableCell>
                       <TableCell className="font-semibold text-emerald-600">
-                        {routes.find(r => r.routeId === b.routeId)?.startTime}
+                        {b.departureTime}
                       </TableCell>
                       <TableCell>{b.totalSeats}</TableCell>
                       <TableCell className="font-medium">{b.busNo}</TableCell>

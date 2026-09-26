@@ -21,6 +21,7 @@ import SeatLayout from "./Passenger/SeatLayout";
 import Profile from "./Passenger/Profile";
 import MyBookings from "./Passenger/MyBookings";
 import TicketInfo from "./Passenger/TicketInfo";
+import PaymentResult from "./Passenger/PaymentResult";
 
 // Admin Components
 import AdminLogin from "./Admin/AdminLogin";
@@ -40,7 +41,7 @@ import ManageBookings from "./Admin/ManageBookings";
 // 🚧 Pages that are "public" — anyone can see them WITHOUT logging in.
 // On these pages we show the decorative PublicFooter instead of the
 // real Footer (which has links to protected pages).
-const PUBLIC_PATHS = ["/", "/passenger-login", "/admin-login", "/register"];
+const PUBLIC_PATHS = ["/", "/passenger-login", "/admin-login", "/register", "/payment-success", "/payment-cancelled"];
 
 /**
  * This little component's ONLY job is to look at the current URL
@@ -119,6 +120,8 @@ function AppContent({
             }
           />
           <Route path="/ticket" element={<TicketInfo />} />
+          <Route path="/payment-success" element={<PaymentResult />} />
+          <Route path="/payment-cancelled" element={<PaymentResult cancelled />} />
 
           {/* Admin Routes */}
           <Route path="/admin-login" element={<AdminLogin />} />
@@ -252,17 +255,20 @@ export default function App() {
   useEffect(() => {
     const storedBuses = localStorage.getItem("buses");
     if (storedBuses) {
+      // Hydrate persisted admin data once during app startup.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setBusesState(JSON.parse(storedBuses));
     }
     const storedRoutes = localStorage.getItem("routes");
     if (storedRoutes) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setRoutesState(JSON.parse(storedRoutes));
     }
     const storedSchedules = localStorage.getItem("schedules");
     if (storedSchedules) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setSchedulesState(JSON.parse(storedSchedules));
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Save functions (auto-save to localStorage)

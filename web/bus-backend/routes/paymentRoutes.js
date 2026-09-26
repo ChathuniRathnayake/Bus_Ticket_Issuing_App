@@ -5,11 +5,11 @@ import {
   getPaymentStatus,
   getPaymentHistory,
 } from "../controllers/paymentController.js";
-import { verifyToken } from "../middleware/authMiddleware.js";
+import { verifyPassenger, verifyToken } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
-router.post("/checkout-session", verifyToken, createCheckoutSession);
+router.post("/checkout-session", verifyToken, verifyPassenger, createCheckoutSession);
 router.post("/:paymentId/cancel", verifyToken, cancelPayment);
 router.get("/:paymentId/status", verifyToken, getPaymentStatus);
 router.get("/history", verifyToken, getPaymentHistory);

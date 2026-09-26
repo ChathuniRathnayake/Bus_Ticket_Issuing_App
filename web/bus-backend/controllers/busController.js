@@ -72,6 +72,19 @@ export const getBuses = async (req, res) => {
   }
 };
 
+export const getAvailableBuses = async (req, res) => {
+  try {
+    const busesSnap = await db.collection("buses")
+      .where("status", "==", "Active")
+      .get();
+    const buses = busesSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+    res.json(buses);
+  } catch (error) {
+    console.error("Get Available Buses Error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
 // GET BUS BY ID
 export const getBusById = async (req, res) => {
   try {

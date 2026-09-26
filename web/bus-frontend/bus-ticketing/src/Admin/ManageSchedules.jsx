@@ -21,7 +21,6 @@ export default function ManageSchedules() {
   const [schedules, setSchedules] = useState([]);
   const [filteredSchedules, setFilteredSchedules] = useState([]);
   const [buses, setBuses] = useState([]);
-  const [routes, setRoutes] = useState([]);
 
   const [loading, setLoading] = useState(false);
   const [editId, setEditId] = useState(null);
@@ -64,7 +63,6 @@ export default function ManageSchedules() {
         const routesData = routeRes.data;
 
         setBuses(busesData);
-        setRoutes(routesData);
 
         const enrichedSchedules = scheduleRes.data.map((schedule) => {
           const bus = busesData.find((b) => b.id === schedule.busId);
@@ -80,6 +78,9 @@ export default function ManageSchedules() {
               : "Unknown",
             routeDistance: route?.distance || "-",
             routeDuration: route?.duration || "-",
+            routeStops: Array.isArray(route?.stops)
+              ? route.stops.map((stop) => typeof stop === "string" ? stop : stop.name).join(" → ")
+              : "Stops not configured",
           };
         });
 
@@ -101,7 +102,7 @@ export default function ManageSchedules() {
     };
 
     loadData();
-  }, []);
+  }, [navigate, token]);
 
   // EDIT
   const handleEdit = (schedule) => {
@@ -233,7 +234,14 @@ export default function ManageSchedules() {
                         )}
                       </TableCell>
 
-                      <TableCell>{s.routeName}</TableCell>
+                      <TableCell>
+                        <div className="font-medium">{s.routeName}</div>
+                        <div className="mt-1 max-w-sm whitespace-normal text-xs text-muted-foreground">{s.routeStops}</div>
+                        <div className="mt-1 text-xs text-muted-foreground">
+                          {s.routeDistance !== "-" ? `${s.routeDistance} km · ` : ""}
+                          {s.routeDuration !== "-" ? `${s.routeDuration} estimated` : ""}
+                        </div>
+                      </TableCell>
 
                       <TableCell>
                         {editId === s.id ? (

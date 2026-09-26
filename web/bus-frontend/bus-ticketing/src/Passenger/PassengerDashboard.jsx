@@ -13,7 +13,7 @@ export default function PassengerDashboard() {
   const navigate = useNavigate();
   const [darkMode, setDarkMode] = useState(false);
   const [profile, setProfile] = useState(null);
-  const [bookings, setBookings] = useState([]);
+  const [bookings, setBookings] = useState(() => JSON.parse(localStorage.getItem("userBookings") || "[]"));
   const [routes, setRoutes] = useState([]);
   const [upcomingBooking, setUpcomingBooking] = useState(null);
   const [countdown, setCountdown] = useState("");
@@ -75,8 +75,7 @@ export default function PassengerDashboard() {
 
   // Load bookings and find next upcoming
   useEffect(() => {
-    const savedBookings = JSON.parse(localStorage.getItem("userBookings")) || [];
-    setBookings(savedBookings);
+    const savedBookings = JSON.parse(localStorage.getItem("userBookings") || "[]");
 
     // Find next upcoming booking
     if (savedBookings.length > 0 && routes.length > 0) {
@@ -87,9 +86,10 @@ export default function PassengerDashboard() {
           return { ...booking, route };
         })
         .filter((b) => b.route && new Date(`${b.route.date}T${b.route.startTime}`) > now)
-        .sort((a, b) => new Date(`${a.route.date}T${a.route.startTime}`) - new Date(`${b.route.date}T${b.route.startTime}`))
-        [0];
+        .sort((a, b) => new Date(`${a.route.date}T${a.route.startTime}`) - new Date(`${b.route.date}T${b.route.startTime}`))[0];
 
+      // This effect synchronizes derived booking state with localStorage and route data.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setUpcomingBooking(upcoming || null);
     }
   }, [routes]);
@@ -103,6 +103,8 @@ export default function PassengerDashboard() {
 
     const savedProfile = localStorage.getItem("passengerProfile");
     if (savedProfile) {
+      // Profile state is restored from the persisted session on mount.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setProfile(JSON.parse(savedProfile));
     }
 
@@ -123,12 +125,6 @@ export default function PassengerDashboard() {
     window.addEventListener("storage", syncBookings);
     return () => window.removeEventListener("storage", syncBookings);
   }, []);
-
-  const handleLogout = () => {
-    localStorage.removeItem("token");
-    localStorage.removeItem("passengerProfile");
-    navigate("/passenger-login");
-  };
 
   return (
     <div className={`min-h-screen bg-gradient-to-br from-zinc-50 to-zinc-100 dark:from-zinc-950 dark:to-zinc-900 transition-colors duration-300`}>

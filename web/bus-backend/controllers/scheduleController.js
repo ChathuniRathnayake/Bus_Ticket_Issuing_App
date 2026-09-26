@@ -1,5 +1,49 @@
 import { db } from "../config/firebase.js";
 
+const normalizePlace = (value) => String(value || "").trim().toLowerCase();
+
+export const searchPassengerSchedules = async (req, res) => {
+  try {
+    const { origin, destination, date } = req.query;
+    if (!origin || !destination || !date) {
+      return res.status(400).json({ message: "origin, destination and date are required" });
+    }
+    const [scheduleSnapshot, routeSnapshot] = await Promise.all([
+      db.collection("schedules").where("date", "==", date).where("status", "==", "Active").get(),
+      db.collection("routes").get(),
+    ]);
+    const routeById = new Map(routeSnapshot.docs.map((doc) => [doc.id, { id: doc.id, ...doc.data() }]));
+    const matches = [];
+    for (const scheduleDoc of scheduleSnapshot.docs) {
+      const schedule = scheduleDoc.data();
+      const route = routeById.get(schedule.routeId);
+      if (!route) continue;
+      const stops = (route.stops || []).map((stop, index) => typeof stop === "string"
+        ? { stopId: `${route.routeId}-${index}`, name: stop, sequence: index, boardingAllowed: index === 0, alightingAllowed: index === (route.stops.length - 1) }
+        : { ...stop, sequence: Number.isInteger(stop.sequence) ? stop.sequence : index });
+      const from = stops.find((stop) => stop.boardingAllowed === true && normalizePlace(stop.name) === normalizePlace(origin));
+      const to = stops.find((stop) => stop.alightingAllowed === true && normalizePlace(stop.name) === normalizePlace(destination)
+        && stop.sequence > (from?.sequence ?? -1));
+      if (!from || !to) continue;
+      const busDoc = await db.collection("buses").doc(schedule.busId).get();
+      if (!busDoc.exists || busDoc.data().status !== "Active") continue;
+      matches.push({
+        id: scheduleDoc.id,
+        ...schedule,
+        bus: { id: busDoc.id, ...busDoc.data() },
+        route: { ...route, stops },
+        boardingStop: from,
+        dropStop: to,
+      });
+    }
+    matches.sort((a, b) => String(a.departureTime).localeCompare(String(b.departureTime)));
+    return res.json(matches);
+  } catch (error) {
+    console.error("Passenger schedule search error:", error);
+    return res.status(500).json({ message: "Could not search schedules" });
+  }
+};
+
 // CREATE SCHEDULE
 export const createSchedule = async (req, res) => {
   try {
@@ -86,6 +130,19 @@ export const getSchedules = async (req, res) => {
     res.json(schedules);
   } catch (error) {
     console.error("Get Schedules Error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+export const getAvailableSchedules = async (req, res) => {
+  try {
+    const schedulesSnap = await db.collection("schedules")
+      .where("status", "==", "Active")
+      .get();
+    const schedules = schedulesSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+    res.json(schedules);
+  } catch (error) {
+    console.error("Get Available Schedules Error:", error);
     res.status(500).json({ message: "Server error" });
   }
 };

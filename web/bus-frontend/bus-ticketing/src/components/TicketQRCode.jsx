@@ -6,6 +6,8 @@ export default function TicketQRCode({ value, size = 140, className = "" }) {
 
   useEffect(() => {
     if (!value) {
+      // QR generation is asynchronous; reset the previous image when the ticket changes.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setSrc("");
       return;
     }
@@ -35,7 +37,8 @@ export default function TicketQRCode({ value, size = 140, className = "" }) {
     />
   ) : (
     <div
-      className={`${className} flex h-[${size}px] w-[${size}px] items-center justify-center rounded-3xl border border-slate-200 bg-slate-50 text-center text-xs text-slate-500`}
+      className={`${className} flex items-center justify-center rounded-3xl border border-slate-200 bg-slate-50 text-center text-xs text-slate-500`}
+      style={{ width: size, height: size }}
     >
       Generating QR...
     </div>

@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, CreditCard } from "lucide-react";
 
 // ─── Single seat button ────────────────────────────────────────────────────────
 function SeatBtn({ label, status, onClick }) {
@@ -32,62 +32,82 @@ function SeatBtn({ label, status, onClick }) {
   );
 }
 
+function normalizeRouteStops(bus) {
+  const routeStops = bus?.route?.stops;
+  if (Array.isArray(routeStops) && routeStops.length >= 2) {
+    return routeStops.map((stop, sequence) => typeof stop === "string"
+      ? { stopId: `${bus.routeId}-${sequence}`, name: stop, sequence, boardingAllowed: sequence === 0, alightingAllowed: sequence === routeStops.length - 1 }
+      : { ...stop, sequence: Number.isInteger(stop.sequence) ? stop.sequence : sequence });
+  }
+  return [
+    { stopId: `${bus?.routeId}-origin`, name: bus?.route?.startStop || bus?.routeId || "Origin", sequence: 0, boardingAllowed: true, alightingAllowed: false },
+    { stopId: `${bus?.routeId}-destination`, name: bus?.route?.endStop || "Destination", sequence: 1, boardingAllowed: false, alightingAllowed: true },
+  ];
+}
+
 // ─── Main component ────────────────────────────────────────────────────────────
 export default function SeatLayout() {
   const navigate = useNavigate();
   const location = useLocation();
   const { bus } = location.state || {};
+  const [routeStops] = useState(() => normalizeRouteStops(bus));
+  const [boardingStopId, setBoardingStopId] = useState(() => (
+    bus?.boardingStop?.stopId
+      || normalizeRouteStops(bus).find((stop) => stop.boardingAllowed === true)?.stopId
+      || ""
+  ));
+  const [dropStopId, setDropStopId] = useState(() => (
+    bus?.dropStop?.stopId
+      || [...normalizeRouteStops(bus)].reverse().find((stop) => stop.alightingAllowed === true)?.stopId
+      || ""
+  ));
 
-  if (!bus) {
-    return (
-      <div className="text-center py-20">
-        <p className="text-muted-foreground mb-4">No bus selected.</p>
-        <Button onClick={() => navigate(-1)}>Go Back</Button>
-      </div>
-    );
-  }
-
-  const leftSeatsPerRow  = parseInt(bus.leftColumns)  || 2;
-  const rightSeatsPerRow = parseInt(bus.rightColumns) || 2;
-  const leftRows         = parseInt(bus.leftRows)     || 10;
-  const rightRows        = parseInt(bus.rightRows)    || 10;
-  const backRowSeats     = parseInt(bus.backRowSeats) || 5;
-  const totalSeats       = parseInt(bus.totalSeats)   || 52;
+  const leftSeatsPerRow  = parseInt(bus?.leftColumns)  || 2;
+  const rightSeatsPerRow = parseInt(bus?.rightColumns) || 2;
+  const leftRows         = parseInt(bus?.leftRows)     || 10;
+  const rightRows        = parseInt(bus?.rightRows)    || 10;
+  const backRowSeats     = parseInt(bus?.backRowSeats) || 5;
+  const totalSeats       = parseInt(bus?.totalSeats)   || 52;
 
   const hasFrontSingle =
-    bus.hasFrontSingle === "yes" || bus.hasFrontSingle === true;
+    bus?.hasFrontSingle === "yes" || bus?.hasFrontSingle === true;
   const hasBackFullRow =
-    bus.hasBackFullRow === "yes" || bus.hasBackFullRow === true;
+    bus?.hasBackFullRow === "yes" || bus?.hasBackFullRow === true;
 
   // ── Seat state ───────────────────────────────────────────────────────────────
   const [bookedSeats, setBookedSeats]   = useState([]);
   const [selectedSeat, setSelectedSeat] = useState(null);
   const [showConfirm, setShowConfirm]   = useState(false);
-  const [lastBooked, setLastBooked]     = useState(null);
   const [loadingSeats, setLoadingSeats] = useState(true);
+  const [checkoutLoading, setCheckoutLoading] = useState(false);
+  const [checkoutError, setCheckoutError] = useState("");
 
   useEffect(() => {
-    if (!bus) return;
+    if (!bus?.scheduleId || !(bus.id || bus.busId) || !boardingStopId || !dropStopId) {
+      setLoadingSeats(false);
+      return undefined;
+    }
     const fetchBookedSeats = async () => {
-      setLoadingSeats(true);
       try {
         const token = localStorage.getItem("token");
         const busId = bus.id || bus.busId;
-        const res = await fetch(`http://localhost:5000/api/ticket/bus/${busId}`, {
+        const query = new URLSearchParams({ scheduleId: bus.scheduleId, busId, boardingStopId, dropStopId });
+        const res = await fetch(`http://localhost:5000/api/ticket/availability?${query}`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.message || "Failed to load booked seats");
-        setBookedSeats(data.map((ticket) => ticket.seatNo));
+        setBookedSeats(data.occupiedSeats.map(String));
       } catch (error) {
         console.error(error);
-        alert(error.message || "Error loading booked seats");
       } finally {
         setLoadingSeats(false);
       }
     };
     fetchBookedSeats();
-  }, [bus]);
+    const interval = window.setInterval(fetchBookedSeats, 5000);
+    return () => window.clearInterval(interval);
+  }, [bus, boardingStopId, dropStopId]);
 
   // ── Seat number helpers ───────────────────────────────────────────────────────
   // Seats are numbered sequentially left-to-right across the full row, top-to-bottom.
@@ -129,47 +149,73 @@ export default function SeatLayout() {
   };
 
   const confirmBooking = async () => {
+    if (!selectedSeat || !bus.scheduleId || !boardingStopId || !dropStopId) {
+      setCheckoutError("Choose an authorized boarding point and destination first.");
+      return;
+    }
+
+    setCheckoutLoading(true);
+    setCheckoutError("");
     try {
-      if (!selectedSeat) return;
       const token = localStorage.getItem("token");
-      const res = await fetch("http://localhost:5000/api/ticket", {
+      const res = await fetch("http://localhost:5000/api/payments/checkout-session", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
+          scheduleId: bus.scheduleId,
           busId: bus.id || bus.busId,
-          seatNo: selectedSeat,
-          routeId: bus.routeId,
+          seatNumber: selectedSeat,
+          boardingStopId,
+          dropStopId,
         }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.message || "Booking failed");
+      if (!res.ok) throw new Error(data.message || "Could not start payment");
+      if (!data.checkoutUrl || !data.paymentId) throw new Error("Payment service returned an incomplete checkout session");
 
-      const bookingId = data.bookingId || `${bus.id || bus.busId}-${selectedSeat}-${Date.now()}`;
-      const newBooking = {
-        bookingId,
+      localStorage.setItem("pendingPayment", JSON.stringify({
+        paymentId: data.paymentId,
+        bookingId: data.bookingId,
+        amountCents: data.amountCents,
+        currency: data.currency,
         busId: bus.id || bus.busId,
         busNo: bus.busNo,
         routeId: bus.routeId,
+        startStop: bus.route?.startStop,
+        endStop: bus.route?.endStop,
+        scheduleId: bus.scheduleId,
+        date: bus.tripDate,
+        departureTime: bus.departureTime,
         seat: selectedSeat,
-        bookingDate: new Date().toISOString(),
-        status: "Confirmed",
-      };
-
-      const existingBookings = JSON.parse(localStorage.getItem("userBookings")) || [];
-      localStorage.setItem("userBookings", JSON.stringify([newBooking, ...existingBookings]));
-
-      setBookedSeats((prev) => [...prev, selectedSeat]);
-      setLastBooked(selectedSeat);
-      setSelectedSeat(null);
-      setShowConfirm(false);
-      navigate("/passenger-dashboard/my-bookings");
+        boardingStopId,
+        boardingStop: routeStops.find((stop) => stop.stopId === boardingStopId)?.name,
+        dropStopId,
+        dropStop: routeStops.find((stop) => stop.stopId === dropStopId)?.name,
+        expiresAt: data.expiresAt,
+      }));
+      window.location.assign(data.checkoutUrl);
     } catch (err) {
-      alert(err.message);
+      setCheckoutError(err.message || "Unable to start payment. Please try again.");
+      setCheckoutLoading(false);
     }
   };
+
+  if (!bus) {
+    return (
+      <div className="text-center py-20">
+        <p className="text-muted-foreground mb-4">No bus selected.</p>
+        <Button onClick={() => navigate(-1)}>Go Back</Button>
+      </div>
+    );
+  }
+
+  const boardingStops = routeStops.filter((stop) => stop.boardingAllowed === true);
+  const selectedBoarding = routeStops.find((stop) => stop.stopId === boardingStopId);
+  const destinationStops = routeStops.filter((stop) => stop.alightingAllowed === true
+    && stop.sequence > (selectedBoarding?.sequence ?? -1));
 
   // ── Seat counts ───────────────────────────────────────────────────────────────
   const generatedTotal =
@@ -198,18 +244,43 @@ export default function SeatLayout() {
         </div>
       </div>
 
-      {/* Success banner */}
-      {lastBooked && (
-        <div className="mb-4 px-4 py-3 rounded-xl bg-emerald-50 border border-emerald-300 text-emerald-700 text-sm font-medium">
-          ✅ Seat <strong>{lastBooked}</strong> booked successfully!
-        </div>
-      )}
-
       {loadingSeats && (
         <div className="mb-4 rounded-2xl border border-slate-200 bg-white px-6 py-5 text-center text-slate-500">
           Loading current seat reservations for this bus...
         </div>
       )}
+
+      <Card className="mb-5 border-slate-200 shadow-sm">
+        <CardContent className="grid gap-4 p-5 md:grid-cols-2">
+          <label className="grid gap-2 text-sm font-medium text-slate-700">
+            Boarding point
+            <select
+              value={boardingStopId}
+              onChange={(event) => {
+                const nextId = event.target.value;
+                const nextStop = routeStops.find((stop) => stop.stopId === nextId);
+                setBoardingStopId(nextId);
+                if ((routeStops.find((stop) => stop.stopId === dropStopId)?.sequence ?? -1) <= (nextStop?.sequence ?? -1)) {
+                  setDropStopId(routeStops.find((stop) => stop.alightingAllowed === true && stop.sequence > nextStop.sequence)?.stopId || "");
+                }
+              }}
+              className="h-11 rounded-md border border-slate-300 bg-white px-3"
+            >
+              {boardingStops.map((stop) => <option key={stop.stopId} value={stop.stopId}>{stop.name}</option>)}
+            </select>
+          </label>
+          <label className="grid gap-2 text-sm font-medium text-slate-700">
+            Destination point
+            <select
+              value={dropStopId}
+              onChange={(event) => setDropStopId(event.target.value)}
+              className="h-11 rounded-md border border-slate-300 bg-white px-3"
+            >
+              {destinationStops.map((stop) => <option key={stop.stopId} value={stop.stopId}>{stop.name}</option>)}
+            </select>
+          </label>
+        </CardContent>
+      </Card>
 
       {/* Legend */}
       <div className="flex gap-3 mb-6 flex-wrap">
@@ -409,18 +480,27 @@ export default function SeatLayout() {
                   <span className="relative z-10 text-blue-700 font-bold text-xs">{selectedSeat}</span>
                 </div>
                 <p className="text-lg font-semibold">
-                  Book seat <strong className="text-blue-700">{selectedSeat}</strong>?
+                  Continue with seat <strong className="text-blue-700">{selectedSeat}</strong>?
                 </p>
                 <p className="text-sm text-muted-foreground">
-                  Bus: {bus.busNo} &nbsp;|&nbsp; Route: {bus.routeId}
+                  {bus.busNo} &nbsp;|&nbsp; {bus.route?.startStop} to {bus.route?.endStop}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Your seat is reserved while you complete secure checkout. The confirmed fare is shown by Stripe.
                 </p>
               </div>
+              {checkoutError && (
+                <p role="alert" className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                  {checkoutError}
+                </p>
+              )}
               <div className="flex gap-3">
-                <Button variant="outline" onClick={() => setShowConfirm(false)} className="flex-1 h-11 cursor-pointer">
+                <Button variant="outline" onClick={() => setShowConfirm(false)} disabled={checkoutLoading} className="flex-1 h-11 cursor-pointer">
                   Cancel
                 </Button>
-                <Button onClick={confirmBooking} className="flex-1 h-11 bg-blue-600 hover:bg-blue-700 text-white cursor-pointer">
-                  Yes, Book It
+                <Button onClick={confirmBooking} disabled={checkoutLoading} className="flex-1 h-11 bg-blue-600 hover:bg-blue-700 text-white cursor-pointer">
+                  <CreditCard className="mr-2 h-4 w-4" />
+                  {checkoutLoading ? "Opening checkout..." : "Pay securely"}
                 </Button>
               </div>
             </CardContent>

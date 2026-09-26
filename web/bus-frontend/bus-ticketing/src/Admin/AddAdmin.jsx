@@ -37,6 +37,8 @@ export default function ManageAdmins() {
     }
   };
 
+  // Load once when the admin form opens; token and navigation are stable for this page.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!token) {
       alert("You must login first");

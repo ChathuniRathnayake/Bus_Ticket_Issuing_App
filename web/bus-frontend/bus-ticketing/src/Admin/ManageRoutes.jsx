@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { Fragment, useCallback, useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 
@@ -13,7 +13,7 @@ import {
   TableRow
 } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
-import { ArrowLeft, Pencil, Trash2, Map } from "lucide-react";
+import { ArrowLeft, Pencil, Trash2, Map, ArrowUp, ArrowDown, Plus, Search, Route as RouteIcon } from "lucide-react";
 
 export default function ManageRoutes() {
 
@@ -24,6 +24,9 @@ export default function ManageRoutes() {
   const [loading, setLoading] = useState(false);
   const [editId, setEditId] = useState(null);
   const [search, setSearch] = useState("");
+  const [stopText, setStopText] = useState("");
+  const [editingStops, setEditingStops] = useState([]);
+  const [stopRecords, setStopRecords] = useState([]);
 
   const [form, setForm] = useState({
     startTime: "",
@@ -50,7 +53,7 @@ export default function ManageRoutes() {
   /* =====================================================
      FETCH ROUTES
   ===================================================== */
-  const fetchRoutes = async () => {
+  const fetchRoutes = useCallback(async () => {
     try {
       setLoading(true);
 
@@ -73,14 +76,12 @@ export default function ManageRoutes() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [token]);
 
   /* =====================================================
      INITIAL LOAD
   ===================================================== */
   useEffect(() => {
-    const token = localStorage.getItem("token");
-    
     if (!token) {
       alert("Session expired. Please login again.");
       navigate("/admin-login");
@@ -95,13 +96,31 @@ export default function ManageRoutes() {
     }
 
     fetchRoutes();
-  }, [navigate]);
+  }, [fetchRoutes, navigate, token]);
 
   /* =====================================================
      EDIT
   ===================================================== */
   const handleEdit = (route) => {
     setEditId(route.id);
+    const stops = Array.isArray(route.stops) && route.stops.length
+      ? route.stops.map((stop, sequence) => typeof stop === "string"
+        ? { stopId: `${route.routeId}-${sequence + 1}`, name: stop, sequence, stopType: "normal_road_waypoint", boardingAllowed: sequence === 0, alightingAllowed: sequence === route.stops.length - 1 }
+        : { ...stop })
+      : [
+        { stopId: `${route.routeId}-origin`, name: route.startStop, sequence: 0, stopType: "terminal", boardingAllowed: true, alightingAllowed: false },
+        { stopId: `${route.routeId}-destination`, name: route.endStop, sequence: 1, stopType: "terminal", boardingAllowed: false, alightingAllowed: true },
+      ];
+    setEditingStops(stops);
+    setStopText(stops.map((stop) => `${stop.name} | ${stop.stopType || "normal_road_waypoint"} | ${stop.boardingAllowed === true} | ${stop.alightingAllowed === true}`).join("\n"));
+    setStopRecords(Array.isArray(route.stops) && route.stops.length
+      ? route.stops.map((stop, index) => typeof stop === "string"
+        ? { stopId: `${route.routeId}-${index + 1}`, name: stop, stopType: "normal_road_waypoint", boardingAllowed: index === 0, alightingAllowed: index === route.stops.length - 1 }
+        : { ...stop })
+      : [
+        { stopId: `${route.routeId}-origin`, name: route.startStop, stopType: "terminal", boardingAllowed: true, alightingAllowed: false },
+        { stopId: `${route.routeId}-destination`, name: route.endStop, stopType: "terminal", boardingAllowed: false, alightingAllowed: true },
+      ]);
     setForm({
       startTime: route.startTime || "",
       endTime: route.endTime || "",
@@ -115,10 +134,27 @@ export default function ManageRoutes() {
   ===================================================== */
   const handleSave = async (id) => {
     try {
+      const stops = stopText.split("\n").map((line) => line.trim()).filter(Boolean).map((line, sequence) => {
+        const [name, stopType = "normal_road_waypoint", boarding = "false", alighting = "false"] = line.split("|").map((part) => part.trim());
+        const preservedId = editingStops.find((stop) => stop.name === name)?.stopId || editingStops[sequence]?.stopId;
+        const isExpresswayElement = stopType === "expressway_interchange" || stopType === "expressway_segment";
+        return {
+          stopId: preservedId,
+          name,
+          sequence,
+          stopType,
+          boardingAllowed: !isExpresswayElement && boarding.toLowerCase() === "true",
+          alightingAllowed: !isExpresswayElement && alighting.toLowerCase() === "true",
+        };
+      });
+      if (stops.length < 2 || stops.some((stop) => !stop.name)) {
+        throw new Error("Add at least two named stops in route order");
+      }
       const updateData = {
         startTime: form.startTime,
         endTime: form.endTime,
         date: form.date,
+          stops,
       };
       
       await axios.put(
@@ -131,6 +167,9 @@ export default function ManageRoutes() {
 
       alert("Route updated successfully");
       setEditId(null);
+      setEditingStops([]);
+      setStopText("");
+      setStopRecords([]);
       fetchRoutes();
 
     } catch (error) {
@@ -171,7 +210,7 @@ export default function ManageRoutes() {
   );
 
   return (
-    <div className="max-w-6xl mx-auto p-6 bg-background/50 animate-fade-in">
+    <div className="mx-auto max-w-7xl space-y-6 p-6 animate-fade-in">
 
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
@@ -185,26 +224,25 @@ export default function ManageRoutes() {
             <ArrowLeft className="h-5 w-5" /> Back to Dashboard
           </Button>
 
-          <h2 className="text-3xl font-bold tracking-tight">
-            Manage Routes
-          </h2>
+          <div><p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-600">Network planning</p><h2 className="mt-2 text-3xl font-bold tracking-tight text-slate-950">Route registry</h2><p className="mt-1 text-sm text-slate-500">Manage corridors, ordered stops, permissions, and timing metadata.</p></div>
         </div>
 
-        <Input
-          placeholder="Search routes..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="w-64 h-10"
-        />
+        <div className="relative">
+          <Search className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-slate-400" />
+          <Input
+            placeholder="Search routes..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="h-10 w-72 pl-9"
+          />
+        </div>
 
       </div>
 
-      <Card className="shadow-lg rounded-2xl border-border">
+        <Card className="rounded-2xl border-slate-200 shadow-sm">
 
         <CardHeader>
-          <CardTitle>
-            Routes ({filteredRoutes.length})
-          </CardTitle>
+          <CardTitle className="flex items-center gap-2"><RouteIcon className="h-5 w-5 text-emerald-600" /> Routes <span className="text-sm font-normal text-slate-500">({filteredRoutes.length})</span></CardTitle>
         </CardHeader>
 
         <CardContent>
@@ -229,7 +267,7 @@ export default function ManageRoutes() {
               <Table>
 
                 <TableHeader>
-                  <TableRow className="bg-muted/50">
+                  <TableRow className="bg-slate-50">
                     <TableHead>Route ID</TableHead>
                     <TableHead>Name</TableHead>
                     <TableHead>Start Stop</TableHead>
@@ -246,18 +284,46 @@ export default function ManageRoutes() {
                 <TableBody>
 
                   {filteredRoutes.map((r) => (
-
+                    <Fragment key={r.id}>
                     <TableRow
-                      key={r.id}
                       className="even:bg-muted/50 hover:bg-muted transition-all duration-300"
                     >
 
-                      <TableCell>{r.routeId}</TableCell>
-                      <TableCell>{r.routeName}</TableCell>
+                      <TableCell><span className="rounded-md bg-slate-100 px-2 py-1 font-mono text-xs font-semibold text-slate-700">{r.routeId}</span></TableCell>
+                      <TableCell>
+                        <div className="font-medium">{r.routeName}</div>
+                        {editId === r.id ? (
+                          <div className="mt-2 space-y-1">
+                            <label htmlFor={`stops-${r.id}`} className="text-xs font-medium text-slate-600">Ordered stops: name | type | boarding | alighting</label>
+                            <textarea
+                              id={`stops-${r.id}`}
+                              value={stopText}
+                              onChange={(event) => setStopText(event.target.value)}
+                              className="min-h-36 w-full rounded border border-slate-300 bg-white p-2 text-xs"
+                            />
+                          </div>
+                        ) : Array.isArray(r.stops) && r.stops.length > 0 && (
+                          <ol className="mt-2 space-y-1 text-xs text-muted-foreground">
+                            {r.stops.map((stop, index) => {
+                              const stopName = typeof stop === "string" ? stop : stop.name;
+                              const stopType = typeof stop === "string" ? "stop" : stop.stopType;
+                              return (
+                                <li key={typeof stop === "string" ? `${r.id}-${index}` : stop.stopId}>
+                                  {index + 1}. {stopName} <span className="text-slate-400">({stopType})</span>
+                                </li>
+                              );
+                            })}
+                          </ol>
+                        )}
+                      </TableCell>
                       <TableCell>{r.startStop}</TableCell>
                       <TableCell>{r.endStop}</TableCell>
                       <TableCell>{r.distance}</TableCell>
                       <TableCell>{r.duration}</TableCell>
+                      <TableCell><span className="font-medium text-slate-800">{r.startStop}</span></TableCell>
+                      <TableCell><span className="font-medium text-slate-800">{r.endStop}</span></TableCell>
+                      <TableCell>{r.distance || "—"}</TableCell>
+                      <TableCell><span className="font-mono text-sm">{r.duration || "—"}</span></TableCell>
 
                       {/* Date */}
                       <TableCell>
@@ -310,7 +376,8 @@ export default function ManageRoutes() {
                       </TableCell>
 
                       {/* Actions */}
-                      <TableCell className="text-right flex gap-2 justify-end">
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-2">
 
                         {editId === r.id ? (
                           <Button
@@ -338,9 +405,43 @@ export default function ManageRoutes() {
                           <Trash2 className="h-4 w-4" />
                         </Button>
 
+                        </div>
                       </TableCell>
 
                     </TableRow>
+                    {editId === r.id && (
+                      <TableRow>
+                        <TableCell colSpan={10} className="bg-slate-50">
+                          <div className="space-y-2">
+                            <p className="text-xs font-semibold uppercase tracking-wide text-slate-600">Ordered route stops</p>
+                            {stopRecords.map((stop, index) => (
+                              <div key={stop.stopId} className="grid grid-cols-1 items-center gap-2 rounded border bg-white p-2 md:grid-cols-[minmax(12rem,1fr)_12rem_auto_auto_auto]">
+                                <Input aria-label={`Stop ${index + 1} name`} value={stop.name} onChange={(event) => setStopRecords((items) => items.map((item, itemIndex) => itemIndex === index ? { ...item, name: event.target.value } : item))} />
+                                <select aria-label={`Stop ${index + 1} type`} value={stop.stopType || "normal_road_waypoint"} onChange={(event) => setStopRecords((items) => items.map((item, itemIndex) => itemIndex === index ? { ...item, stopType: event.target.value, boardingAllowed: event.target.value.startsWith("expressway_") ? false : item.boardingAllowed, alightingAllowed: event.target.value.startsWith("expressway_") ? false : item.alightingAllowed } : item))} className="h-10 rounded border border-slate-300 bg-white px-2 text-sm">
+                                  <option value="terminal">Terminal</option>
+                                  <option value="normal_road_waypoint">Normal road stop</option>
+                                  <option value="expressway_interchange">Expressway interchange</option>
+                                  <option value="expressway_segment">Expressway segment</option>
+                                </select>
+                                <label className="flex items-center gap-1 text-xs"><input type="checkbox" checked={stop.boardingAllowed === true} disabled={stop.stopType?.startsWith("expressway_")} onChange={(event) => setStopRecords((items) => items.map((item, itemIndex) => itemIndex === index ? { ...item, boardingAllowed: event.target.checked } : item))} />Board</label>
+                                <label className="flex items-center gap-1 text-xs"><input type="checkbox" checked={stop.alightingAllowed === true} disabled={stop.stopType?.startsWith("expressway_")} onChange={(event) => setStopRecords((items) => items.map((item, itemIndex) => itemIndex === index ? { ...item, alightingAllowed: event.target.checked } : item))} />Alight</label>
+                                <div className="flex gap-1">
+                                  <Button size="icon" variant="ghost" title="Move stop up" disabled={index === 0} onClick={() => setStopRecords((items) => { const next = [...items]; [next[index - 1], next[index]] = [next[index], next[index - 1]]; return next; })}><ArrowUp className="h-4 w-4" /></Button>
+                                  <Button size="icon" variant="ghost" title="Move stop down" disabled={index === stopRecords.length - 1} onClick={() => setStopRecords((items) => { const next = [...items]; [next[index], next[index + 1]] = [next[index + 1], next[index]]; return next; })}><ArrowDown className="h-4 w-4" /></Button>
+                                  <Button size="icon" variant="ghost" title="Remove stop" disabled={stopRecords.length <= 2} onClick={() => setStopRecords((items) => items.filter((_, itemIndex) => itemIndex !== index))}><Trash2 className="h-4 w-4" /></Button>
+                                </div>
+                              </div>
+                            ))}
+                            <Button size="sm" variant="outline" onClick={() => setStopRecords((items) => {
+                              const next = [...items];
+                              next.splice(Math.max(1, next.length - 1), 0, { stopId: `${r.routeId}-stop-${Date.now()}`, name: "", stopType: "normal_road_waypoint", boardingAllowed: false, alightingAllowed: false });
+                              return next;
+                            })}><Plus className="mr-1 h-4 w-4" />Add stop</Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    )}
+                    </Fragment>
 
                   ))}
 

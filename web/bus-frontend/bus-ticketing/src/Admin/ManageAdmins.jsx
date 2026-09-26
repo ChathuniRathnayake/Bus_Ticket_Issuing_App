@@ -43,6 +43,8 @@ export default function ManageAdmins() {
     }
   };
 
+  // Load once when the admin page opens.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     const token = localStorage.getItem("token");
     

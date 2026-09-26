@@ -1,5 +1,35 @@
 import { db } from "../config/firebase.js";
 
+const slugStop = (name) => name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+
+function normalizeStops(input) {
+  if (!Array.isArray(input) || input.length < 2) throw new Error("Routes require an ordered list of at least two stops");
+  const seen = new Set();
+  return input.map((raw, sequence) => {
+    const source = typeof raw === "string" ? { name: raw } : raw;
+    const name = String(source?.name || "").trim();
+    if (!name) throw new Error(`Stop ${sequence + 1} must have a name`);
+    const stopType = source.stopType || "normal_road_waypoint";
+    const stopId = source.stopId || `${slugStop(name)}-${sequence + 1}`;
+    if (seen.has(stopId)) throw new Error(`Duplicate stop ID: ${stopId}`);
+    seen.add(stopId);
+    const isInterchange = ["expressway_interchange", "expressway_segment"].includes(stopType);
+    return {
+      stopId,
+      name,
+      sequence,
+      stopType,
+      boardingAllowed: !isInterchange && source.boardingAllowed === true,
+      alightingAllowed: !isInterchange && source.alightingAllowed === true,
+      ...(Number.isFinite(Number(source.estimatedMinutesFromOrigin))
+        ? { estimatedMinutesFromOrigin: Number(source.estimatedMinutesFromOrigin) }
+        : {}),
+      ...(source.timingBasis ? { timingBasis: source.timingBasis } : {}),
+      ...(Array.isArray(source.sourceUrls) ? { sourceUrls: source.sourceUrls } : {}),
+    };
+  });
+}
+
 /* =====================================================
    CREATE ROUTE
 ===================================================== */
@@ -15,6 +45,7 @@ export const createRoute = async (req, res) => {
       startTime,
       endTime,
       date,
+      stops,
     } = req.body;
 
     if (
@@ -37,6 +68,11 @@ export const createRoute = async (req, res) => {
       return res.status(400).json({ message: "Route ID already exists" });
     }
 
+    const orderedStops = normalizeStops(stops || [
+      { name: startStop, stopType: "terminal", boardingAllowed: true },
+      { name: endStop, stopType: "terminal", alightingAllowed: true },
+    ]);
+
     await db.collection("routes").doc(routeId).set({
       routeId,
       routeName,
@@ -47,6 +83,7 @@ export const createRoute = async (req, res) => {
       startTime,
       endTime,
       date,
+      stops: orderedStops,
       createdAt: new Date(),
     });
 
@@ -54,7 +91,7 @@ export const createRoute = async (req, res) => {
 
   } catch (error) {
     console.error("Create route error:", error);
-    res.status(500).json({ message: "Server error" });
+    res.status(400).json({ message: error.message || "Server error" });
   }
 };
 
@@ -82,6 +119,22 @@ export const getRoutes = async (req, res) => {
 
   } catch (error) {
     console.error("Get routes error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+export const getAvailableRoutes = async (req, res) => {
+  try {
+    const snapshot = await db.collection("routes").get();
+    const routes = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+    routes.sort((a, b) => {
+      const dateA = new Date(`${a.date}T${a.startTime}`);
+      const dateB = new Date(`${b.date}T${b.startTime}`);
+      return dateA - dateB;
+    });
+    res.json(routes);
+  } catch (error) {
+    console.error("Get Available Routes Error:", error);
     res.status(500).json({ message: "Server error" });
   }
 };
@@ -127,6 +180,7 @@ export const updateRoute = async (req, res) => {
       startTime,
       endTime,
       date,
+      stops,
     } = req.body;
 
     const routeRef = db.collection("routes").doc(id);
@@ -136,6 +190,7 @@ export const updateRoute = async (req, res) => {
       return res.status(404).json({ message: "Route not found" });
     }
 
+    const orderedStops = stops === undefined ? undefined : normalizeStops(stops);
     await routeRef.update({
       ...(routeName && { routeName }),
       ...(startStop && { startStop }),
@@ -145,6 +200,7 @@ export const updateRoute = async (req, res) => {
       ...(startTime && { startTime }),
       ...(endTime && { endTime }),
       ...(date && { date }),
+      ...(orderedStops && { stops: orderedStops }),
       updatedAt: new Date(),
     });
 
@@ -152,7 +208,7 @@ export const updateRoute = async (req, res) => {
 
   } catch (error) {
     console.error("Update route error:", error);
-    res.status(500).json({ message: "Server error" });
+    res.status(400).json({ message: error.message || "Server error" });
   }
 };
 
@@ -178,5 +234,28 @@ export const deleteRoute = async (req, res) => {
   } catch (error) {
     console.error("Delete route error:", error);
     res.status(500).json({ message: "Server error" });
+  }
+};
+
+export const getAvailableStops = async (req, res) => {
+  try {
+    const snapshot = await db.collection("routes").get();
+    const stopsByName = new Map();
+    snapshot.docs.forEach((doc) => {
+      const stops = doc.data().stops || [];
+      stops.forEach((stop) => {
+        if (typeof stop === "string" || !stop.name) return;
+        if (!stop.boardingAllowed && !stop.alightingAllowed) return;
+        const key = stop.name.trim().toLowerCase();
+        const entry = stopsByName.get(key) || { name: stop.name, boardingAllowed: false, alightingAllowed: false };
+        entry.boardingAllowed ||= stop.boardingAllowed === true;
+        entry.alightingAllowed ||= stop.alightingAllowed === true;
+        stopsByName.set(key, entry);
+      });
+    });
+    return res.json([...stopsByName.values()].sort((a, b) => a.name.localeCompare(b.name)));
+  } catch (error) {
+    console.error("Get available stops error:", error);
+    return res.status(500).json({ message: "Server error" });
   }
 };

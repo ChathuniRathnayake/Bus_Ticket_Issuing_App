@@ -44,3 +44,37 @@ export const verifyAdmin = async (req, res, next) => {
     res.status(500).json({ message: "Server error" });
   }
 };
+
+const requireRole = (role) => async (req, res, next) => {
+  try {
+    const userDoc = await db.collection("users").doc(req.user.uid).get();
+    if (!userDoc.exists || userDoc.data().role !== role) {
+      return res.status(403).json({ message: `Not authorized as ${role}` });
+    }
+    req.account = userDoc.data();
+    return next();
+  } catch (error) {
+    console.error(`${role} authorization error:`, error);
+    return res.status(500).json({ message: "Authorization service error" });
+  }
+};
+
+export const verifyPassenger = requireRole("passenger");
+
+export const verifyConductor = async (req, res, next) => {
+  try {
+    const [userDoc, conductorDoc] = await Promise.all([
+      db.collection("users").doc(req.user.uid).get(),
+      db.collection("conductors").doc(req.user.uid).get(),
+    ]);
+    if (!userDoc.exists || userDoc.data().role !== "conductor" || !conductorDoc.exists) {
+      return res.status(403).json({ message: "Not authorized as conductor" });
+    }
+    req.account = userDoc.data();
+    req.conductor = conductorDoc.data();
+    return next();
+  } catch (error) {
+    console.error("Conductor authorization error:", error);
+    return res.status(500).json({ message: "Authorization service error" });
+  }
+};

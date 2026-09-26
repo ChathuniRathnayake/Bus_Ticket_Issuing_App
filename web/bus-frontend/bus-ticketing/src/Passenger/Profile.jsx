@@ -71,7 +71,7 @@ export default function Profile() {
         navigate("/passenger-dashboard");
       }, 800); // Small delay so user can see the success message
 
-    } catch (error) {
+    } catch {
       alert("Failed to save profile. Please try again.");
     } finally {
       setSaving(false);

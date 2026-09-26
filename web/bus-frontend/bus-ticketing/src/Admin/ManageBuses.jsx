@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useCallback, useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 
@@ -13,12 +13,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { ArrowLeft, Pencil, Trash2, Bus } from "lucide-react";
+import { ArrowLeft, Pencil, Trash2, Bus, Search, Users, Route, Activity } from "lucide-react";
 
 export default function ManageBuses() {
   const navigate = useNavigate();
   const [buses, setBuses] = useState([]);
-  const [routes, setRoutes] = useState([]);
+  const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(false);
   const [editId, setEditId] = useState(null);
   const [form, setForm] = useState({
@@ -31,7 +31,7 @@ export default function ManageBuses() {
   const token = localStorage.getItem("token");
 
   // FETCH ALL BUSES AND ROUTES
-  const fetchBuses = async () => {
+  const fetchBuses = useCallback(async () => {
     if (!token) return;
     try {
       setLoading(true);
@@ -43,8 +43,6 @@ export default function ManageBuses() {
           headers: { Authorization: `Bearer ${token}` },
         }),
       ]);
-      setRoutes(routeRes.data);
-      
       // Merge bus data with route data and sort by date and time
       const busesWithRoutes = busRes.data.map((bus) => {
         const route = routeRes.data.find((r) => r.routeId === bus.routeId);
@@ -70,11 +68,10 @@ export default function ManageBuses() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [token]);
 
+  // Load once when the admin page opens.
   useEffect(() => {
-    const token = localStorage.getItem("token");
-    
     if (!token) {
       alert("Session expired. Please login again.");
       navigate("/admin-login");
@@ -89,7 +86,17 @@ export default function ManageBuses() {
     }
 
     fetchBuses();
-  }, [navigate]);
+  }, [fetchBuses, navigate, token]);
+
+  const filteredBuses = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    if (!query) return buses;
+    return buses.filter((bus) => [bus.id, bus.busNo, bus.routeId, bus.routeName]
+      .some((value) => String(value || "").toLowerCase().includes(query)));
+  }, [buses, search]);
+
+  const activeCount = buses.filter((bus) => bus.status === "Active").length;
+  const seatCount = buses.reduce((total, bus) => total + Number(bus.totalSeats || 0), 0);
 
   const handleEdit = (bus) => {
     setEditId(bus.id);
@@ -131,41 +138,49 @@ export default function ManageBuses() {
   };
 
   return (
-    <div className="max-w-6xl mx-auto p-6 bg-background/50 animate-fade-in">
-      <div className="flex items-center justify-between mb-8">
+    <div className="mx-auto max-w-7xl space-y-6 p-6 animate-fade-in">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-blue-600">Fleet operations</p>
+          <h2 className="mt-2 text-3xl font-bold tracking-tight text-slate-950">Bus registry</h2>
+          <p className="mt-1 text-sm text-slate-500">Maintain fleet identity, capacity, routes, and service status.</p>
+        </div>
         <Button
           variant="ghost"
           onClick={() => navigate("/admin-dashboard")}
-          className="h-10 gap-2"
+          className="h-10 gap-2 self-start lg:self-auto"
         >
           <ArrowLeft className="h-5 w-5" /> Back
         </Button>
-        <h2 className="text-3xl font-bold tracking-tight">Manage Buses</h2>
-        <Input
-          placeholder="Search buses..."
-          className="w-64 h-10"
-          onChange={(e) => {
-            const query = e.target.value.toLowerCase();
-            setBuses((prev) =>
-              prev.filter((b) =>
-                b.busNo.toLowerCase().includes(query) ||
-                b.routeId.toLowerCase().includes(query) ||
-                b.id.toLowerCase().includes(query)
-              )
-            );
-          }}
-        />
       </div>
 
-      <Card className="shadow-lg rounded-2xl border-border">
-        <CardHeader>
-          <CardTitle>Buses ({buses.length})</CardTitle>
+      <div className="grid gap-4 sm:grid-cols-3">
+        {[
+          { label: "Registered buses", value: buses.length, icon: Bus, tone: "blue" },
+          { label: "Active service", value: activeCount, icon: Activity, tone: "emerald" },
+          { label: "Total seats", value: seatCount, icon: Users, tone: "amber" },
+        ].map((metric) => {
+          const Icon = metric.icon;
+          const toneClass = metric.tone === "blue" ? "bg-blue-50 text-blue-600" : metric.tone === "emerald" ? "bg-emerald-50 text-emerald-600" : "bg-amber-50 text-amber-600";
+          return (
+          <div key={metric.label} className="flex items-center gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div className={`flex h-11 w-11 items-center justify-center rounded-xl ${toneClass}`}><Icon className="h-5 w-5" /></div>
+            <div><p className="text-xs font-medium uppercase tracking-wide text-slate-500">{metric.label}</p><p className="mt-1 text-2xl font-bold text-slate-950">{metric.value}</p></div>
+          </div>
+          );
+        })}
+      </div>
+
+      <Card className="rounded-2xl border-slate-200 shadow-sm">
+        <CardHeader className="flex flex-col gap-4 border-b border-slate-100 sm:flex-row sm:items-center sm:justify-between">
+          <div><CardTitle>Fleet records</CardTitle><p className="mt-1 text-sm text-slate-500">{filteredBuses.length} of {buses.length} records</p></div>
+          <div className="relative w-full sm:w-80"><Search className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-slate-400" /><Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search ID, bus number, or route" className="h-10 pl-9" /></div>
         </CardHeader>
 
         <CardContent>
           {loading ? (
             <p className="text-center py-12">Loading...</p>
-          ) : buses.length === 0 ? (
+          ) : filteredBuses.length === 0 ? (
             <div className="text-center py-12">
               <Bus className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
               <p>No buses found.</p>
@@ -174,9 +189,9 @@ export default function ManageBuses() {
             <div className="overflow-auto rounded-xl border border-border">
               <Table>
                 <TableHeader>
-                  <TableRow className="bg-muted/50">
-                    <TableHead>Bus ID</TableHead>
-                    <TableHead>Bus Number</TableHead>
+                    <TableRow className="bg-slate-50">
+                    <TableHead>Fleet ID</TableHead>
+                    <TableHead>Bus number</TableHead>
                     <TableHead>Route</TableHead>
                     <TableHead>Date</TableHead>
                     <TableHead>Time</TableHead>
@@ -187,12 +202,12 @@ export default function ManageBuses() {
                 </TableHeader>
 
                 <TableBody>
-                  {buses.map((bus) => (
+                  {filteredBuses.map((bus) => (
                     <TableRow
                       key={bus.id}
                       className="even:bg-muted/50 hover:bg-muted"
                     >
-                      <TableCell>{bus.id}</TableCell>
+                      <TableCell><span className="rounded-md bg-slate-100 px-2 py-1 font-mono text-xs font-semibold text-slate-700">{bus.id}</span></TableCell>
                       <TableCell>
                         {editId === bus.id ? (
                           <Input
@@ -202,12 +217,12 @@ export default function ManageBuses() {
                             }
                           />
                         ) : (
-                          bus.busNo
+                          <span className="font-semibold text-slate-950">{bus.busNo || "Unassigned"}</span>
                         )}
                       </TableCell>
-                      <TableCell>{bus.routeName}</TableCell>
-                      <TableCell>{bus.routeDate}</TableCell>
-                      <TableCell>{bus.routeTime}</TableCell>
+                      <TableCell><div className="flex items-center gap-2"><Route className="h-4 w-4 text-blue-500" /><span>{bus.routeName || "No route assigned"}</span></div><span className="ml-6 font-mono text-xs text-slate-400">{bus.routeId || "—"}</span></TableCell>
+                      <TableCell><span className="text-sm">{bus.routeDate || "—"}</span></TableCell>
+                      <TableCell><span className="font-mono text-sm">{bus.routeTime || "—"}</span></TableCell>
                       <TableCell>
                         {editId === bus.id ? (
                           <Input
@@ -218,7 +233,7 @@ export default function ManageBuses() {
                             }
                           />
                         ) : (
-                          bus.totalSeats
+                          <span className="font-semibold">{bus.totalSeats || 0}</span>
                         )}
                       </TableCell>
                       <TableCell>
@@ -230,7 +245,7 @@ export default function ManageBuses() {
                             }
                           />
                         ) : (
-                          bus.status
+                          <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${bus.status === "Active" ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-600"}`}>{bus.status || "Unknown"}</span>
                         )}
                       </TableCell>
                       <TableCell className="text-right flex gap-2 justify-end">

@@ -2,6 +2,7 @@ import "dotenv/config";
 import Stripe from "stripe";
 import QRCode from "qrcode";
 import { admin, db } from "../config/firebase.js";
+import { allocateSeatInTransaction, expireStalePaymentReservations, setTicketLocksStatus } from "../services/seatAllocation.js";
 
 const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
 const stripeWebhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
@@ -21,32 +22,12 @@ const getTicketPriceCents = (schedule) => {
   return schedulePrice ? Number(schedulePrice) : configuredPriceCents;
 };
 
-const cleanupExpiredReservations = async (scheduleId, busId, seatNumber) => {
-  const cutoff = new Date(Date.now() - reservationMinutes * 60 * 1000);
-  const snapshot = await db.collection("tickets")
-    .where("scheduleId", "==", scheduleId)
-    .where("busId", "==", busId)
-    .where("seatNo", "==", seatNumber)
-    .where("status", "==", "PENDING_PAYMENT")
-    .get();
-  const batch = db.batch();
-  snapshot.docs.forEach((doc) => {
-    const createdAt = doc.data().createdAt?.toDate?.() || new Date(0);
-    if (createdAt <= cutoff) batch.update(doc.ref, {
-      status: "AVAILABLE",
-      releasedAt: admin.firestore.FieldValue.serverTimestamp(),
-      releaseReason: "reservation_expired",
-    });
-  });
-  if (!snapshot.empty) await batch.commit();
-};
-
 export const createCheckoutSession = async (req, res) => {
   if (!stripe || !stripeSecretKey) return res.status(503).json({ message: "Stripe is not configured" });
-  const { scheduleId, busId, seatNumber, amountCents } = req.body;
+  const { scheduleId, busId, seatNumber, boardingStopId, dropStopId, amountCents } = req.body;
   const userId = req.user.uid;
-  if (!scheduleId || !busId || !seatNumber) {
-    return res.status(400).json({ message: "scheduleId, busId and seatNumber are required" });
+  if (!scheduleId || !busId || !seatNumber || !boardingStopId || !dropStopId) {
+    return res.status(400).json({ message: "scheduleId, busId, seatNumber, boardingStopId and dropStopId are required" });
   }
 
   try {
@@ -64,27 +45,30 @@ export const createCheckoutSession = async (req, res) => {
       return res.status(400).json({ message: "Ticket amount is invalid" });
     }
 
-    await cleanupExpiredReservations(scheduleId, busId, String(seatNumber));
-    await db.runTransaction(async (transaction) => {
-      const existing = await transaction.get(db.collection("tickets")
-        .where("scheduleId", "==", scheduleId)
-        .where("busId", "==", busId)
-        .where("seatNo", "==", String(seatNumber))
-        .where("status", "in", ["PENDING_PAYMENT", "BOOKED", "booked"]));
-      if (!existing.empty) throw new Error("SEAT_UNAVAILABLE");
-      transaction.set(bookingRef, {
-        bookingId: bookingRef.id, userId, scheduleId, busId, seatNumber: String(seatNumber),
-        amountCents: priceCents, currency, status: "PENDING_PAYMENT", expiresAt, createdAt: now,
-      });
-      transaction.set(paymentRef, {
-        paymentId: paymentRef.id, bookingId: bookingRef.id, userId,
-        amountCents: priceCents, currency, status: "PENDING", createdAt: now,
-      });
-      transaction.set(db.collection("tickets").doc(bookingRef.id), {
-        ticketId: bookingRef.id, bookingId: bookingRef.id, userId, scheduleId, busId,
-        seatNo: String(seatNumber), status: "PENDING_PAYMENT", createdAt: now,
-      });
-    });
+    await expireStalePaymentReservations(scheduleId, busId, String(seatNumber));
+    await db.runTransaction(async (transaction) => allocateSeatInTransaction(transaction, {
+      scheduleId,
+      busId,
+      seatNumber,
+      boardingStopId,
+      dropStopId,
+      userId,
+      bookingRef,
+      ticketRef: db.collection("tickets").doc(bookingRef.id),
+      paymentRef,
+      paymentData: {
+        paymentId: paymentRef.id,
+        bookingId: bookingRef.id,
+        userId,
+        amountCents: priceCents,
+        currency,
+        status: "PENDING",
+        createdAt: now,
+      },
+      bookingStatus: "PENDING_PAYMENT",
+      ticketStatus: "PENDING_PAYMENT",
+      passengerDetails: { amountCents: priceCents, currency, expiresAt },
+    }));
 
     let session;
     try {
@@ -96,7 +80,7 @@ export const createCheckoutSession = async (req, res) => {
         customer_email: req.user.email,
         success_url: process.env.STRIPE_SUCCESS_URL || "http://localhost:5173/payment-success?session_id={CHECKOUT_SESSION_ID}",
         cancel_url: process.env.STRIPE_CANCEL_URL || "http://localhost:5173/payment-cancelled",
-        metadata: { bookingId: bookingRef.id, paymentId: paymentRef.id, userId, scheduleId, busId, seatNumber: String(seatNumber) },
+        metadata: { bookingId: bookingRef.id, paymentId: paymentRef.id, userId, scheduleId, busId, seatNumber: String(seatNumber), boardingStopId, dropStopId },
         expires_at: Math.floor(expiresAt.toMillis() / 1000),
       }, { idempotencyKey: `checkout-${bookingRef.id}` });
     } catch (error) {
@@ -107,9 +91,18 @@ export const createCheckoutSession = async (req, res) => {
       paymentRef.update({ stripeSessionId: session.id, status: "CHECKOUT_CREATED" }),
       bookingRef.update({ stripeSessionId: session.id }),
     ]);
-    return res.status(201).json({ paymentId: paymentRef.id, bookingId: bookingRef.id, checkoutUrl: session.url, expiresAt: expiresAt.toDate().toISOString() });
+    return res.status(201).json({
+      paymentId: paymentRef.id,
+      bookingId: bookingRef.id,
+      checkoutUrl: session.url,
+      amountCents: priceCents,
+      currency,
+      expiresAt: expiresAt.toDate().toISOString(),
+    });
   } catch (error) {
     if (error.message === "SEAT_UNAVAILABLE") return res.status(409).json({ message: "Seat is already reserved or booked" });
+    if (["Schedule not found", "Bus not found", "Bus does not match schedule", "Route not found"].includes(error.message)
+      || /stop|Destination|Boarding|Alighting|active/i.test(error.message)) return res.status(400).json({ message: error.message });
     return serverError(res, error);
   }
 };
@@ -122,6 +115,7 @@ const releaseReservation = async (bookingId, reason) => {
     const booking = bookingDoc.data();
     if (!["PENDING_PAYMENT", "CHECKOUT_CREATED"].includes(booking.status)) return;
     const ticketRef = db.collection("tickets").doc(bookingId);
+    await setTicketLocksStatus(transaction, ticketRef.id, "RELEASED");
     transaction.update(bookingRef, { status: "PAYMENT_FAILED", releasedAt: admin.firestore.FieldValue.serverTimestamp(), releaseReason: reason });
     transaction.update(ticketRef, { status: "AVAILABLE", releasedAt: admin.firestore.FieldValue.serverTimestamp(), releaseReason: reason });
   });
@@ -163,6 +157,7 @@ const finalizePayment = async (session, eventId) => {
     const bookingDoc = await transaction.get(bookingRef);
     const paymentDoc = await transaction.get(paymentRef);
     const ticketDoc = await transaction.get(ticketRef);
+    await setTicketLocksStatus(transaction, ticketRef.id, "ACTIVE");
     if (!bookingDoc.exists || !paymentDoc.exists || !ticketDoc.exists) throw new Error("Payment records not found");
     if (bookingDoc.data().status === "CONFIRMED") {
       transaction.create(eventRef, { eventId, type: "checkout.session.completed", processedAt: admin.firestore.FieldValue.serverTimestamp() });

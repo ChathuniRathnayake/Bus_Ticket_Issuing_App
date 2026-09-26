@@ -13,8 +13,8 @@ function getRoutes() {
 
 export default function MyBookings() {
   const navigate = useNavigate();
-  const [bookings, setBookings] = useState([]);
-  const [routes, setRoutes] = useState([]);
+  const [bookings, setBookings] = useState(() => JSON.parse(localStorage.getItem("userBookings") || "[]"));
+  const [routes] = useState(getRoutes);
   const [cancelBookingId, setCancelBookingId] = useState(null);
 
   useEffect(() => {
@@ -23,9 +23,6 @@ export default function MyBookings() {
       navigate("/passenger-login");
       return;
     }
-    setRoutes(getRoutes());
-    const savedBookings = JSON.parse(localStorage.getItem("userBookings")) || [];
-    setBookings(savedBookings);
   }, [navigate]);
 
   const handleCancelClick = (bookingId) => {
@@ -117,7 +114,7 @@ export default function MyBookings() {
                       <div className="flex items-start justify-between">
                         <div>
                           <h3 className="text-3xl font-bold text-gray-900">
-                            {route ? `${route.startStop} → ${route.endStop}` : "Bus Journey"}
+                            {route ? `${route.startStop} → ${route.endStop}` : booking.startStop && booking.endStop ? `${booking.startStop} → ${booking.endStop}` : "Bus Journey"}
                           </h3>
                           <p className="text-lg text-purple-600 font-medium mt-1">
                             {route?.routeName || "Express Route"}
@@ -132,8 +129,8 @@ export default function MyBookings() {
                       <div className="mt-8 flex items-center gap-8">
                         <div className="text-center bg-white/70 rounded-2xl px-6 py-4 shadow-sm">
                           <p className="text-xs text-emerald-600 font-medium">DEPARTURE</p>
-                          <p className="text-4xl font-bold text-emerald-600 mt-1">{route?.startTime}</p>
-                          <p className="text-sm text-gray-600 mt-1">{route?.date}</p>
+                          <p className="text-4xl font-bold text-emerald-600 mt-1">{booking.departureTime || route?.startTime}</p>
+                          <p className="text-sm text-gray-600 mt-1">{booking.date || route?.date}</p>
                         </div>
 
                         <div className="flex-1 h-px bg-gradient-to-r from-emerald-400 via-purple-400 to-violet-400" />
