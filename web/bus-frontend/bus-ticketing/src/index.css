@@ -89,3 +89,37 @@
     @apply bg-background text-foreground;
   }
 }
+/* ══════════════════════════════════════════════
+   ✨ Extra animations for the Home page
+   Add this block to the BOTTOM of your existing
+   src/index.css file (keep everything already there).
+   ══════════════════════════════════════════════ */
+
+/* Makes an element gently float up and down forever — nice for icons */
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50%      { transform: translateY(-12px); }
+}
+.animate-float {
+  animation: float 3.5s ease-in-out infinite;
+}
+
+/* Makes a background gradient slowly drift/shimmer */
+@keyframes gradient-move {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+.animate-gradient {
+  background-size: 200% 200%;
+  animation: gradient-move 8s ease infinite;
+}
+
+/* A soft pulsing glow, good for buttons/badges */
+@keyframes soft-pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.6; }
+}
+.animate-soft-pulse {
+  animation: soft-pulse 2.5s ease-in-out infinite;
+}

@@ -10,11 +10,16 @@ import routeRoutes from "./routes/routeRoutes.js";
 import ticketRoutes from "./routes/ticketRoutes.js";
 import scheduleRoutes from "./routes/scheduleRoutes.js";
 import bookingRoutes from "./routes/bookingRoutes.js";
+import paymentRoutes from "./routes/paymentRoutes.js";
+import { handleStripeWebhook } from "./controllers/paymentController.js";
 
 dotenv.config();
 
 const app = express();
 app.use(cors());
+
+// Stripe signs the exact raw request body, so this route must precede JSON parsing.
+app.post("/api/payments/webhook", express.raw({ type: "application/json" }), handleStripeWebhook);
 app.use(express.json());
 
 // Routes
@@ -26,6 +31,7 @@ app.use("/api/route", routeRoutes);
 app.use("/api/ticket", ticketRoutes);
 app.use("/api/schedule", scheduleRoutes);
 app.use("/api/booking", bookingRoutes);
+app.use("/api/payments", paymentRoutes);
 
 app.get("/", (req, res) => res.send("🚀 Backend running"));
 
