@@ -7,14 +7,17 @@ import '../auth/conductor_login.dart';
 import '../conductor_bottom_nav.dart';
 
 class IssueTicketScreen extends StatefulWidget {
-  final int seatNo;
+  // Seat number is now optional: it comes pre-filled when the conductor taps
+  // a seat on the seat map, but the screen can also be opened without one
+  // (in which case the seat dropdown starts empty with a "Select" hint).
+  final int? seatNo;
   final Bus? bus;
   final Conductor conductor;
   final RouteModel? route;
 
   const IssueTicketScreen({
     super.key,
-    required this.seatNo,
+    this.seatNo,
     this.bus,
     required this.conductor,
     this.route,
@@ -28,15 +31,15 @@ class _IssueTicketScreenState extends State<IssueTicketScreen> {
   String _passengerType = 'Adult';
   String? _boardingStop;
   String? _dropStop;
+  int? _selectedSeatNo;
   final TextEditingController _passengerNameController = TextEditingController();
   final TextEditingController _priceController = TextEditingController();
   bool _isLoading = false;
 
-
-
   @override
   void initState() {
     super.initState();
+    _selectedSeatNo = widget.seatNo;
   }
 
   @override
@@ -189,12 +192,14 @@ class _IssueTicketScreenState extends State<IssueTicketScreen> {
           if (!uniqueStops.contains(_boardingStop)) _boardingStop = uniqueStops.first;
           if (!uniqueStops.contains(_dropStop)) _dropStop = uniqueStops.last;
 
+          final String? busId = widget.bus?.id ?? widget.conductor.busId;
+
           return Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
               children: [
                 _infoCard("Bus ID", widget.bus?.id ?? "BUS-101"),
-                _infoCard("Seat Number", widget.seatNo.toString()),
+                _buildSeatSelector(busId),
                 _buildTextInputRow("Passenger Name", _passengerNameController, hint: "Enter Name"),
                 _buildDropdownRow("Passenger Type", ['Adult', 'Half', 'Free'], _passengerType, (val) {
                   setState(() => _passengerType = val!);
@@ -242,6 +247,104 @@ class _IssueTicketScreenState extends State<IssueTicketScreen> {
       ),
     );
   }
+
+  /// Builds the "Seat Number" row as a dropdown of currently-available seats
+  /// (instead of the old static text). The seat passed in from the seat map
+  /// (widget.seatNo) is pre-selected; the conductor can still open the
+  /// dropdown and pick a different available seat if they change their mind.
+  /// If the screen is opened without a seat (widget.seatNo == null), the
+  /// dropdown shows a "Select" hint until the conductor picks one.
+  Widget _buildSeatSelector(String? busId) {
+    if (busId == null) {
+      return _buildSeatDropdownRow(const []);
+    }
+
+    return StreamBuilder<DocumentSnapshot>(
+      stream: FirebaseFirestore.instance.collection('buses').doc(busId).snapshots(),
+      builder: (context, busSnapshot) {
+        int totalSeats = (widget.bus != null && widget.bus!.totalSeats > 0) ? widget.bus!.totalSeats : 42;
+        if (busSnapshot.hasData && busSnapshot.data!.exists) {
+          final data = busSnapshot.data!.data() as Map<String, dynamic>;
+          totalSeats = int.tryParse(data['totalSeats']?.toString() ?? '0') ??
+              int.tryParse(data['capacity']?.toString() ?? '0') ??
+              totalSeats;
+        }
+        if (totalSeats <= 0) totalSeats = 42;
+
+        return StreamBuilder<QuerySnapshot>(
+          stream: FirebaseFirestore.instance
+              .collection('seats')
+              .where('busId', isEqualTo: busId)
+              .snapshots(),
+          builder: (context, seatsSnapshot) {
+            // A seat is booked simply if a doc with that seatNo exists for
+            // this bus (same rule the seat map screen uses).
+            final Set<int> bookedSeatNos = {};
+            if (seatsSnapshot.hasData) {
+              for (var doc in seatsSnapshot.data!.docs) {
+                final data = doc.data() as Map<String, dynamic>;
+                final seatNo = int.tryParse(data['seatNo']?.toString() ?? '');
+                if (seatNo != null) bookedSeatNos.add(seatNo);
+              }
+            }
+
+            final availableSeats = <int>[
+              for (int i = 1; i <= totalSeats; i++)
+                if (!bookedSeatNos.contains(i) || i == _selectedSeatNo) i,
+            ];
+
+            // If the previously selected seat got booked by someone else in
+            // the meantime, clear the selection instead of holding on to an
+            // invalid value.
+            if (_selectedSeatNo != null && !availableSeats.contains(_selectedSeatNo)) {
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (mounted) setState(() => _selectedSeatNo = null);
+              });
+            }
+
+            return _buildSeatDropdownRow(availableSeats);
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildSeatDropdownRow(List<int> availableSeats) {
+    final currentValue = availableSeats.contains(_selectedSeatNo) ? _selectedSeatNo : null;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      decoration: BoxDecoration(
+        color: const Color(0xFFA0E4F1),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          const Text(
+            "Seat Number",
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+          ),
+          DropdownButton<int>(
+            value: currentValue,
+            underline: const SizedBox(),
+            hint: const Text("Select", style: TextStyle(fontWeight: FontWeight.bold)),
+            items: availableSeats
+                .map((s) => DropdownMenuItem(
+                      value: s,
+                      child: Text(s.toString(), style: const TextStyle(fontWeight: FontWeight.bold)),
+                    ))
+                .toList(),
+            onChanged: availableSeats.isEmpty
+                ? null
+                : (val) => setState(() => _selectedSeatNo = val),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildDropdownRow(String title, List<String> items, String? currentValue, ValueChanged<String?> onChanged) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -314,6 +417,11 @@ class _IssueTicketScreenState extends State<IssueTicketScreen> {
       return;
     }
 
+    if (_selectedSeatNo == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Please select a seat number")));
+      return;
+    }
+
     final priceText = _priceController.text.trim();
     if (priceText.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Please enter a ticket price")));
@@ -329,7 +437,7 @@ class _IssueTicketScreenState extends State<IssueTicketScreen> {
       await db.collection('seats').add({
         'busId': busId,
         'routeId': routeId,
-        'seatNo': widget.seatNo,
+        'seatNo': _selectedSeatNo,
         'passengerName': _passengerNameController.text.trim(),
         'passengerType': _passengerType,
         'boardingStop': _boardingStop,

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:mobile_app/conductor/info/info_card.dart';
+
 import '../auth/conductor_login.dart';
 import '../conductor_bottom_nav.dart';
 
@@ -104,57 +104,76 @@ class TripInfoScreen extends StatelessWidget {
       ),
       body: SafeArea(
         child: StreamBuilder<DocumentSnapshot>(
-          stream: FirebaseFirestore.instance.collection('buses').doc(bus?.id).snapshots(),
+          stream: FirebaseFirestore.instance
+              .collection('buses')
+              .doc(bus?.id)
+              .snapshots(),
           builder: (context, busSnapshot) {
-            final busData = busSnapshot.data?.data() as Map<String, dynamic>?;
-            final nextStop = busData?['nextStop'] ?? "Unknown";
+            final busData =
+                busSnapshot.data?.data() as Map<String, dynamic>?;
+
+            // Total seats: prefer local model, then Firestore, then default 40
+            final total =
+                bus?.totalSeats ??
+                int.tryParse(busData?['totalSeats']?.toString() ?? '0') ??
+                40;
 
             return StreamBuilder<QuerySnapshot>(
-              stream: FirebaseFirestore.instance.collection('seats').where('busId', isEqualTo: bus?.id).snapshots(),
+              stream: FirebaseFirestore.instance
+                  .collection('seats')
+                  .where('busId', isEqualTo: bus?.id)
+                  .snapshots(),
               builder: (context, seatSnapshot) {
-                int droppingNext = 0;
-                int boardingNext = 0;
-                int notBoarded = 0;
+                int bookedCount = 0;
 
                 if (seatSnapshot.hasData) {
                   for (var doc in seatSnapshot.data!.docs) {
                     final data = doc.data() as Map<String, dynamic>;
-                    if (data['dropStop'] == nextStop) droppingNext++;
-                    if (data['boardingStop'] == nextStop) boardingNext++;
+                    final status =
+                        data['status']?.toString().toLowerCase();
+
+                    // Only count active (non-cancelled/released) seats
+                    final isActive =
+                        status == null ||
+                        (status != 'cancelled' && status != 'released');
+
+                    if (isActive) bookedCount++;
                   }
                 }
+
+                final availableCount =
+                    (total - bookedCount).clamp(0, total);
 
                 return SingleChildScrollView(
                   padding: const EdgeInsets.all(16),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _tripHeader(route?.routeName ?? "Unknown", bus?.id ?? "Unknown", nextStop),
-                      const SizedBox(height: 12),
-                      GridView.count(
-                        crossAxisCount: 2,
-                        mainAxisSpacing: 12,
-                        crossAxisSpacing: 12,
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
+                      _tripHeader(
+                        route?.routeName ?? "Unknown",
+                        bus?.id ?? "Unknown",
+                      ),
+                      const SizedBox(height: 16),
+
+                      // -- Seat Summary Row --
+                      Row(
                         children: [
-                          InfoCard(
-                            title: 'Currently\nNot Boarded',
-                            count: notBoarded,
-                            icon: Icons.hourglass_bottom,
-                            color: Colors.orange,
+                          Expanded(
+                            child: _seatSummaryCard(
+                              title: 'Available\nSeats',
+                              count: availableCount,
+                              color: Colors.green,
+                              icon: Icons.event_seat,
+                            ),
                           ),
-                          InfoCard(
-                            title: 'Dropping\nNext Stop',
-                            count: droppingNext,
-                            icon: Icons.arrow_downward,
-                            color: Colors.red,
-                          ),
-                          InfoCard(
-                            title: 'Boarding\nNext Stop',
-                            count: boardingNext,
-                            icon: Icons.arrow_upward,
-                            color: Colors.blue,
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: _seatSummaryCard(
+                              title: 'Booked\nSeats',
+                              count: bookedCount,
+                              color: Colors.red,
+                              icon: Icons.airline_seat_recline_normal,
+                            ),
                           ),
                         ],
                       ),
@@ -175,7 +194,7 @@ class TripInfoScreen extends StatelessWidget {
     );
   }
 
-  Widget _tripHeader(String routeName, String busId, String nextStop) {
+  Widget _tripHeader(String routeName, String busId) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -191,7 +210,54 @@ class TripInfoScreen extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           Text('Bus ID: $busId'),
-          Text('Next Stop: $nextStop'),
+        ],
+      ),
+    );
+  }
+
+  /// A wide horizontal card used for the seat-count summary at the top.
+  Widget _seatSummaryCard({
+    required String title,
+    required int count,
+    required Color color,
+    required IconData icon,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: color.withOpacity(0.35)),
+        boxShadow: [
+          BoxShadow(
+            color: color.withOpacity(0.12),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          Icon(icon, size: 30, color: color),
+          const SizedBox(height: 8),
+          Text(
+            count.toString(),
+            style: TextStyle(
+              fontSize: 28,
+              fontWeight: FontWeight.bold,
+              color: color,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            title,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: Colors.grey[700],
+            ),
+          ),
         ],
       ),
     );

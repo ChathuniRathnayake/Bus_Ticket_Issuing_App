@@ -220,9 +220,11 @@ class SeatMapScreen extends StatelessWidget {
     SeatStatus status = SeatStatus.available;
     if (bookedSeatsData.containsKey(seatNo)) {
       status = SeatStatus.booked;
-      // You can add logic for 'droppingNext' if your data model supports it later
     }
-    
+
+    // SeatWidget already has its own GestureDetector that navigates to
+    // IssueTicketScreen when tapped (for available seats), so it's used
+    // directly here without wrapping it in another tap handler.
     return SizedBox(
       width: seatWidth - 8,
       height: 55,
@@ -242,7 +244,6 @@ class SeatMapScreen extends StatelessWidget {
       children: const [
         _LegendItem(color: Colors.green, label: "Available"),
         _LegendItem(color: Colors.red, label: "Booked"),
-        _LegendItem(color: Colors.orange, label: "Dropping Next"),
       ],
     );
   }
