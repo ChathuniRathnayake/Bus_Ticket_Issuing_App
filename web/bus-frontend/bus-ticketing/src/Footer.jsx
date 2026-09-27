@@ -1,5 +1,6 @@
 // src/components/Footer.jsx
 import { useNavigate } from "react-router-dom";
+import { Facebook, Instagram, Youtube } from "lucide-react";
 
 export default function Footer() {
   const navigate = useNavigate();
@@ -37,6 +38,11 @@ export default function Footer() {
               TicketGo is a modern real-time bus ticketing platform designed to make 
               travel booking simple, fast, and reliable for passengers across Sri Lanka.
             </p>
+            <div className="mt-5 flex items-center gap-3 text-blue-100" aria-label="Social channels">
+              <span className="flex h-9 w-9 items-center justify-center rounded-full border border-white/20 bg-white/10"><Facebook className="h-4 w-4" /></span>
+              <span className="flex h-9 w-9 items-center justify-center rounded-full border border-white/20 bg-white/10"><Instagram className="h-4 w-4" /></span>
+              <span className="flex h-9 w-9 items-center justify-center rounded-full border border-white/20 bg-white/10"><Youtube className="h-4 w-4" /></span>
+            </div>
           </div>
 
           {/* Column 2: Quick Links */}
@@ -96,7 +102,7 @@ export default function Footer() {
         </div>
 
         {/* Bottom Copyright */}
-        <div className="border-t border-blue-500 dark:border-zinc-700 mt-10 pt-6 text-center text-blue-100 text-sm">
+        <div className="mt-10 border-t border-white/20 pt-6 text-center text-sm text-blue-100">
           © 2026 TicketGo • Real-time Bus Ticketing System<br />
           • All Rights Reserved
         </div>

@@ -1,4 +1,6 @@
 // src/components/PublicFooter.jsx
+import { Facebook, Instagram, Youtube } from "lucide-react";
+
 export default function PublicFooter() {
   return (
     <footer className="bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-600 dark:from-zinc-800 dark:to-zinc-900 border-t border-blue-700 dark:border-zinc-700 mt-auto">
@@ -18,6 +20,11 @@ export default function PublicFooter() {
               TicketGo is a modern real-time bus ticketing platform designed to make
               travel booking simple, fast, and reliable for passengers across Sri Lanka.
             </p>
+            <div className="mt-5 flex items-center gap-3 text-blue-100" aria-label="Social channels">
+              <span className="flex h-9 w-9 items-center justify-center rounded-full border border-white/20 bg-white/10"><Facebook className="h-4 w-4" /></span>
+              <span className="flex h-9 w-9 items-center justify-center rounded-full border border-white/20 bg-white/10"><Instagram className="h-4 w-4" /></span>
+              <span className="flex h-9 w-9 items-center justify-center rounded-full border border-white/20 bg-white/10"><Youtube className="h-4 w-4" /></span>
+            </div>
           </div>
 
           {/* Column 2: About / Public info only — NO protected links here */}
@@ -62,7 +69,7 @@ export default function PublicFooter() {
         </div>
 
         {/* Bottom Copyright */}
-        <div className="border-t border-blue-500 dark:border-zinc-700 mt-10 pt-6 text-center text-blue-100 text-sm">
+        <div className="mt-10 border-t border-white/20 pt-6 text-center text-sm text-blue-100">
           © 2026 TicketGo • Real-time Bus Ticketing System<br />
           • All Rights Reserved
         </div>

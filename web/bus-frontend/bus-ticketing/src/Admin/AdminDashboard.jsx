@@ -9,34 +9,34 @@ export default function AdminDashboard() {
   // 🎨 Custom brand color styles
   const colorStyles = {
     blue: {
-      iconBg: "bg-[#318CE7]/20",
-      iconText: "text-[#318CE7]",
-      btn: "bg-[#318CE7] hover:bg-[#2b7cc9]",
+      iconBg: "bg-gradient-to-br from-blue-500 to-sky-700",
+      iconText: "text-white",
+      btn: "bg-gradient-to-r from-blue-600 to-sky-700 hover:from-blue-700 hover:to-sky-800",
     },
     violet: {
-      iconBg: "bg-[#9966CC]/20",
-      iconText: "text-[#9966CC]",
-      btn: "bg-[#9966CC] hover:bg-[#875bb5]",
+      iconBg: "bg-gradient-to-br from-violet-500 to-indigo-700",
+      iconText: "text-white",
+      btn: "bg-gradient-to-r from-violet-600 to-indigo-700 hover:from-violet-700 hover:to-indigo-800",
     },
     emerald: {
-      iconBg: "bg-emerald-100",
-      iconText: "text-emerald-600",
-      btn: "bg-emerald-600 hover:bg-emerald-700",
+      iconBg: "bg-gradient-to-br from-emerald-500 to-teal-700",
+      iconText: "text-white",
+      btn: "bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800",
     },
     amber: {
-      iconBg: "bg-[#A0785A]/20",
-      iconText: "text-[#A0785A]",
-      btn: "bg-[#A0785A] hover:bg-[#8b654b]",
+      iconBg: "bg-gradient-to-br from-amber-500 to-orange-700",
+      iconText: "text-white",
+      btn: "bg-gradient-to-r from-amber-600 to-orange-700 hover:from-amber-700 hover:to-orange-800",
     },
     orange: {
-      iconBg: "bg-orange-100",
-      iconText: "text-orange-600",
-      btn: "bg-orange-600 hover:bg-orange-700",
+      iconBg: "bg-gradient-to-br from-orange-500 to-rose-600",
+      iconText: "text-white",
+      btn: "bg-gradient-to-r from-orange-600 to-rose-700 hover:from-orange-700 hover:to-rose-800",
     },
     rose: {
-      iconBg: "bg-rose-100",
-      iconText: "text-rose-600",
-      btn: "bg-rose-600 hover:bg-rose-700",
+      iconBg: "bg-gradient-to-br from-rose-500 to-pink-700",
+      iconText: "text-white",
+      btn: "bg-gradient-to-r from-rose-600 to-pink-700 hover:from-rose-700 hover:to-pink-800",
     },
   };
 
@@ -51,19 +51,22 @@ export default function AdminDashboard() {
   ];
 
   return (
-    <div className="max-w-6xl mx-auto p-6 bg-background/50 animate-fade-in">
+    <div className="mx-auto max-w-7xl p-6 animate-fade-in">
       
       {/* Header */}
-      <div className="flex justify-between items-center mb-12">
+      <div className="mb-10 flex flex-wrap items-center justify-between gap-5">
         <div>
           <h1 className="text-4xl font-bold tracking-tight text-foreground">Admin Dashboard</h1>
           <p className="text-lg text-muted-foreground mt-2">Real-time Bus Ticketing System</p>
         </div>
-        
+        <div className="flex items-center gap-3 rounded-xl border bg-card px-4 py-3">
+          <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-100 text-sm font-bold text-blue-700 dark:bg-blue-950 dark:text-blue-300">{String(sections.length).padStart(2, "0")}</span>
+          <div><p className="text-sm font-semibold">Management areas</p><p className="text-xs text-muted-foreground">System overview</p></div>
+        </div>
       </div>
 
       {/* Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
         {sections.map((sec, i) => {
           const styles = colorStyles[sec.color];
           const hasAdd = Boolean(sec.add);
@@ -71,10 +74,10 @@ export default function AdminDashboard() {
           return (
             <Card 
               key={i} 
-              className="hover:shadow-2xl hover:scale-105 transition-all duration-300 cursor-pointer border-border rounded-2xl overflow-hidden"
+              className="group overflow-hidden rounded-xl border-border transition-all duration-300 hover:-translate-y-1 hover:shadow-xl"
             >
               <CardHeader>
-                <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mx-auto ${styles.iconBg} ${styles.iconText}`}>
+                <div className={`mx-auto flex h-14 w-14 items-center justify-center rounded-xl shadow-md transition-transform duration-300 group-hover:rotate-[-5deg] group-hover:scale-105 ${styles.iconBg} ${styles.iconText}`}>
                   <sec.icon className="h-8 w-8" />
                 </div>
                 <CardTitle className="text-2xl mt-4 font-semibold text-center">{sec.title}</CardTitle>
@@ -83,19 +86,19 @@ export default function AdminDashboard() {
                 </CardDescription>
               </CardHeader>
 
-              <CardContent className={`grid ${hasAdd ? "grid-cols-2" : "grid-cols-1"} gap-3 pt-2 pb-6`}>
+              <CardContent className="space-y-3 pt-2 pb-6">
                 {hasAdd && (
                   <Button 
                     onClick={() => navigate(sec.add)} 
                     variant="outline" 
-                    className="h-12 gap-2 hover:bg-muted transition-all duration-300 cursor-pointer font-medium"
+                    className="h-11 w-full gap-2 font-medium transition-colors"
                   >
                     + Add New
                   </Button>
                 )}
                 <Button 
                   onClick={() => navigate(sec.manage)} 
-                  className={`h-12 text-white transition-all duration-300 cursor-pointer font-medium ${styles.btn}`}
+                  className={`h-11 w-full text-white shadow-sm transition-all duration-300 ${styles.btn}`}
                 >
                   {hasAdd ? "Manage All" : "View All Bookings"}
                 </Button>

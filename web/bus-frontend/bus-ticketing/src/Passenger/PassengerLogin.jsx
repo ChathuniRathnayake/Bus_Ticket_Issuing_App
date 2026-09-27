@@ -13,18 +13,21 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Bus } from "lucide-react";
+import { Bus, Eye, EyeOff, LoaderCircle, Route, TicketCheck } from "lucide-react";
 
 export default function PassengerLogin() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [error, setError] = useState("");
 
   const navigate = useNavigate();
 
   const handleLogin = async () => {
+    setError("");
     if (!email || !password) {
-      alert("Please enter email and password");
+      setError("Please enter email and password");
       return;
     }
 
@@ -59,29 +62,43 @@ export default function PassengerLogin() {
         }),
       );
 
-      alert("Login successful!");
       navigate("/passenger-dashboard");
     } catch (error) {
       console.error(error);
-      alert(error.message);
+      setError(error.message || "Unable to sign in. Please try again.");
     } finally {
       setLoading(false);
     }
   };
   return (
-    <div className="flex min-h-[80vh] items-center justify-center bg-gradient-to-br from-zinc-50 to-zinc-100 p-6">
-      <Card className="w-full max-w-md shadow-2xl rounded-3xl border-border overflow-hidden">
-        <CardHeader className="space-y-1 text-center pb-2">
-          <div className="mx-auto w-14 h-14 bg-blue-600 text-white rounded-2xl flex items-center justify-center mb-3">
-            <Bus className="h-7 w-7" />
+    <div className="mx-auto flex min-h-[78vh] max-w-6xl items-center justify-center py-6 animate-fade-in">
+      <div className="grid w-full overflow-hidden rounded-2xl border bg-card shadow-xl md:grid-cols-[0.9fr_1.1fr]">
+        <aside className="relative flex min-h-56 flex-col justify-between overflow-hidden bg-gradient-to-br from-blue-700 via-indigo-700 to-violet-800 p-8 text-white md:min-h-[620px] md:p-10">
+          <div className="pointer-events-none absolute inset-0 opacity-20" style={{ backgroundImage: "radial-gradient(circle, white 1px, transparent 1.5px)", backgroundSize: "24px 24px" }} />
+          <div className="relative flex items-center gap-3">
+            <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-white/15"><Bus className="h-6 w-6" /></span>
+            <span className="text-lg font-semibold">TicketGo</span>
           </div>
+          <div className="relative py-8">
+            <Route className="mb-5 h-8 w-8 text-cyan-200" />
+            <h1 className="max-w-sm text-3xl font-bold leading-tight md:text-4xl">Your next journey starts here.</h1>
+            <p className="mt-4 max-w-sm text-sm leading-6 text-blue-100">Sign in to find your route, choose your seat, and keep every ticket close at hand.</p>
+            <div className="mt-8 flex items-center gap-3 text-sm text-blue-100"><TicketCheck className="h-5 w-5" />Simple booking, smoother travel</div>
+          </div>
+          <div className="relative hidden items-center gap-2 text-xs text-blue-200 md:flex"><span className="h-px w-10 bg-blue-300/70" /> Colombo · Galle · Kandy · Jaffna</div>
+        </aside>
 
-          <CardTitle className="text-3xl font-bold">Passenger Login</CardTitle>
+        <section className="flex items-center justify-center px-6 py-10 sm:px-10 md:px-14">
+          <div className="w-full max-w-md">
+            <CardHeader className="px-0 pb-7 text-left">
+              <p className="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-blue-600">Passenger portal</p>
+              <CardTitle className="text-3xl font-bold">Welcome back</CardTitle>
+              <CardDescription className="mt-2">Sign in to manage your trips and tickets.</CardDescription>
+            </CardHeader>
 
-          <CardDescription>Book your bus tickets easily</CardDescription>
-        </CardHeader>
+            <CardContent className="space-y-5 px-0">
+          {error && <div role="alert" className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300">{error}</div>}
 
-        <CardContent className="space-y-6 px-8 pb-8 pt-4">
           {/* Email */}
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
@@ -99,28 +116,34 @@ export default function PassengerLogin() {
           {/* Password */}
           <div className="space-y-2">
             <Label htmlFor="password">Password</Label>
-            <Input
-              id="password"
-              type="password"
-              placeholder="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="h-11"
-              required
-            />
+            <div className="relative">
+              <Input
+                id="password"
+                type={showPassword ? "text" : "password"}
+                placeholder="Enter your password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="h-11 pr-12"
+                required
+              />
+              <button type="button" onClick={() => setShowPassword((visible) => !visible)} aria-label={showPassword ? "Hide password" : "Show password"} className="absolute inset-y-0 right-0 flex w-11 items-center justify-center text-muted-foreground hover:text-foreground">
+                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+            </div>
           </div>
 
           {/* Login Button */}
           <Button
             onClick={handleLogin}
             disabled={loading}
-            className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-lg"
+            className="w-full h-12 bg-blue-600 text-base text-white hover:bg-blue-700"
           >
-            {loading ? "Logging in..." : "Login"}
+            {loading && <LoaderCircle className="h-4 w-4 animate-spin" />}
+            {loading ? "Signing in..." : "Sign in"}
           </Button>
 
           {/* Links */}
-          <div className="flex justify-between pt-2">
+          <div className="flex flex-wrap justify-between gap-x-3 pt-2">
             <Button variant="link" onClick={() => navigate("/admin-login")}>
               Admin Login →
             </Button>
@@ -130,7 +153,9 @@ export default function PassengerLogin() {
             </Button>
           </div>
         </CardContent>
-      </Card>
+          </div>
+        </section>
+      </div>
     </div>
   );
 }
