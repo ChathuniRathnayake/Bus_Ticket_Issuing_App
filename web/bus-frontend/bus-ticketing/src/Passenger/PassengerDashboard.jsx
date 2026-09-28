@@ -28,6 +28,20 @@ function getDepartureDate(booking, route) {
   return Number.isNaN(departure.getTime()) ? null : departure;
 }
 
+function formatCountdown(departureAt, now) {
+  const diff = departureAt.getTime() - now.getTime();
+  if (diff <= 0) return "Journey started";
+
+  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+  const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+  const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+  const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+
+  if (days > 0) return `${days}d ${hours}h ${minutes}m`;
+  if (hours > 0) return `${hours}h ${minutes}m ${seconds}s`;
+  return `${minutes}m ${seconds}s`;
+}
+
 function getPendingPayment() {
   try {
     return JSON.parse(localStorage.getItem("pendingPayment") || "null");
@@ -44,8 +58,8 @@ export default function PassengerDashboard() {
   const [pendingPayment, setPendingPayment] = useState(getPendingPayment);
   const [routes, setRoutes] = useState([]);
   const [upcomingBookings, setUpcomingBookings] = useState([]);
-  const [countdown, setCountdown] = useState("");
   const [currentTime, setCurrentTime] = useState(() => new Date());
+  const [clockTime, setClockTime] = useState(() => new Date());
 
   const confirmedBookings = bookings.filter(isConfirmedBooking);
   const processingBookings = bookings.filter(isProcessingBooking);
@@ -65,6 +79,9 @@ export default function PassengerDashboard() {
     .filter((booking) => booking.departureAt && booking.departureAt <= currentTime)
     .sort((first, second) => second.departureAt - first.departureAt);
   const recentExpiredBookings = expiredBookings.slice(0, 5);
+  const nextDepartureCountdown = upcomingBookings.length > 0
+    ? formatCountdown(upcomingBookings[0].departureAt, clockTime)
+    : "";
 
   // Fetch routes from backend
   useEffect(() => {
@@ -111,39 +128,10 @@ export default function PassengerDashboard() {
     return () => window.clearInterval(timer);
   }, []);
 
-  // Calculate countdown timer
   useEffect(() => {
-    if (upcomingBookings.length === 0) return;
-
-    const calculateTimer = () => {
-      const bookingDate = upcomingBookings[0].departureAt;
-      if (!bookingDate) return;
-      const now = new Date();
-      const diff = bookingDate - now;
-
-      if (diff <= 0) {
-        setCountdown("Journey Started!");
-        return;
-      }
-
-      const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-      const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-      const seconds = Math.floor((diff % (1000 * 60)) / 1000);
-
-      if (days > 0) {
-        setCountdown(`${days}d ${hours}h ${minutes}m`);
-      } else if (hours > 0) {
-        setCountdown(`${hours}h ${minutes}m ${seconds}s`);
-      } else {
-        setCountdown(`${minutes}m ${seconds}s`);
-      }
-    };
-
-    calculateTimer();
-    const timer = setInterval(calculateTimer, 1000);
-    return () => clearInterval(timer);
-  }, [upcomingBookings]);
+    const timer = window.setInterval(() => setClockTime(new Date()), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   // Keep upcoming confirmed and processing trips together in departure order.
   useEffect(() => {
@@ -234,7 +222,7 @@ export default function PassengerDashboard() {
               <div className="mt-4 inline-flex items-center gap-3 rounded-lg border border-blue-200 bg-card px-4 py-3 shadow-sm">
                 <Clock className="h-5 w-5 text-blue-600" />
                 <p className="text-sm text-muted-foreground">
-                  Next departure in <span className="font-semibold text-emerald-700 dark:text-emerald-400">{countdown || "Calculating..."}</span>
+                  Next departure in <span className="font-semibold text-emerald-700 dark:text-emerald-400">{nextDepartureCountdown}</span>
                 </p>
               </div>
             )}
@@ -331,12 +319,20 @@ export default function PassengerDashboard() {
 
         {/* Upcoming Trip Summaries */}
         <Card className="mb-10 border-0 shadow-2xl bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950 dark:to-indigo-950">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-3 text-2xl">
-              <Clock className="h-7 w-7 text-blue-600" />
-              Your Next Journey
-            </CardTitle>
-            <CardDescription>Confirmed and processing bookings, ordered by departure time.</CardDescription>
+          <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-3 text-2xl">
+                <Clock className="h-7 w-7 text-blue-600" />
+                Your Next Journey
+              </CardTitle>
+              <CardDescription>Confirmed and processing bookings, ordered by departure time.</CardDescription>
+            </div>
+            {upcomingBookings.length > 0 && (
+              <div className="rounded-lg border border-blue-200 bg-card px-4 py-3">
+                <p className="text-xs font-semibold uppercase text-muted-foreground">Next departure in</p>
+                <p className="mt-1 font-semibold text-emerald-700 dark:text-emerald-400">{nextDepartureCountdown}</p>
+              </div>
+            )}
           </CardHeader>
           <CardContent className="space-y-5 pb-8">
             {upcomingBookings.length > 0 ? (
@@ -361,6 +357,9 @@ export default function PassengerDashboard() {
                         <p className="mt-2 text-sm text-muted-foreground">
                           Bus {booking.busNo || booking.busId || "—"} · Seat {booking.seat || "—"}
                         </p>
+                        <p className="mt-1 text-sm font-medium text-blue-700 dark:text-blue-300">
+                          Departure in {formatCountdown(booking.departureAt, clockTime)}
+                        </p>
                       </div>
                       <Badge className={isProcessing
                         ? "w-fit bg-amber-500 text-white hover:bg-amber-500"
@@ -376,11 +375,6 @@ export default function PassengerDashboard() {
               <p className="py-4 text-center text-muted-foreground">No upcoming bookings</p>
             )}
             <div className="flex flex-wrap items-center justify-between gap-4 border-t border-blue-200 pt-5">
-              {upcomingBookings.length > 0 && (
-                <p className="text-sm text-muted-foreground">
-                  Next departure in <span className="font-semibold text-emerald-700 dark:text-emerald-400">{countdown || "Calculating..."}</span>
-                </p>
-              )}
               <Button
                 className="bg-blue-600 hover:bg-blue-700"
                 onClick={() => navigate("/passenger-dashboard/search-buses")}
