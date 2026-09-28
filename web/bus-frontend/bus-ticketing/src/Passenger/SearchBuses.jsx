@@ -74,7 +74,7 @@ export default function SearchBuses() {
 
       return {
         ...bus,
-        scheduleId: schedule.scheduleId || schedule.id,
+        scheduleId: schedule.id || schedule.scheduleId,
         routeId: schedule.routeId,
         tripDate: schedule.date,
         departureTime: schedule.departureTime,

@@ -73,7 +73,7 @@ export default function ManageBookings() {
         };
       });
 
-      enriched.sort((a, b) => getTimestamp(b.createdAt) - getTimestamp(a.createdAt));
+      enriched.sort((a, b) => getTimestamp(getBookedAt(b)) - getTimestamp(getBookedAt(a)));
       setBookings(enriched);
       if (ticketResults.some((result) => result.status === "rejected")) {
         setErrorMessage("Some buses could not be loaded. Displaying tickets from the buses that responded.");
@@ -97,22 +97,31 @@ export default function ManageBookings() {
   );
 
   function getTimestamp(value) {
-    if (value?.seconds) return value.seconds * 1000;
     if (typeof value?.toDate === "function") return value.toDate().getTime();
-    return new Date(value || 0).getTime() || 0;
+    const seconds = value?.seconds ?? value?._seconds;
+    const nanoseconds = value?.nanoseconds ?? value?._nanoseconds ?? 0;
+    if (seconds !== undefined && Number.isFinite(Number(seconds))) {
+      return Number(seconds) * 1000 + Number(nanoseconds) / 1_000_000;
+    }
+    const timestamp = new Date(value || "").getTime();
+    return Number.isFinite(timestamp) ? timestamp : null;
   }
 
-  const formatDate = (createdAt) => {
-    if (!createdAt) return "-";
-    const date = new Date(getTimestamp(createdAt));
+  function getBookedAt(booking) {
+    return booking.bookedAt || booking.confirmedAt || booking.createdAt;
+  }
+
+  const formatDate = (timestampValue) => {
+    if (!timestampValue) return "-";
+    const timestamp = getTimestamp(timestampValue);
+    if (timestamp === null) return "-";
+    const date = new Date(timestamp);
     if (isNaN(date.getTime())) return "-";
-    return date.toLocaleString("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+    return new Intl.DateTimeFormat("en-LK", {
+      timeZone: "Asia/Colombo",
+      dateStyle: "medium",
+      timeStyle: "short",
+    }).format(date);
   };
 
   const statusBadge = (status) => {
@@ -216,7 +225,7 @@ export default function ManageBookings() {
                       <TableCell>{b.busNo}</TableCell>
                       <TableCell>{b.routeName}</TableCell>
                       <TableCell className="font-semibold">{b.seatNumber}</TableCell>
-                      <TableCell>{formatDate(b.createdAt)}</TableCell>
+                      <TableCell>{formatDate(getBookedAt(b))}</TableCell>
                       <TableCell>{statusBadge(b.status)}</TableCell>
                       <TableCell className="text-right">
                         <Button
@@ -247,7 +256,7 @@ export default function ManageBookings() {
                             <Detail label="Drop-off stop" value={b.dropStop || b.dropStopId} />
                             <Detail label="Fare" value={formatFare(b)} />
                             <Detail label="Booking channel" value={b.bookingChannel || "Not recorded"} />
-                            <Detail label="Booked at" value={formatDate(b.createdAt)} />
+                            <Detail label="Booked at" value={formatDate(getBookedAt(b))} />
                             <Detail label="Ticket status" value={b.status} />
                             <Detail label="Schedule ID" value={b.scheduleId} mono />
                           </div>
