@@ -66,6 +66,7 @@ function AppContent({
 
   // Is the current page one of our public (not-logged-in) pages?
   const isPublicPage = PUBLIC_PATHS.includes(location.pathname);
+  const isAdminPage = location.pathname.startsWith("/admin-dashboard");
 
   return (
     <div className="flex min-h-screen flex-col bg-zinc-50">
@@ -238,7 +239,7 @@ function AppContent({
 
       {/* 👇 Show the pretty "safe" footer on public pages, and the
           real footer (with protected links) everywhere else */}
-      {isPublicPage ? <PublicFooter /> : <Footer />}
+      {!isAdminPage && (isPublicPage ? <PublicFooter /> : <Footer />)}
     </div>
   );
 }

@@ -237,23 +237,27 @@ export default function SeatLayout() {
           <ArrowLeft className="h-5 w-5" /> Back to Buses
         </Button>
         <div>
-          <h2 className="text-2xl font-bold">Seat Layout — {bus.busNo}</h2>
-          <p className="text-sm text-muted-foreground">
-            Route: {bus.routeId} &nbsp;|&nbsp; Total seats: {totalSeats}
+          <h2 className="text-3xl font-bold bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-600 bg-clip-text text-transparent">
+            Seat Layout — {bus.busNo}
+          </h2>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            Route: {bus.routeId} &nbsp;·&nbsp; Total seats: {totalSeats}
           </p>
         </div>
       </div>
 
       {loadingSeats && (
-        <div className="mb-4 rounded-2xl border border-slate-200 bg-white px-6 py-5 text-center text-slate-500">
+        <div className="mb-4 flex items-center gap-3 rounded-xl border border-blue-100 bg-blue-50 px-6 py-4 text-sm text-blue-700">
+          <div className="h-4 w-4 rounded-full border-2 border-blue-300 border-t-blue-600 animate-spin shrink-0" />
           Loading current seat reservations for this bus...
         </div>
       )}
 
-      <Card className="mb-5 border-slate-200 shadow-sm">
+      <Card className="mb-5 border border-slate-200 shadow-md rounded-xl overflow-hidden">
+        <div className="h-1 bg-gradient-to-r from-blue-500 via-indigo-500 to-violet-500" />
         <CardContent className="grid gap-4 p-5 md:grid-cols-2">
-          <label className="grid gap-2 text-sm font-medium text-slate-700">
-            Boarding point
+          <label className="grid gap-2 text-sm font-semibold text-slate-700">
+            📍 Boarding point
             <select
               value={boardingStopId}
               onChange={(event) => {
@@ -264,17 +268,17 @@ export default function SeatLayout() {
                   setDropStopId(routeStops.find((stop) => stop.alightingAllowed === true && stop.sequence > nextStop.sequence)?.stopId || "");
                 }
               }}
-              className="h-11 rounded-md border border-slate-300 bg-white px-3"
+              className="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               {boardingStops.map((stop) => <option key={stop.stopId} value={stop.stopId}>{stop.name}</option>)}
             </select>
           </label>
-          <label className="grid gap-2 text-sm font-medium text-slate-700">
-            Destination point
+          <label className="grid gap-2 text-sm font-semibold text-slate-700">
+            🏁 Destination point
             <select
               value={dropStopId}
               onChange={(event) => setDropStopId(event.target.value)}
-              className="h-11 rounded-md border border-slate-300 bg-white px-3"
+              className="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               {destinationStops.map((stop) => <option key={stop.stopId} value={stop.stopId}>{stop.name}</option>)}
             </select>
@@ -284,16 +288,18 @@ export default function SeatLayout() {
 
       {/* Legend */}
       <div className="flex gap-3 mb-6 flex-wrap">
-        {[
-          { color: "emerald", label: `Available: ${availableCount}` },
-          { color: "red",     label: `Booked: ${bookedSeats.length}` },
-          { color: "blue",    label: `Selected: ${selectedSeat ?? "None"}` },
-        ].map(({ color, label }) => (
-          <div key={label} className={`flex items-center gap-2 px-4 py-2 rounded-full bg-${color}-50 border border-${color}-200 text-${color}-700 text-sm font-medium`}>
-            <span className={`w-3 h-3 rounded-sm bg-${color}-400 inline-block`} />
-            {label}
-          </div>
-        ))}
+        <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-sm font-medium">
+          <span className="w-3 h-3 rounded-sm bg-emerald-400 inline-block" />
+          Available: {availableCount}
+        </div>
+        <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-red-50 border border-red-200 text-red-700 text-sm font-medium">
+          <span className="w-3 h-3 rounded-sm bg-red-400 inline-block" />
+          Booked: {bookedSeats.length}
+        </div>
+        <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-blue-50 border border-blue-200 text-blue-700 text-sm font-medium">
+          <span className="w-3 h-3 rounded-sm bg-blue-400 inline-block" />
+          Selected: {selectedSeat ?? "None"}
+        </div>
       </div>
 
       <Card className="shadow-lg rounded-2xl">

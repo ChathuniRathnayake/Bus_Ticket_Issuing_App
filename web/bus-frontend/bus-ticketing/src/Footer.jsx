@@ -1,6 +1,6 @@
 // src/components/Footer.jsx
 import { useNavigate } from "react-router-dom";
-import { Facebook, Instagram, Youtube } from "lucide-react";
+import { Facebook, Instagram, Youtube, MapPin, Phone, Mail } from "lucide-react";
 
 export default function Footer() {
   const navigate = useNavigate();
@@ -22,39 +22,51 @@ export default function Footer() {
 
   return (
     <footer className="bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-600 dark:from-zinc-800 dark:to-zinc-900 border-t border-blue-700 dark:border-zinc-700 mt-auto">
-      <div className="max-w-7xl mx-auto px-6 py-10">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          
+      <div className="max-w-7xl mx-auto px-6 py-12">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
+
           {/* Column 1: Logo + About */}
           <div>
             <div className="flex items-center gap-3 mb-4">
-              <img 
-                src="/src/assets/logo.png" 
-                alt="TicketGo Logo" 
-                className="h-11 w-auto object-contain"
+              <img
+                src="/src/assets/logo.png"
+                alt="TicketGo Logo"
+                className="h-11 w-auto object-contain drop-shadow"
               />
             </div>
             <p className="text-blue-100 text-sm leading-relaxed">
-              TicketGo is a modern real-time bus ticketing platform designed to make 
+              TicketGo is a modern real-time bus ticketing platform designed to make
               travel booking simple, fast, and reliable for passengers across Sri Lanka.
             </p>
-            <div className="mt-5 flex items-center gap-3 text-blue-100" aria-label="Social channels">
-              <span className="flex h-9 w-9 items-center justify-center rounded-full border border-white/20 bg-white/10"><Facebook className="h-4 w-4" /></span>
-              <span className="flex h-9 w-9 items-center justify-center rounded-full border border-white/20 bg-white/10"><Instagram className="h-4 w-4" /></span>
-              <span className="flex h-9 w-9 items-center justify-center rounded-full border border-white/20 bg-white/10"><Youtube className="h-4 w-4" /></span>
+            {/* Social icons */}
+            <div className="mt-5 flex items-center gap-3" aria-label="Social channels">
+              {[
+                { Icon: Facebook, label: "Facebook" },
+                { Icon: Instagram, label: "Instagram" },
+                { Icon: Youtube, label: "YouTube" },
+              ].map(({ Icon, label }) => (
+                <button
+                  key={label}
+                  aria-label={label}
+                  className="flex h-9 w-9 items-center justify-center rounded-full border border-white/20 bg-white/10 text-blue-100 transition-colors hover:bg-white/20 hover:text-white"
+                >
+                  <Icon className="h-4 w-4" />
+                </button>
+              ))}
             </div>
           </div>
 
           {/* Column 2: Quick Links */}
           <div>
-            <h3 className="text-white font-semibold mb-4">Quick Links</h3>
-            <ul className="space-y-2 text-blue-100 text-sm">
+            <h3 className="text-white font-semibold mb-5 text-sm uppercase tracking-wider">Quick Links</h3>
+            <ul className="space-y-3 text-blue-100 text-sm">
               <li>
                 <a
                   href="/passenger-dashboard/search-buses"
                   onClick={(e) => handleProtectedLink(e, "/passenger-dashboard/search-buses")}
-                  className="hover:text-white transition-colors"
+                  className="flex items-center gap-2 transition-colors hover:text-white group"
                 >
+                  <span className="h-px w-4 bg-blue-300/50 group-hover:w-6 transition-all" />
                   Search Buses
                 </a>
               </li>
@@ -62,36 +74,48 @@ export default function Footer() {
                 <a
                   href="/passenger-dashboard/my-bookings"
                   onClick={(e) => handleProtectedLink(e, "/passenger-dashboard/my-bookings")}
-                  className="hover:text-white transition-colors"
+                  className="flex items-center gap-2 transition-colors hover:text-white group"
                 >
+                  <span className="h-px w-4 bg-blue-300/50 group-hover:w-6 transition-all" />
                   My Bookings
                 </a>
               </li>
-              <li><a href="#" className="hover:text-white transition-colors">Contact Us</a></li>
+              <li>
+                <a href="/#contact" className="flex items-center gap-2 transition-colors hover:text-white group">
+                  <span className="h-px w-4 bg-blue-300/50 group-hover:w-6 transition-all" />
+                  Contact Us
+                </a>
+              </li>
+              <li>
+                <a href="/#about" className="flex items-center gap-2 transition-colors hover:text-white group">
+                  <span className="h-px w-4 bg-blue-300/50 group-hover:w-6 transition-all" />
+                  About TicketGo
+                </a>
+              </li>
             </ul>
           </div>
 
           {/* Column 3: Contact Details */}
           <div>
-            <h3 className="text-white font-semibold mb-4">Contact Us</h3>
-            <div className="space-y-3 text-blue-100 text-sm">
+            <h3 className="text-white font-semibold mb-5 text-sm uppercase tracking-wider">Contact Us</h3>
+            <div className="space-y-4 text-blue-100 text-sm">
               <div className="flex items-start gap-3">
-                <span className="mt-0.5">📍</span>
+                <MapPin className="h-4 w-4 mt-0.5 shrink-0 text-cyan-300" />
                 <div>
                   Colombo 4, Western Province<br />
                   Sri Lanka
                 </div>
               </div>
-              
+
               <div className="flex items-center gap-3">
-                <span>📞</span>
+                <Phone className="h-4 w-4 shrink-0 text-cyan-300" />
                 <a href="tel:+94712345678" className="hover:text-white transition-colors">
                   +94 71 234 5678
                 </a>
               </div>
 
               <div className="flex items-center gap-3">
-                <span>✉️</span>
+                <Mail className="h-4 w-4 shrink-0 text-cyan-300" />
                 <a href="mailto:info@ticketgo.lk" className="hover:text-white transition-colors">
                   info@ticketgo.lk
                 </a>
@@ -101,10 +125,11 @@ export default function Footer() {
 
         </div>
 
-        {/* Bottom Copyright */}
-        <div className="mt-10 border-t border-white/20 pt-6 text-center text-sm text-blue-100">
-          © 2026 TicketGo • Real-time Bus Ticketing System<br />
-          • All Rights Reserved
+        {/* Divider */}
+        <div className="mt-10 border-t border-white/15 pt-6 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-blue-200">
+          <span>© 2026 TicketGo. All Rights Reserved.</span>
+          <span className="hidden sm:block h-px flex-1 bg-white/10 mx-4" />
+          <span>Real-time Bus Ticketing System · Sri Lanka</span>
         </div>
       </div>
     </footer>
