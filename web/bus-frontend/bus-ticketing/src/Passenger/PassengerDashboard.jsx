@@ -187,6 +187,14 @@ export default function PassengerDashboard() {
             <p className="text-xl text-muted-foreground mt-2">
               Where are you heading today?
             </p>
+            {upcomingBookings.length > 0 && (
+              <div className="mt-4 inline-flex items-center gap-3 rounded-lg border border-blue-200 bg-card px-4 py-3 shadow-sm">
+                <Clock className="h-5 w-5 text-blue-600" />
+                <p className="text-sm text-muted-foreground">
+                  Next departure in <span className="font-semibold text-emerald-700 dark:text-emerald-400">{countdown || "Calculating..."}</span>
+                </p>
+              </div>
+            )}
           </div>
 
           <div className="flex items-center gap-4">
