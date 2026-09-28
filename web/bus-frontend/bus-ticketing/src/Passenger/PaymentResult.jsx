@@ -13,23 +13,34 @@ function readStoredPayment(key) {
   }
 }
 
-function saveConfirmedBooking(payment) {
+function saveConfirmedBooking(payment, confirmedDetails, paymentStatus) {
   const bookings = readStoredPayment("userBookings") || [];
-  if (bookings.some((booking) => booking.bookingId === payment.bookingId)) return;
-
   const booking = {
     bookingId: payment.bookingId,
-    busId: payment.busId,
+    busId: confirmedDetails?.busId || payment.busId,
     busNo: payment.busNo,
-    routeId: payment.routeId,
-    scheduleId: payment.scheduleId,
+    routeId: confirmedDetails?.routeId || payment.routeId,
+    scheduleId: confirmedDetails?.scheduleId || payment.scheduleId,
+    startStop: payment.startStop,
+    endStop: payment.endStop,
+    boardingStop: confirmedDetails?.boardingStop || payment.boardingStop,
+    dropStop: confirmedDetails?.dropStop || payment.dropStop,
     date: payment.date,
     departureTime: payment.departureTime,
-    seat: payment.seat,
+    seat: confirmedDetails?.seatNumber || confirmedDetails?.seatNo || payment.seat,
     bookingDate: new Date().toISOString(),
     status: "Confirmed",
+    paymentStatus,
+    amountCents: confirmedDetails?.amountCents ?? payment.amountCents,
+    currency: confirmedDetails?.currency || payment.currency,
+    paymentId: payment.paymentId,
   };
-  localStorage.setItem("userBookings", JSON.stringify([booking, ...bookings]));
+  const existingIndex = bookings.findIndex((item) => item.bookingId === booking.bookingId);
+  const updatedBookings = existingIndex === -1
+    ? [booking, ...bookings]
+    : bookings.map((item, index) => index === existingIndex ? { ...item, ...booking } : item);
+  localStorage.setItem("userBookings", JSON.stringify(updatedBookings));
+  return booking;
 }
 
 export default function PaymentResult({ cancelled = false }) {
@@ -97,10 +108,11 @@ export default function PaymentResult({ cancelled = false }) {
         if (!response.ok) throw new Error(data.message || "Unable to verify payment");
 
         if (data.status === "SUCCEEDED" || data.booking?.status === "CONFIRMED") {
-          saveConfirmedBooking(payment);
-          localStorage.setItem("lastPayment", JSON.stringify(payment));
+          const booking = saveConfirmedBooking(payment, data.booking, data.status);
+          const confirmedPayment = { ...payment, ...booking };
+          localStorage.setItem("lastPayment", JSON.stringify(confirmedPayment));
           localStorage.removeItem("pendingPayment");
-          update({ status: "succeeded", payment });
+          update({ status: "succeeded", payment: confirmedPayment });
           return;
         }
 
@@ -111,7 +123,7 @@ export default function PaymentResult({ cancelled = false }) {
         }
 
         if (attempt >= 20) {
-          update({ status: "pending", payment });
+          update({ status: "pending", payment, paymentStatus: data.status });
           return;
         }
 
@@ -134,6 +146,13 @@ export default function PaymentResult({ cancelled = false }) {
   const isSuccess = result.status === "succeeded";
   const isCancelled = result.status === "cancelled";
   const isFailure = result.status === "failed" || result.status === "cancel-error" || result.status === "error" || result.status === "missing";
+  const paymentStatusLabel = isSuccess
+    ? "Successful"
+    : result.status === "pending"
+      ? "Processing"
+      : result.status === "loading"
+        ? "Verifying"
+        : result.paymentStatus || "Not completed";
   const Icon = isSuccess ? CheckCircle2 : isCancelled ? XCircle : isFailure ? AlertCircle : result.status === "pending" ? Clock3 : LoaderCircle;
   const styles = isSuccess
     ? { bar: "bg-emerald-500", icon: "bg-emerald-50 text-emerald-600", button: "bg-emerald-700 hover:bg-emerald-800" }
@@ -146,7 +165,7 @@ export default function PaymentResult({ cancelled = false }) {
   const heading = {
     loading: "Verifying your payment",
     pending: "Payment is still processing",
-    succeeded: "Your ticket is confirmed",
+    succeeded: "Payment successful",
     cancelled: "Checkout was cancelled",
     failed: "Payment was not completed",
     "cancel-error": "Seat release needs attention",
@@ -178,7 +197,7 @@ export default function PaymentResult({ cancelled = false }) {
           <p className="mt-3 max-w-lg text-sm leading-6 text-slate-600">{description}</p>
 
           {payment && (
-            <div className="mt-7 grid grid-cols-2 gap-x-6 gap-y-4 border-y border-slate-200 py-5 text-sm">
+            <div className="mt-7 grid grid-cols-1 gap-x-6 gap-y-4 border-y border-slate-200 py-5 text-sm sm:grid-cols-2">
               <div>
                 <p className="text-xs text-slate-500">ROUTE</p>
                 <p className="mt-1 font-medium text-slate-900">
@@ -194,8 +213,26 @@ export default function PaymentResult({ cancelled = false }) {
                 <p className="mt-1 font-medium text-slate-900">{payment.busNo || payment.busId} · {payment.seat}</p>
               </div>
               <div>
+                <p className="text-xs text-slate-500">BOARDING · DROP-OFF</p>
+                <p className="mt-1 font-medium text-slate-900">{payment.boardingStop || "—"} · {payment.dropStop || "—"}</p>
+              </div>
+              <div>
                 <p className="text-xs text-slate-500">BOOKING REFERENCE</p>
                 <p className="mt-1 truncate font-mono text-xs text-slate-700">{payment.bookingId || payment.paymentId}</p>
+              </div>
+              <div>
+                <p className="text-xs text-slate-500">AMOUNT PAID</p>
+                <p className="mt-1 font-medium text-slate-900">
+                  {payment.amountCents != null
+                    ? `${(payment.amountCents / 100).toFixed(2)} ${(payment.currency || "").toUpperCase()}`.trim()
+                    : "—"}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-slate-500">PAYMENT STATUS</p>
+                <p className={`mt-1 font-semibold ${isSuccess ? "text-emerald-700" : "text-amber-700"}`}>
+                  {paymentStatusLabel}
+                </p>
               </div>
             </div>
           )}

@@ -160,6 +160,28 @@ export default function MyBookings() {
                           <p className="text-xs text-muted-foreground">BOOKING ID</p>
                           <p className="font-mono text-sm text-gray-600 mt-1 break-all">{booking.bookingId}</p>
                         </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground">BOARDING STOP</p>
+                          <p className="font-medium mt-1 text-gray-700">{booking.boardingStop || "—"}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground">DROP-OFF STOP</p>
+                          <p className="font-medium mt-1 text-gray-700">{booking.dropStop || "—"}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground">PAYMENT</p>
+                          <p className="font-semibold mt-1 text-emerald-700">
+                            {booking.paymentStatus === "SUCCEEDED" ? "Successful" : booking.status}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground">AMOUNT PAID</p>
+                          <p className="font-medium mt-1 text-gray-700">
+                            {booking.amountCents != null
+                              ? `${(booking.amountCents / 100).toFixed(2)} ${(booking.currency || "").toUpperCase()}`.trim()
+                              : "—"}
+                          </p>
+                        </div>
                       </div>
                     </div>
 

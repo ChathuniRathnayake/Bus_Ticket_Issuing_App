@@ -208,8 +208,18 @@ export const getPaymentStatus = async (req, res) => {
   try {
     const paymentDoc = await db.collection("payments").doc(req.params.paymentId).get();
     if (!paymentDoc.exists) return res.status(404).json({ message: "Payment not found" });
-    const payment = paymentDoc.data();
+    let payment = paymentDoc.data();
     if (payment.userId !== req.user.uid) return res.status(403).json({ message: "Not authorized" });
+
+    if (stripe && payment.stripeSessionId && !["SUCCEEDED", "FAILED", "EXPIRED", "CANCELLED"].includes(payment.status)) {
+      const session = await stripe.checkout.sessions.retrieve(payment.stripeSessionId);
+      if (session.payment_status === "paid") {
+        await finalizePayment(session, `status-check-${session.id}`);
+        const refreshedPaymentDoc = await db.collection("payments").doc(req.params.paymentId).get();
+        payment = refreshedPaymentDoc.data();
+      }
+    }
+
     const bookingDoc = await db.collection("bookings").doc(payment.bookingId).get();
     return res.json({ paymentId: paymentDoc.id, ...payment, booking: bookingDoc.exists ? { id: bookingDoc.id, ...bookingDoc.data() } : null });
   } catch (error) { return serverError(res, error); }
