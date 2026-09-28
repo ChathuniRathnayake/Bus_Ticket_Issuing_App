@@ -4,18 +4,29 @@ import { useNavigate } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Ticket, Trash2, Calendar, Clock } from "lucide-react";
+import { ArrowLeft, Bus, Ticket, Trash2, Clock } from "lucide-react";
 import TicketQRCode from "@/components/TicketQRCode";
 
 function getRoutes() {
   return JSON.parse(localStorage.getItem("routes")) || [];
 }
 
+function getPendingPayment() {
+  try {
+    return JSON.parse(localStorage.getItem("pendingPayment") || "null");
+  } catch {
+    return null;
+  }
+}
+
 export default function MyBookings() {
   const navigate = useNavigate();
   const [bookings, setBookings] = useState(() => JSON.parse(localStorage.getItem("userBookings") || "[]"));
   const [routes] = useState(getRoutes);
+  const [pendingPayment, setPendingPayment] = useState(getPendingPayment);
   const [cancelBookingId, setCancelBookingId] = useState(null);
+  const [currentTime, setCurrentTime] = useState(() => new Date());
+  const [selectedStatus, setSelectedStatus] = useState("all");
 
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -24,6 +35,14 @@ export default function MyBookings() {
       return;
     }
   }, [navigate]);
+
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      setCurrentTime(new Date());
+      setPendingPayment(getPendingPayment());
+    }, 30_000);
+    return () => window.clearInterval(interval);
+  }, []);
 
   const handleCancelClick = (bookingId) => {
     setCancelBookingId(bookingId);
@@ -52,11 +71,37 @@ export default function MyBookings() {
   };
 
   const getRouteDetails = (routeId) => routes.find((r) => r.routeId === routeId);
+  const bookingItems = bookings.map((booking) => {
+    const route = getRouteDetails(booking.routeId);
+    const departureAt = new Date(`${booking.date || route?.date || ""}T${booking.departureTime || route?.startTime || ""}`);
+    return {
+      ...booking,
+      displayStatus: !Number.isNaN(departureAt.getTime()) && departureAt <= currentTime ? "expired" : "confirmed",
+    };
+  });
+
+  if (pendingPayment && !bookings.some((booking) => booking.bookingId === pendingPayment.bookingId)) {
+    bookingItems.push({ ...pendingPayment, displayStatus: "processing", isPendingPayment: true });
+  }
+
+  const statusFilters = [
+    { value: "all", label: "All" },
+    { value: "confirmed", label: "Confirmed" },
+    { value: "processing", label: "Processing" },
+    { value: "expired", label: "Expired" },
+  ];
+  const statusCounts = bookingItems.reduce((counts, booking) => {
+    counts[booking.displayStatus] += 1;
+    return counts;
+  }, { confirmed: 0, processing: 0, expired: 0 });
+  const visibleBookings = selectedStatus === "all"
+    ? bookingItems
+    : bookingItems.filter((booking) => booking.displayStatus === selectedStatus);
 
   return (
     <div className="max-w-6xl mx-auto p-6 animate-fade-in">
       {/* Header */}
-      <div className="flex items-center gap-4 mb-8">
+      <div className="flex flex-wrap items-center gap-4 mb-8">
         <Button 
           variant="ghost" 
           onClick={() => navigate("/passenger-dashboard")} 
@@ -70,9 +115,36 @@ export default function MyBookings() {
           </h2>
           <p className="text-muted-foreground">Your upcoming and recent journeys</p>
         </div>
+        {bookingItems.length > 0 && (
+          <Button
+            onClick={() => navigate("/passenger-dashboard/search-buses")}
+            className="ml-auto bg-blue-600 hover:bg-blue-700"
+          >
+            <Bus className="mr-2 h-4 w-4" /> Book another trip
+          </Button>
+        )}
       </div>
 
-      {bookings.length === 0 ? (
+      {bookingItems.length > 0 && (
+        <div className="mb-6 flex flex-wrap gap-2" role="group" aria-label="Filter bookings by status">
+          {statusFilters.map((filter) => {
+            const count = filter.value === "all" ? bookingItems.length : statusCounts[filter.value];
+            return (
+              <Button
+                key={filter.value}
+                type="button"
+                variant={selectedStatus === filter.value ? "default" : "outline"}
+                aria-pressed={selectedStatus === filter.value}
+                onClick={() => setSelectedStatus(filter.value)}
+              >
+                {filter.label} ({count})
+              </Button>
+            );
+          })}
+        </div>
+      )}
+
+      {bookingItems.length === 0 ? (
         <Card className="shadow-2xl border-0 bg-gradient-to-br from-violet-600 via-blue-600 to-indigo-600 text-white">
           <CardContent className="p-20 text-center">
             <Ticket className="w-24 h-24 mx-auto mb-6 opacity-90" />
@@ -87,10 +159,18 @@ export default function MyBookings() {
             </Button>
           </CardContent>
         </Card>
+      ) : visibleBookings.length === 0 ? (
+        <Card>
+          <CardContent className="py-12 text-center text-muted-foreground">
+            No {selectedStatus} bookings.
+          </CardContent>
+        </Card>
       ) : (
         <div className="space-y-8">
-          {bookings.map((booking) => {
+          {visibleBookings.map((booking) => {
             const route = getRouteDetails(booking.routeId);
+            const isExpired = booking.displayStatus === "expired";
+            const isProcessing = booking.displayStatus === "processing";
             
             let duration = "—";
             if (route?.startTime && route?.endTime) {
@@ -120,8 +200,13 @@ export default function MyBookings() {
                             {route?.routeName || "Express Route"}
                           </p>
                         </div>
-                        <Badge className="bg-gradient-to-r from-emerald-500 to-teal-500 text-white px-5 py-1.5 text-sm font-medium shadow">
-                          CONFIRMED
+                        <Badge className={isProcessing
+                          ? "bg-amber-500 text-white px-5 py-1.5 text-sm font-medium shadow"
+                          : isExpired
+                            ? "bg-rose-600 text-white px-5 py-1.5 text-sm font-medium shadow"
+                            : "bg-gradient-to-r from-emerald-500 to-teal-500 text-white px-5 py-1.5 text-sm font-medium shadow"}
+                        >
+                          {booking.displayStatus.toUpperCase()}
                         </Badge>
                       </div>
 
@@ -154,7 +239,7 @@ export default function MyBookings() {
                         </div>
                         <div>
                           <p className="text-xs text-muted-foreground">BOOKED ON</p>
-                          <p className="font-medium mt-1 text-gray-700">{formatDateTime(booking.bookingDate)}</p>
+                          <p className="font-medium mt-1 text-gray-700">{booking.bookingDate ? formatDateTime(booking.bookingDate) : "—"}</p>
                         </div>
                         <div>
                           <p className="text-xs text-muted-foreground">BOOKING ID</p>
@@ -170,8 +255,8 @@ export default function MyBookings() {
                         </div>
                         <div>
                           <p className="text-xs text-muted-foreground">PAYMENT</p>
-                          <p className="font-semibold mt-1 text-emerald-700">
-                            {booking.paymentStatus === "SUCCEEDED" ? "Successful" : booking.status}
+                          <p className={`font-semibold mt-1 ${isProcessing ? "text-amber-700" : "text-emerald-700"}`}>
+                            {isProcessing ? "Processing" : booking.paymentStatus === "SUCCEEDED" ? "Successful" : booking.status}
                           </p>
                         </div>
                         <div>
@@ -187,23 +272,33 @@ export default function MyBookings() {
 
                     {/* QR Code Section - More Vibrant */}
                     <div className="lg:w-80 flex flex-col items-center justify-center bg-gradient-to-br from-white to-blue-50 rounded-3xl p-8 border border-blue-100">
-                      <div className="bg-white p-5 rounded-3xl shadow-xl">
-                        <TicketQRCode
-                          value={`Ticket ID: ${booking.bookingId}\nBus: ${booking.busNo}\nSeat: ${booking.seat}\nRoute: ${route ? `${route.startStop} → ${route.endStop}` : booking.routeId}`}
-                          size={170}
-                        />
-                      </div>
-                      <p className="text-center text-xs text-slate-500 mt-4">Scan at boarding point</p>
+                      {isProcessing ? (
+                        <>
+                          <Clock className="h-12 w-12 text-amber-600" />
+                          <p className="mt-4 text-center font-semibold text-slate-800">Payment is processing</p>
+                          <p className="mt-2 text-center text-sm text-slate-500">Your ticket will be available after payment is confirmed.</p>
+                        </>
+                      ) : (
+                        <>
+                          <div className="bg-white p-5 rounded-3xl shadow-xl">
+                            <TicketQRCode
+                              value={`Ticket ID: ${booking.bookingId}\nBus: ${booking.busNo}\nSeat: ${booking.seat}\nRoute: ${route ? `${route.startStop} → ${route.endStop}` : booking.routeId}`}
+                              size={170}
+                            />
+                          </div>
+                          <p className="text-center text-xs text-slate-500 mt-4">Scan at boarding point</p>
 
-                      <Button
-                        variant="destructive"
-                        size="lg"
-                        className="mt-8 w-full bg-gradient-to-r from-red-500 to-rose-600 hover:from-red-600 hover:to-rose-700 shadow-lg"
-                        onClick={() => handleCancelClick(booking.bookingId)}
-                      >
-                        <Trash2 className="mr-2 h-5 w-5" />
-                        Cancel Ticket
-                      </Button>
+                          <Button
+                            variant="destructive"
+                            size="lg"
+                            className="mt-8 w-full bg-gradient-to-r from-red-500 to-rose-600 hover:from-red-600 hover:to-rose-700 shadow-lg"
+                            onClick={() => handleCancelClick(booking.bookingId)}
+                          >
+                            <Trash2 className="mr-2 h-5 w-5" />
+                            Cancel Ticket
+                          </Button>
+                        </>
+                      )}
                     </div>
                   </div>
                 </CardContent>
