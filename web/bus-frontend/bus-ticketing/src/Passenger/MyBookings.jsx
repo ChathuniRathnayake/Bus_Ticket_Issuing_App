@@ -4,7 +4,8 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Bus, Ticket, Trash2, Clock } from "lucide-react";
+import { ArrowLeft, Bus, Download, FileText, Ticket, Trash2, Clock } from "lucide-react";
+import QRCode from "qrcode";
 import TicketQRCode from "@/components/TicketQRCode";
 import { fetchPassengerBookings } from "@/utils/bookings";
 
@@ -99,6 +100,69 @@ export default function MyBookings() {
   };
 
   const getRouteDetails = (routeId) => routes.find((r) => r.routeId === routeId);
+  const getQrValue = (booking, route) => (
+    `Ticket ID: ${booking.bookingId}\nBus: ${booking.busNo}\nSeat: ${booking.seat}\nRoute: ${route ? `${route.startStop} to ${route.endStop}` : booking.routeId}`
+  );
+  const getExportFilename = (booking) => String(booking.bookingId || "ticket").replace(/[^a-z0-9_-]/gi, "-");
+
+  const saveQrAsImage = async (booking, route) => {
+    try {
+      const dataUrl = await QRCode.toDataURL(getQrValue(booking, route), {
+        width: 600,
+        margin: 2,
+        color: { dark: "#0f172a", light: "#ffffff" },
+      });
+      const link = document.createElement("a");
+      link.href = dataUrl;
+      link.download = `${getExportFilename(booking)}-qr.png`;
+      link.click();
+    } catch (error) {
+      console.error("QR image export failed:", error);
+      window.alert("Could not save the QR image. Please try again.");
+    }
+  };
+
+  const saveTicketAsPdf = async (booking, route) => {
+    try {
+      const [{ jsPDF }, qrDataUrl] = await Promise.all([
+        import("jspdf"),
+        QRCode.toDataURL(getQrValue(booking, route), {
+          width: 600,
+          margin: 2,
+          color: { dark: "#0f172a", light: "#ffffff" },
+        }),
+      ]);
+      const pdf = new jsPDF();
+      const routeName = route
+        ? `${route.startStop} to ${route.endStop}`
+        : `${booking.startStop || "Starting point"} to ${booking.endStop || "Destination"}`;
+      const amount = booking.amountCents == null
+        ? "—"
+        : `${(booking.amountCents / 100).toFixed(2)} ${(booking.currency || "").toUpperCase()}`.trim();
+
+      pdf.setFontSize(20);
+      pdf.text("TicketGo Bus Ticket", 20, 22);
+      pdf.addImage(qrDataUrl, "PNG", 20, 32, 75, 75);
+      pdf.setFontSize(11);
+      pdf.text([
+        `Route: ${routeName}`,
+        `Date: ${booking.date || route?.date || "—"}`,
+        `Departure: ${booking.departureTime || route?.startTime || "—"}`,
+        `Boarding: ${booking.boardingStop || "—"}`,
+        `Drop-off: ${booking.dropStop || "—"}`,
+        `Bus: ${booking.busNo || booking.busId || "—"}`,
+        `Seat: ${booking.seat || "—"}`,
+        `Booking reference: ${booking.bookingId || "—"}`,
+        `Payment: ${booking.paymentStatus === "SUCCEEDED" ? "Successful" : booking.status || "Confirmed"}`,
+        `Amount paid: ${amount}`,
+      ], 20, 125);
+      pdf.save(`${getExportFilename(booking)}-ticket.pdf`);
+    } catch (error) {
+      console.error("Ticket PDF export failed:", error);
+      window.alert("Could not save the ticket PDF. Please try again.");
+    }
+  };
+
   const bookingItems = bookings.map((booking) => {
     const route = getRouteDetails(booking.routeId);
     const departureAt = new Date(`${booking.date || route?.date || ""}T${booking.departureTime || route?.startTime || ""}`);
@@ -322,11 +386,20 @@ export default function MyBookings() {
                         <>
                           <div className="bg-white p-5 rounded-3xl shadow-xl">
                             <TicketQRCode
-                              value={`Ticket ID: ${booking.bookingId}\nBus: ${booking.busNo}\nSeat: ${booking.seat}\nRoute: ${route ? `${route.startStop} → ${route.endStop}` : booking.routeId}`}
+                              value={getQrValue(booking, route)}
                               size={170}
                             />
                           </div>
                           <p className="text-center text-xs text-slate-500 mt-4">Scan at boarding point</p>
+
+                          <div className="mt-5 grid w-full gap-2">
+                            <Button variant="outline" size="sm" onClick={() => saveQrAsImage(booking, route)}>
+                              <Download className="mr-2 h-4 w-4" /> Save QR as image
+                            </Button>
+                            <Button variant="outline" size="sm" onClick={() => saveTicketAsPdf(booking, route)}>
+                              <FileText className="mr-2 h-4 w-4" /> Save QR as PDF
+                            </Button>
+                          </div>
 
                           <Button
                             variant="destructive"
