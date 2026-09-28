@@ -15,6 +15,7 @@ export default function SearchBuses() {
   const [routes, setRoutes] = useState([]);
   const [schedules, setSchedules] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [currentTime, setCurrentTime] = useState(() => new Date());
 
   const [startStopFilter, setStartStopFilter] = useState("");
   const [endStopFilter, setEndStopFilter] = useState("");
@@ -23,6 +24,11 @@ export default function SearchBuses() {
   const [dateFilter, setDateFilter] = useState("");
 
   const token = localStorage.getItem("token");
+
+  useEffect(() => {
+    const interval = window.setInterval(() => setCurrentTime(new Date()), 30_000);
+    return () => window.clearInterval(interval);
+  }, []);
 
   // Fetch data
   useEffect(() => {
@@ -81,7 +87,8 @@ export default function SearchBuses() {
         route,
       };
     })
-    .filter(Boolean);
+    .filter(Boolean)
+    .filter((trip) => new Date(`${trip.tripDate}T${trip.departureTime}`) > currentTime);
 
   const getStops = (route) => {
     if (Array.isArray(route?.stops) && route.stops.length > 0) {
