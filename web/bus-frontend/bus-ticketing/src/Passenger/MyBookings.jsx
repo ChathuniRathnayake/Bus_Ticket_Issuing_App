@@ -30,6 +30,7 @@ export default function MyBookings() {
   const requestedStatus = searchParams.get("status");
   const validStatuses = ["all", "confirmed", "processing", "expired"];
   const selectedStatus = validStatuses.includes(requestedStatus) ? requestedStatus : "all";
+  const selectedBookingId = searchParams.get("bookingId");
 
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -46,6 +47,11 @@ export default function MyBookings() {
     }, 30_000);
     return () => window.clearInterval(interval);
   }, []);
+
+  useEffect(() => {
+    if (!selectedBookingId) return;
+    document.getElementById(`booking-detail-${selectedBookingId}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [selectedBookingId]);
 
   const handleCancelClick = (bookingId) => {
     setCancelBookingId(bookingId);
@@ -103,6 +109,7 @@ export default function MyBookings() {
 
   const selectStatus = (status) => {
     const nextParams = new URLSearchParams(searchParams);
+    nextParams.delete("bookingId");
     if (status === "all") nextParams.delete("status");
     else nextParams.set("status", status);
     setSearchParams(nextParams);
@@ -194,7 +201,8 @@ export default function MyBookings() {
             return (
               <Card 
                 key={booking.bookingId} 
-                className="overflow-hidden shadow-2xl border-0 bg-gradient-to-br from-slate-50 via-white to-blue-50 hover:shadow-3xl transition-all duration-300"
+                id={`booking-detail-${booking.bookingId || booking.paymentId}`}
+                className={`overflow-hidden shadow-2xl border-0 bg-gradient-to-br from-slate-50 via-white to-blue-50 hover:shadow-3xl transition-all duration-300 ${selectedBookingId === (booking.bookingId || booking.paymentId) ? "ring-2 ring-blue-500" : ""}`}
               >
                 <CardContent className="p-8">
                   <div className="flex flex-col lg:flex-row gap-10">

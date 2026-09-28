@@ -51,6 +51,14 @@ export default function PassengerDashboard() {
     const departure = getDepartureDate(booking, route);
     return departure && departure > currentTime;
   }).length;
+  const expiredBookings = confirmedBookings
+    .map((booking) => {
+      const route = routes.find((item) => item.routeId === booking.routeId);
+      return { ...booking, route, departureAt: getDepartureDate(booking, route), displayStatus: "expired" };
+    })
+    .filter((booking) => booking.departureAt && booking.departureAt <= currentTime)
+    .sort((first, second) => second.departureAt - first.departureAt);
+  const recentExpiredBookings = expiredBookings.slice(0, 5);
 
   // Fetch routes from backend
   useEffect(() => {
@@ -119,7 +127,7 @@ export default function PassengerDashboard() {
       .filter(isConfirmedBooking)
       .map((booking) => {
         const route = routes.find((item) => item.routeId === booking.routeId);
-        return { ...booking, route, departureAt: getDepartureDate(booking, route) };
+        return { ...booking, route, departureAt: getDepartureDate(booking, route), displayStatus: "confirmed" };
       });
 
     if (pendingPayment && !bookings.some((booking) => booking.bookingId === pendingPayment.bookingId)) {
@@ -173,6 +181,12 @@ export default function PassengerDashboard() {
     window.addEventListener("storage", syncBookings);
     return () => window.removeEventListener("storage", syncBookings);
   }, []);
+
+  const getBookingDetailsPath = (booking) => {
+    const bookingId = booking.bookingId || booking.paymentId;
+    const params = new URLSearchParams({ status: booking.displayStatus, bookingId });
+    return `/passenger-dashboard/my-bookings?${params.toString()}`;
+  };
 
   return (
     <div className={`min-h-screen bg-gradient-to-br from-zinc-50 to-zinc-100 dark:from-zinc-950 dark:to-zinc-900 transition-colors duration-300`}>
@@ -303,9 +317,10 @@ export default function PassengerDashboard() {
                   const startStop = booking.startStop || booking.route?.startStop || "Starting point";
                   const endStop = booking.endStop || booking.route?.endStop || "Destination";
                   return (
-                    <div
+                    <Link
+                      to={getBookingDetailsPath(booking)}
                       key={booking.bookingId || booking.paymentId}
-                      className="flex flex-col gap-4 rounded-lg border border-blue-200 bg-card p-5 sm:flex-row sm:items-center sm:justify-between"
+                      className="flex w-full flex-col gap-4 rounded-lg border border-blue-200 bg-card p-5 text-left text-foreground no-underline transition hover:border-blue-400 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 sm:flex-row sm:items-center sm:justify-between"
                     >
                       <div>
                         <p className="text-xs font-semibold uppercase text-muted-foreground">
@@ -324,7 +339,7 @@ export default function PassengerDashboard() {
                       >
                         {isProcessing ? "PROCESSING" : "CONFIRMED"}
                       </Badge>
-                    </div>
+                    </Link>
                   );
                 })}
               </div>
@@ -349,31 +364,55 @@ export default function PassengerDashboard() {
 
         {/* Recent Activity */}
         <Card>
-          <CardHeader>
-            <CardTitle>Recent Activity</CardTitle>
-            <CardDescription>Your latest travels</CardDescription>
+          <CardHeader className="flex flex-row items-center justify-between gap-4">
+            <div>
+              <CardTitle>Recent Activity</CardTitle>
+              <CardDescription>Most recent expired bookings</CardDescription>
+            </div>
+            {expiredBookings.length > 0 && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => navigate("/passenger-dashboard/my-bookings?status=expired")}
+              >
+                View all ({expiredBookings.length})
+              </Button>
+            )}
           </CardHeader>
           <CardContent>
-            <div className="relative space-y-0 before:absolute before:bottom-8 before:left-6 before:top-8 before:w-px before:bg-border">
-              {[
-                { route: "Negombo → Colombo Fort", date: "Yesterday", status: "Completed", bus: "NB-2341" },
-                { route: "Kandy → Nuwara Eliya", date: "3 days ago", status: "Completed", bus: "NB-7890" },
-                { route: "Colombo → Galle", date: "Feb 25, 2026", status: "Completed", bus: "NB-1122" },
-              ].map((item, i) => (
-                <div key={`${item.bus}-${i}`} className="relative flex items-center justify-between gap-4 border-b py-5 last:border-0">
-                  <div className="flex items-center gap-4">
-                    <div className="z-10 flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border-4 border-card bg-emerald-100 dark:bg-emerald-900">
-                      <Bus className="h-6 w-6 text-emerald-600" />
+            {expiredBookings.length === 0 ? (
+              <p className="py-8 text-center text-muted-foreground">No expired bookings yet.</p>
+            ) : (
+              <div className="divide-y">
+                {recentExpiredBookings.map((booking) => (
+                  <Link
+                    key={booking.bookingId}
+                    to={getBookingDetailsPath(booking)}
+                    className="flex w-full flex-col gap-3 py-5 text-left text-foreground no-underline transition hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 sm:flex-row sm:items-center sm:justify-between"
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-rose-100 dark:bg-rose-950">
+                        <Bus className="h-5 w-5 text-rose-600" />
+                      </div>
+                      <div>
+                        <p className="font-medium">
+                          {booking.startStop || booking.route?.startStop || "Starting point"} → {booking.endStop || booking.route?.endStop || "Destination"}
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          Bus {booking.busNo || booking.busId || "—"} · Seat {booking.seat || "—"}
+                        </p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="font-medium">{item.route}</p>
-                      <p className="text-sm text-muted-foreground">{item.bus} • {item.date}</p>
+                    <div className="flex items-center gap-3 sm:pl-4">
+                      <p className="text-sm text-muted-foreground">
+                        {booking.departureAt.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}
+                      </p>
+                      <Badge className="bg-rose-600 text-white hover:bg-rose-600">Expired</Badge>
                     </div>
-                  </div>
-                  <Badge variant="secondary" className="px-4 py-1.5">Completed</Badge>
-                </div>
-              ))}
-            </div>
+                  </Link>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
 
