@@ -4,14 +4,19 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
+import { fetchPassengerBookings } from "@/utils/bookings";
 import { 
   Search, Ticket, User, LogOut, Bus, Calendar, Clock, MapPin, 
   Sun, Moon, ArrowRight 
 } from "lucide-react";
 
 function isConfirmedBooking(booking) {
-  return String(booking.status || "").toUpperCase() === "CONFIRMED"
+  return ["CONFIRMED", "BOOKED"].includes(String(booking.status || "").toUpperCase())
     || String(booking.paymentStatus || "").toUpperCase() === "SUCCEEDED";
+}
+
+function isProcessingBooking(booking) {
+  return ["PENDING_PAYMENT", "CHECKOUT_CREATED"].includes(String(booking.status || "").toUpperCase());
 }
 
 function getDepartureDate(booking, route) {
@@ -43,8 +48,9 @@ export default function PassengerDashboard() {
   const [currentTime, setCurrentTime] = useState(() => new Date());
 
   const confirmedBookings = bookings.filter(isConfirmedBooking);
-  const totalBookingCount = confirmedBookings.length + (
-    pendingPayment && !confirmedBookings.some((booking) => booking.bookingId === pendingPayment.bookingId) ? 1 : 0
+  const processingBookings = bookings.filter(isProcessingBooking);
+  const totalBookingCount = confirmedBookings.length + processingBookings.length + (
+    pendingPayment && !bookings.some((booking) => booking.bookingId === pendingPayment.bookingId) ? 1 : 0
   );
   const upcomingBookingCount = confirmedBookings.filter((booking) => {
     const route = routes.find((item) => item.routeId === booking.routeId);
@@ -77,6 +83,24 @@ export default function PassengerDashboard() {
       }
     };
     fetchRoutes();
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    const syncBookings = async () => {
+      const token = localStorage.getItem("token");
+      if (!token) return;
+      try {
+        const savedBookings = await fetchPassengerBookings(token);
+        if (!active) return;
+        setBookings(savedBookings);
+        localStorage.setItem("userBookings", JSON.stringify(savedBookings));
+      } catch (error) {
+        console.error("Failed to restore passenger bookings:", error);
+      }
+    };
+    syncBookings();
+    return () => { active = false; };
   }, []);
 
   useEffect(() => {
@@ -124,10 +148,15 @@ export default function PassengerDashboard() {
   // Keep upcoming confirmed and processing trips together in departure order.
   useEffect(() => {
     const trips = bookings
-      .filter(isConfirmedBooking)
+      .filter((booking) => isConfirmedBooking(booking) || isProcessingBooking(booking))
       .map((booking) => {
         const route = routes.find((item) => item.routeId === booking.routeId);
-        return { ...booking, route, departureAt: getDepartureDate(booking, route), displayStatus: "confirmed" };
+        return {
+          ...booking,
+          route,
+          departureAt: getDepartureDate(booking, route),
+          displayStatus: isProcessingBooking(booking) ? "processing" : "confirmed",
+        };
       });
 
     if (pendingPayment && !bookings.some((booking) => booking.bookingId === pendingPayment.bookingId)) {

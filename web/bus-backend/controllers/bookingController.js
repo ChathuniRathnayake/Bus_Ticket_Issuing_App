@@ -58,9 +58,31 @@ export const getMyBookings = async (req, res) => {
       .where("userId", "==", userId)
       .get();
 
-    const bookings = snapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
+    const bookings = await Promise.all(snapshot.docs.map(async (doc) => {
+      const booking = doc.data();
+      const [scheduleDoc, busDoc, routeDoc] = await Promise.all([
+        booking.scheduleId ? db.collection("schedules").doc(booking.scheduleId).get() : Promise.resolve(null),
+        booking.busId ? db.collection("buses").doc(booking.busId).get() : Promise.resolve(null),
+        booking.routeId ? db.collection("routes").doc(booking.routeId).get() : Promise.resolve(null),
+      ]);
+      const schedule = scheduleDoc?.exists ? scheduleDoc.data() : {};
+      const bus = busDoc?.exists ? busDoc.data() : {};
+      const route = routeDoc?.exists ? routeDoc.data() : {};
+      const createdAt = booking.createdAt?.toDate?.().toISOString?.() || booking.createdAt || null;
+
+      return {
+        ...booking,
+        id: doc.id,
+        bookingId: doc.id,
+        seat: booking.seat || booking.seatNumber || booking.seatNo,
+        date: booking.date || schedule.date,
+        departureTime: booking.departureTime || schedule.departureTime,
+        busNo: booking.busNo || bus.busNo,
+        startStop: booking.startStop || route.startStop,
+        endStop: booking.endStop || route.endStop,
+        routeName: booking.routeName || route.routeName,
+        bookingDate: booking.bookingDate || createdAt,
+      };
     }));
 
     res.json(bookings);

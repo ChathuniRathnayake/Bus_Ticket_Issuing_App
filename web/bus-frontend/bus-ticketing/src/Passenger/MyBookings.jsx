@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, Bus, Ticket, Trash2, Clock } from "lucide-react";
 import TicketQRCode from "@/components/TicketQRCode";
+import { fetchPassengerBookings } from "@/utils/bookings";
 
 function getRoutes() {
   return JSON.parse(localStorage.getItem("routes")) || [];
@@ -39,6 +40,24 @@ export default function MyBookings() {
       return;
     }
   }, [navigate]);
+
+  useEffect(() => {
+    let active = true;
+    const restoreBookings = async () => {
+      const token = localStorage.getItem("token");
+      if (!token) return;
+      try {
+        const savedBookings = await fetchPassengerBookings(token);
+        if (!active) return;
+        setBookings(savedBookings);
+        localStorage.setItem("userBookings", JSON.stringify(savedBookings));
+      } catch (error) {
+        console.error("Failed to restore passenger bookings:", error);
+      }
+    };
+    restoreBookings();
+    return () => { active = false; };
+  }, []);
 
   useEffect(() => {
     const interval = window.setInterval(() => {
@@ -83,9 +102,12 @@ export default function MyBookings() {
   const bookingItems = bookings.map((booking) => {
     const route = getRouteDetails(booking.routeId);
     const departureAt = new Date(`${booking.date || route?.date || ""}T${booking.departureTime || route?.startTime || ""}`);
+    const isProcessing = ["PENDING_PAYMENT", "CHECKOUT_CREATED"].includes(String(booking.status || "").toUpperCase());
     return {
       ...booking,
-      displayStatus: !Number.isNaN(departureAt.getTime()) && departureAt <= currentTime ? "expired" : "confirmed",
+      displayStatus: isProcessing
+        ? "processing"
+        : !Number.isNaN(departureAt.getTime()) && departureAt <= currentTime ? "expired" : "confirmed",
     };
   });
 
