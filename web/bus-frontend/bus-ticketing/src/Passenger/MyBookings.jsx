@@ -1,6 +1,6 @@
 // src/Passenger/MyBookings.jsx
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -21,12 +21,15 @@ function getPendingPayment() {
 
 export default function MyBookings() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [bookings, setBookings] = useState(() => JSON.parse(localStorage.getItem("userBookings") || "[]"));
   const [routes] = useState(getRoutes);
   const [pendingPayment, setPendingPayment] = useState(getPendingPayment);
   const [cancelBookingId, setCancelBookingId] = useState(null);
   const [currentTime, setCurrentTime] = useState(() => new Date());
-  const [selectedStatus, setSelectedStatus] = useState("all");
+  const requestedStatus = searchParams.get("status");
+  const validStatuses = ["all", "confirmed", "processing", "expired"];
+  const selectedStatus = validStatuses.includes(requestedStatus) ? requestedStatus : "all";
 
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -98,6 +101,13 @@ export default function MyBookings() {
     ? bookingItems
     : bookingItems.filter((booking) => booking.displayStatus === selectedStatus);
 
+  const selectStatus = (status) => {
+    const nextParams = new URLSearchParams(searchParams);
+    if (status === "all") nextParams.delete("status");
+    else nextParams.set("status", status);
+    setSearchParams(nextParams);
+  };
+
   return (
     <div className="max-w-6xl mx-auto p-6 animate-fade-in">
       {/* Header */}
@@ -135,7 +145,7 @@ export default function MyBookings() {
                 type="button"
                 variant={selectedStatus === filter.value ? "default" : "outline"}
                 aria-pressed={selectedStatus === filter.value}
-                onClick={() => setSelectedStatus(filter.value)}
+                onClick={() => selectStatus(filter.value)}
               >
                 {filter.label} ({count})
               </Button>
@@ -162,7 +172,7 @@ export default function MyBookings() {
       ) : visibleBookings.length === 0 ? (
         <Card>
           <CardContent className="py-12 text-center text-muted-foreground">
-            No {selectedStatus} bookings.
+            No bookings in {statusFilters.find((filter) => filter.value === selectedStatus)?.label.toLowerCase() || "this filter"}.
           </CardContent>
         </Card>
       ) : (
