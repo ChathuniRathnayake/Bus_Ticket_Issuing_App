@@ -9,8 +9,6 @@ import {
   Sun, Moon, ArrowRight 
 } from "lucide-react";
 
-const qrPattern = ["1110101", "1011101", "1110101", "0001010", "1101101", "1010011", "1110111"];
-
 function isConfirmedBooking(booking) {
   return String(booking.status || "").toUpperCase() === "CONFIRMED"
     || String(booking.paymentStatus || "").toUpperCase() === "SUCCEEDED";
@@ -33,16 +31,6 @@ function getPendingPayment() {
   }
 }
 
-function QrPlaceholder() {
-  return (
-    <div className="grid aspect-square w-16 grid-cols-7 gap-[2px] rounded bg-white p-1" aria-label="Ticket QR placeholder">
-      {qrPattern.flatMap((row, rowIndex) => [...row].map((cell, cellIndex) => (
-        <span key={`${rowIndex}-${cellIndex}`} className={cell === "1" ? "bg-zinc-900" : "bg-white"} />
-      )))}
-    </div>
-  );
-}
-
 export default function PassengerDashboard() {
   const navigate = useNavigate();
   const [darkMode, setDarkMode] = useState(false);
@@ -50,7 +38,7 @@ export default function PassengerDashboard() {
   const [bookings, setBookings] = useState(() => JSON.parse(localStorage.getItem("userBookings") || "[]"));
   const [pendingPayment, setPendingPayment] = useState(getPendingPayment);
   const [routes, setRoutes] = useState([]);
-  const [upcomingBooking, setUpcomingBooking] = useState(null);
+  const [upcomingBookings, setUpcomingBookings] = useState([]);
   const [countdown, setCountdown] = useState("");
   const [currentTime, setCurrentTime] = useState(() => new Date());
 
@@ -93,13 +81,10 @@ export default function PassengerDashboard() {
 
   // Calculate countdown timer
   useEffect(() => {
-    if (!upcomingBooking) return;
+    if (upcomingBookings.length === 0) return;
 
     const calculateTimer = () => {
-      const route = routes.find((r) => r.routeId === upcomingBooking.routeId);
-      if (!route) return;
-
-      const bookingDate = upcomingBooking.departureAt || getDepartureDate(upcomingBooking, route);
+      const bookingDate = upcomingBookings[0].departureAt;
       if (!bookingDate) return;
       const now = new Date();
       const diff = bookingDate - now;
@@ -126,23 +111,35 @@ export default function PassengerDashboard() {
     calculateTimer();
     const timer = setInterval(calculateTimer, 1000);
     return () => clearInterval(timer);
-  }, [upcomingBooking, routes]);
+  }, [upcomingBookings]);
 
-  // Find the next confirmed trip that has not departed.
+  // Keep upcoming confirmed and processing trips together in departure order.
   useEffect(() => {
-    const upcoming = bookings
+    const trips = bookings
       .filter(isConfirmedBooking)
       .map((booking) => {
         const route = routes.find((item) => item.routeId === booking.routeId);
         return { ...booking, route, departureAt: getDepartureDate(booking, route) };
-      })
-      .filter((booking) => booking.route && booking.departureAt && booking.departureAt > currentTime)
-      .sort((first, second) => first.departureAt - second.departureAt)[0];
+      });
 
-    // This effect synchronizes the next trip with bookings, routes, and current time.
+    if (pendingPayment && !bookings.some((booking) => booking.bookingId === pendingPayment.bookingId)) {
+      const route = routes.find((item) => item.routeId === pendingPayment.routeId);
+      trips.push({
+        ...pendingPayment,
+        route,
+        departureAt: getDepartureDate(pendingPayment, route),
+        displayStatus: "processing",
+      });
+    }
+
+    const upcoming = trips
+      .filter((booking) => booking.departureAt && booking.departureAt > currentTime)
+      .sort((first, second) => first.departureAt - second.departureAt);
+
+    // This effect synchronizes the trip summaries with bookings, routes, and current time.
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    setUpcomingBooking(upcoming || null);
-  }, [bookings, routes, currentTime]);
+    setUpcomingBookings(upcoming);
+  }, [bookings, pendingPayment, routes, currentTime]);
 
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -281,62 +278,66 @@ export default function PassengerDashboard() {
           </Card>
         </div>
 
-        {/* Upcoming Trip Highlight */}
-        {upcomingBooking && upcomingBooking.route ? (
-          <Card className="mb-10 border-0 shadow-2xl bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950 dark:to-indigo-950">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-3 text-2xl">
-                <Clock className="h-7 w-7 text-blue-600" />
-                Your Next Journey
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="pb-8">
-              <div className="overflow-hidden rounded-xl border border-dashed border-blue-300 bg-card shadow-sm">
-                <div className="grid md:grid-cols-[1fr_auto]">
-                  <div className="p-6 sm:p-8">
-                    <div className="flex flex-wrap items-start justify-between gap-5">
+        {/* Upcoming Trip Summaries */}
+        <Card className="mb-10 border-0 shadow-2xl bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950 dark:to-indigo-950">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-3 text-2xl">
+              <Clock className="h-7 w-7 text-blue-600" />
+              Your Next Journey
+            </CardTitle>
+            <CardDescription>Confirmed and processing bookings, ordered by departure time.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-5 pb-8">
+            {upcomingBookings.length > 0 ? (
+              <div className="space-y-3">
+                {upcomingBookings.map((booking) => {
+                  const isProcessing = booking.displayStatus === "processing";
+                  const startStop = booking.startStop || booking.route?.startStop || "Starting point";
+                  const endStop = booking.endStop || booking.route?.endStop || "Destination";
+                  return (
+                    <div
+                      key={booking.bookingId || booking.paymentId}
+                      className="flex flex-col gap-4 rounded-lg border border-blue-200 bg-card p-5 sm:flex-row sm:items-center sm:justify-between"
+                    >
                       <div>
-                        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-blue-600">Boarding pass</p>
-                        <h3 className="mt-3 text-2xl font-bold sm:text-3xl">{upcomingBooking.route.startStop} <span className="text-blue-500">→</span> {upcomingBooking.route.endStop}</h3>
+                        <p className="text-xs font-semibold uppercase text-muted-foreground">
+                          {booking.date || booking.route?.date || "Date unavailable"} · {booking.departureTime || booking.route?.startTime || "Time unavailable"}
+                        </p>
+                        <h3 className="mt-2 text-xl font-bold text-foreground">
+                          {startStop} <span className="text-blue-500">→</span> {endStop}
+                        </h3>
+                        <p className="mt-2 text-sm text-muted-foreground">
+                          Bus {booking.busNo || booking.busId || "—"} · Seat {booking.seat || "—"}
+                        </p>
                       </div>
-                      <QrPlaceholder />
+                      <Badge className={isProcessing
+                        ? "w-fit bg-amber-500 text-white hover:bg-amber-500"
+                        : "w-fit bg-emerald-600 text-white hover:bg-emerald-600"}
+                      >
+                        {isProcessing ? "PROCESSING" : "CONFIRMED"}
+                      </Badge>
                     </div>
-                    <div className="mt-7 grid grid-cols-2 gap-5 border-t border-dashed pt-5 sm:grid-cols-3">
-                      <div><p className="text-xs uppercase text-muted-foreground">Departure</p><p className="mt-1 text-xl font-semibold">{upcomingBooking.departureTime || upcomingBooking.route.startTime}</p></div>
-                      <div><p className="text-xs uppercase text-muted-foreground">Travel date</p><p className="mt-1 text-sm font-semibold">{upcomingBooking.date || upcomingBooking.route.date}</p></div>
-                      <div><p className="text-xs uppercase text-muted-foreground">Bus · Seat</p><p className="mt-1 text-sm font-semibold">{upcomingBooking.busNo} · {upcomingBooking.seat}</p></div>
-                    </div>
-                  </div>
-                  <div className="flex flex-col justify-center border-t border-dashed border-blue-300 bg-blue-50 p-6 dark:bg-blue-950/30 md:w-56 md:border-l md:border-t-0">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Departure in</p>
-                    <p className="mt-2 text-2xl font-bold text-emerald-700 dark:text-emerald-400">{countdown || "Calculating..."}</p>
-                    <div className="mt-4 flex items-center gap-2 text-xs text-muted-foreground"><Bus className="h-4 w-4" />TicketGo · Passenger</div>
-                  </div>
-                </div>
+                  );
+                })}
               </div>
-            </CardContent>
-          </Card>
-        ) : (
-          <Card className="mb-10 border-0 shadow-2xl bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-950 dark:to-gray-900">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-3 text-2xl">
-                <Clock className="h-7 w-7 text-gray-600" />
-                Your Next Journey
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="pb-8">
-              <div className="text-center py-8">
-                <p className="text-muted-foreground text-lg">No upcoming bookings</p>
-                <Button
-                  className="mt-4 bg-blue-600 hover:bg-blue-700"
-                  onClick={() => navigate("/passenger-dashboard/search-buses")}
-                >
-                  Search & Book a Bus
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        )}
+            ) : (
+              <p className="py-4 text-center text-muted-foreground">No upcoming bookings</p>
+            )}
+            <div className="flex flex-wrap items-center justify-between gap-4 border-t border-blue-200 pt-5">
+              {upcomingBookings.length > 0 && (
+                <p className="text-sm text-muted-foreground">
+                  Next departure in <span className="font-semibold text-emerald-700 dark:text-emerald-400">{countdown || "Calculating..."}</span>
+                </p>
+              )}
+              <Button
+                className="bg-blue-600 hover:bg-blue-700"
+                onClick={() => navigate("/passenger-dashboard/search-buses")}
+              >
+                Search & Book a Bus
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Recent Activity */}
         <Card>
