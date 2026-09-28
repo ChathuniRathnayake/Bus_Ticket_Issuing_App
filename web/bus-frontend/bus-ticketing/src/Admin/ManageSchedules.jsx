@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 
@@ -13,14 +13,15 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { ArrowLeft, Pencil, Trash2, Calendar } from "lucide-react";
+import { ArrowLeft, Pencil, Trash2, Calendar, Plus, Search } from "lucide-react";
 
 export default function ManageSchedules() {
   const navigate = useNavigate();
 
   const [schedules, setSchedules] = useState([]);
-  const [filteredSchedules, setFilteredSchedules] = useState([]);
   const [buses, setBuses] = useState([]);
+  const [routes, setRoutes] = useState([]);
+  const [search, setSearch] = useState("");
 
   const [loading, setLoading] = useState(false);
   const [editId, setEditId] = useState(null);
@@ -36,9 +37,7 @@ export default function ManageSchedules() {
 
   const token = localStorage.getItem("token");
 
-  // 🔥 FETCH EVERYTHING (FIXED)
-  useEffect(() => {
-    const loadData = async () => {
+  const loadData = useCallback(async () => {
       try {
         if (!token) {
           navigate("/admin-login");
@@ -63,6 +62,7 @@ export default function ManageSchedules() {
         const routesData = routeRes.data;
 
         setBuses(busesData);
+        setRoutes(routesData);
 
         const enrichedSchedules = scheduleRes.data.map((schedule) => {
           const bus = busesData.find((b) => b.id === schedule.busId);
@@ -91,7 +91,6 @@ export default function ManageSchedules() {
         });
 
         setSchedules(enrichedSchedules);
-        setFilteredSchedules(enrichedSchedules);
 
       } catch (error) {
         console.error(error);
@@ -99,10 +98,11 @@ export default function ManageSchedules() {
       } finally {
         setLoading(false);
       }
-    };
-
-    loadData();
   }, [navigate, token]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   // EDIT
   const handleEdit = (schedule) => {
@@ -127,12 +127,10 @@ export default function ManageSchedules() {
       );
 
       setEditId(null);
-
-      // refresh
-      window.location.reload();
+      await loadData();
     } catch (error) {
       console.error(error);
-      alert("Failed to update schedule");
+      alert(error.response?.data?.message || "Failed to update schedule");
     }
   };
 
@@ -145,17 +143,22 @@ export default function ManageSchedules() {
         headers: { Authorization: `Bearer ${token}` },
       });
 
-      window.location.reload();
+      await loadData();
     } catch (error) {
       console.error(error);
-      alert("Failed to delete schedule");
+      alert(error.response?.data?.message || "Failed to delete schedule");
     }
   };
+
+  const visibleSchedules = schedules.filter((schedule) =>
+    [schedule.scheduleId, schedule.busNo, schedule.routeName, schedule.date, schedule.status]
+      .some((value) => String(value || "").toLowerCase().includes(search.toLowerCase()))
+  );
 
   return (
     <div className="max-w-6xl mx-auto p-6 animate-fade-in">
       {/* HEADER */}
-      <div className="flex items-center justify-between mb-8">
+      <div className="flex flex-wrap items-center justify-between gap-4 mb-8">
         <Button
           variant="ghost"
           onClick={() => navigate("/admin-dashboard")}
@@ -164,33 +167,33 @@ export default function ManageSchedules() {
           <ArrowLeft className="h-5 w-5" /> Back
         </Button>
 
-        <h2 className="text-3xl font-bold">Manage Schedules</h2>
+        <div className="flex flex-wrap items-center gap-3">
+          <h2 className="text-3xl font-bold">Manage Schedules</h2>
+          <Button onClick={() => navigate("/admin-dashboard/add-schedule")} className="gap-2">
+            <Plus className="h-4 w-4" /> Add Schedule
+          </Button>
+        </div>
 
-        <Input
-          placeholder="Search schedules..."
-          className="w-64"
-          onChange={(e) => {
-            const q = e.target.value.toLowerCase();
-            setFilteredSchedules(
-              schedules.filter((s) =>
-                s.scheduleId?.toLowerCase().includes(q) ||
-                s.busNo?.toLowerCase().includes(q) ||
-                s.routeName?.toLowerCase().includes(q)
-              )
-            );
-          }}
-        />
+        <div className="relative w-full sm:w-64">
+          <Search className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+          <Input
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Search schedules..."
+            className="pl-9"
+          />
+        </div>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>Schedules ({filteredSchedules.length})</CardTitle>
+          <CardTitle>Schedules ({visibleSchedules.length})</CardTitle>
         </CardHeader>
 
         <CardContent>
           {loading ? (
             <p className="text-center py-10">Loading...</p>
-          ) : filteredSchedules.length === 0 ? (
+          ) : visibleSchedules.length === 0 ? (
             <div className="text-center py-10">
               <Calendar className="mx-auto mb-4 opacity-50" />
               <p>No schedules found</p>
@@ -211,7 +214,7 @@ export default function ManageSchedules() {
                 </TableHeader>
 
                 <TableBody>
-                  {filteredSchedules.map((s) => (
+                  {visibleSchedules.map((s) => (
                     <TableRow key={s.id}>
                       <TableCell>{s.scheduleId}</TableCell>
 
@@ -222,6 +225,7 @@ export default function ManageSchedules() {
                             onChange={(e) =>
                               setForm({ ...form, busId: e.target.value })
                             }
+                            className="h-9 rounded-md border border-input bg-background px-2"
                           >
                             {buses.map((b) => (
                               <option key={b.id} value={b.id}>
@@ -235,12 +239,28 @@ export default function ManageSchedules() {
                       </TableCell>
 
                       <TableCell>
-                        <div className="font-medium">{s.routeName}</div>
+                        {editId === s.id ? (
+                          <select
+                            value={form.routeId}
+                            onChange={(e) => setForm({ ...form, routeId: e.target.value })}
+                            className="h-9 max-w-56 rounded-md border border-input bg-background px-2"
+                          >
+                            {routes.map((route) => (
+                              <option key={route.id} value={route.id}>
+                                {route.routeName || `${route.startStop} → ${route.endStop}`}
+                              </option>
+                            ))}
+                          </select>
+                        ) : <div className="font-medium">{s.routeName}</div>}
+                        {editId !== s.id && (
+                          <>
                         <div className="mt-1 max-w-sm whitespace-normal text-xs text-muted-foreground">{s.routeStops}</div>
                         <div className="mt-1 text-xs text-muted-foreground">
                           {s.routeDistance !== "-" ? `${s.routeDistance} km · ` : ""}
                           {s.routeDuration !== "-" ? `${s.routeDuration} estimated` : ""}
                         </div>
+                          </>
+                        )}
                       </TableCell>
 
                       <TableCell>
@@ -274,7 +294,19 @@ export default function ManageSchedules() {
                         )}
                       </TableCell>
 
-                      <TableCell>{s.status}</TableCell>
+                      <TableCell>
+                        {editId === s.id ? (
+                          <select
+                            value={form.status}
+                            onChange={(e) => setForm({ ...form, status: e.target.value })}
+                            className="h-9 rounded-md border border-input bg-background px-2"
+                          >
+                            <option value="Active">Active</option>
+                            <option value="Inactive">Inactive</option>
+                            <option value="Cancelled">Cancelled</option>
+                          </select>
+                        ) : s.status}
+                      </TableCell>
 
                       <TableCell className="flex gap-2">
                         {editId === s.id ? (
