@@ -29,9 +29,14 @@ export default function ManageBookings() {
   const [seatMapError, setSeatMapError] = useState("");
   const [activeView, setActiveView] = useState("layout");
   const [highlightedSeat, setHighlightedSeat] = useState("");
+  const [tripPeriodFilter, setTripPeriodFilter] = useState("all");
+  const [busIdFilter, setBusIdFilter] = useState("");
+  const [routeFilter, setRouteFilter] = useState("");
+  const [startTimeFilter, setStartTimeFilter] = useState("");
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [expandedId, setExpandedId] = useState(null);
+  const [expandedIds, setExpandedIds] = useState(() => new Set());
+  const [bookingFocus, setBookingFocus] = useState(null);
   const [errorMessage, setErrorMessage] = useState("");
 
   const fetchData = useCallback(async () => {
@@ -111,7 +116,42 @@ export default function ManageBookings() {
     fetchData();
   }, [fetchData]);
 
-  const selectedSeatMapTrip = seatMapTrips.find((trip) => trip.scheduleId === selectedScheduleId);
+  const getTripDepartureTimestamp = (trip) => {
+    const date = trip.schedule?.date || trip.date;
+    const time = trip.schedule?.departureTime || trip.departureTime || "23:59:59";
+    const timestamp = date ? new Date(`${date}T${time}`).getTime() : null;
+    return Number.isFinite(timestamp) ? timestamp : null;
+  };
+
+  const matchesTripFilters = (trip) => {
+    const busId = trip.schedule?.busId || trip.busId || trip.id;
+    const routeId = trip.schedule?.routeId || trip.routeId || trip.route?.routeId || trip.route?.id;
+    const departureTime = trip.schedule?.departureTime || trip.departureTime || "";
+    if (busIdFilter && String(busId) !== busIdFilter) return false;
+    if (routeFilter && String(routeId) !== routeFilter) return false;
+    if (startTimeFilter && departureTime !== startTimeFilter) return false;
+
+    const departureTimestamp = getTripDepartureTimestamp(trip);
+    if (tripPeriodFilter === "upcoming" && (departureTimestamp === null || departureTimestamp < Date.now())) return false;
+    if (tripPeriodFilter === "expired" && (departureTimestamp === null || departureTimestamp >= Date.now())) return false;
+    return true;
+  };
+
+  const filteredSeatMapTrips = seatMapTrips.filter(matchesTripFilters);
+  const selectedSeatMapTrip = filteredSeatMapTrips.find((trip) => trip.scheduleId === selectedScheduleId)
+    || filteredSeatMapTrips[0];
+  const busIdOptions = [...new Map(seatMapTrips.map((trip) => {
+    const id = String(trip.schedule?.busId || trip.id || trip.busId);
+    return [id, { id, label: `${trip.busId || trip.id || id} · ${trip.busNo || "Bus"}` }];
+  })).values()].sort((first, second) => first.label.localeCompare(second.label));
+  const routeOptions = [...new Map(seatMapTrips.map((trip) => {
+    const id = String(trip.schedule?.routeId || trip.route?.routeId || trip.route?.id || "");
+    const label = trip.route?.routeName || `${trip.route?.startStop || "Route"} → ${trip.route?.endStop || "Destination"}`;
+    return [id, { id, label: `${label} · ${id}` }];
+  }).filter(([id]) => id)).values()].sort((first, second) => first.label.localeCompare(second.label));
+  const startTimeOptions = [...new Set(seatMapTrips
+    .map((trip) => trip.schedule?.departureTime || trip.departureTime)
+    .filter(Boolean))].sort();
 
   useEffect(() => {
     if (!selectedSeatMapTrip?.scheduleId || !(selectedSeatMapTrip.id || selectedSeatMapTrip.busId)) {
@@ -164,11 +204,60 @@ export default function ManageBookings() {
     };
   }, [selectedSeatMapTrip, token]);
 
-  const filteredBookings = bookings.filter((booking) =>
-    [booking.bookingId, booking.passengerName, booking.userId, booking.busNo, booking.routeName,
-      booking.seatNumber, booking.date, booking.boardingStop, booking.dropStop, booking.status]
-      .some((value) => String(value || "").toLowerCase().includes(search.toLowerCase()))
-  );
+  const filteredBookings = bookings.filter((booking) => {
+    const scheduledTrip = seatMapTrips.find((trip) => String(trip.scheduleId) === String(booking.scheduleId));
+    const bookingTrip = {
+      busId: booking.busId || scheduledTrip?.schedule?.busId || scheduledTrip?.id,
+      routeId: booking.routeId || scheduledTrip?.schedule?.routeId || scheduledTrip?.route?.routeId || scheduledTrip?.route?.id,
+      date: booking.date || scheduledTrip?.schedule?.date,
+      departureTime: booking.departureTime || scheduledTrip?.schedule?.departureTime,
+    };
+    const isFocusedBooking = bookingFocus?.bookingIds.includes(booking.id) || false;
+    return (bookingFocus ? isFocusedBooking : matchesTripFilters(bookingTrip))
+      && [booking.bookingId, booking.passengerName, booking.userId, booking.busNo, booking.routeName,
+        booking.seatNumber, booking.date, booking.boardingStop, booking.dropStop, booking.status]
+        .some((value) => String(value || "").toLowerCase().includes(search.toLowerCase()));
+  });
+
+  const showBookingForSeat = (seatNumber) => {
+    const trip = selectedSeatMapTrip;
+    const busIds = new Set([trip?.schedule?.busId, trip?.id, trip?.busId].filter(Boolean).map(String));
+    const scheduleIds = new Set([trip?.scheduleId, trip?.schedule?.id, trip?.schedule?.scheduleId].filter(Boolean).map(String));
+    const tripDate = String(trip?.schedule?.date || trip?.date || "").slice(0, 10);
+    const tripStartTime = String(trip?.schedule?.departureTime || trip?.departureTime || "").slice(0, 5);
+    const seatBookings = bookings.filter((booking) =>
+      String(booking.seatNumber ?? booking.seatNo ?? "").trim().toUpperCase() === seatNumber.trim().toUpperCase()
+    );
+    const busIdMatches = seatBookings.filter((booking) => !booking.busId || busIds.has(String(booking.busId)));
+    const busNumberMatches = seatBookings.filter((booking) => booking.busNo && booking.busNo === trip?.busNo);
+    const sameBusBookings = busIdMatches.length > 0
+      ? busIdMatches
+      : busNumberMatches.length > 0
+        ? busNumberMatches
+        : seatBookings.filter((booking) => !booking.busId && !booking.busNo);
+    const matchingBookings = sameBusBookings.filter((booking) => {
+      const sameSchedule = booking.scheduleId && scheduleIds.has(String(booking.scheduleId));
+      const sameDeparture = String(booking.date || "").slice(0, 10) === tripDate
+        && String(booking.departureTime || "").slice(0, 5) === tripStartTime;
+      return sameSchedule || sameDeparture || !booking.scheduleId;
+    });
+    const bookingsToShow = matchingBookings.length > 0 ? matchingBookings : sameBusBookings;
+
+    if (bookingsToShow.length === 0) {
+      setSeatMapError(`No ticket record was found for booked seat ${seatNumber} on this trip.`);
+      return;
+    }
+
+    const bookingIds = bookingsToShow.map((booking) => booking.id);
+    setBookingFocus({ seatNumber, bookingIds });
+    setSearch("");
+    setSeatMapError("");
+    setExpandedIds(new Set(bookingIds));
+    setActiveView("bookings");
+    window.requestAnimationFrame(() => {
+      document.getElementById("admin-bookings-panel")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  };
 
   function getTimestamp(value) {
     if (typeof value?.toDate === "function") return value.toDate().getTime();
@@ -252,25 +341,67 @@ export default function ManageBookings() {
         </div>
       </div>
 
-      <div role="tablist" aria-label="Booking views" className="sticky top-0 z-20 -mx-6 mb-5 flex gap-2 border-b bg-background/95 px-6 py-3 backdrop-blur">
-        <Button
-          role="tab"
-          aria-selected={activeView === "layout"}
-          variant={activeView === "layout" ? "default" : "outline"}
-          onClick={() => setActiveView("layout")}
-          className="gap-2"
-        >
-          <Bus className="h-4 w-4" /> Seat Layout
-        </Button>
-        <Button
-          role="tab"
-          aria-selected={activeView === "bookings"}
-          variant={activeView === "bookings" ? "default" : "outline"}
-          onClick={() => setActiveView("bookings")}
-          className="gap-2"
-        >
-          <Ticket className="h-4 w-4" /> All Bookings
-        </Button>
+      <div className="sticky top-0 z-20 -mx-6 mb-5 space-y-3 border-b bg-background/95 px-6 py-3 backdrop-blur">
+        <div role="tablist" aria-label="Booking views" className="flex gap-2">
+          <Button
+            role="tab"
+            aria-selected={activeView === "layout"}
+            variant={activeView === "layout" ? "default" : "outline"}
+            onClick={() => setActiveView("layout")}
+            className="gap-2"
+          >
+            <Bus className="h-4 w-4" /> Seat Layout
+          </Button>
+          <Button
+            role="tab"
+            aria-selected={activeView === "bookings"}
+            variant={activeView === "bookings" ? "default" : "outline"}
+            onClick={() => {
+              setBookingFocus(null);
+              setActiveView("bookings");
+            }}
+            className="gap-2"
+          >
+            <Ticket className="h-4 w-4" /> All Bookings
+          </Button>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_1fr_1fr_auto]">
+          <label className="grid gap-1 text-xs font-medium text-muted-foreground">
+            Trip period
+            <select value={tripPeriodFilter} onChange={(event) => setTripPeriodFilter(event.target.value)} className="h-9 rounded-md border border-input bg-background px-2 text-sm text-foreground">
+              <option value="all">All trips</option>
+              <option value="upcoming">Upcoming trips</option>
+              <option value="expired">Expired trips</option>
+            </select>
+          </label>
+          <label className="grid gap-1 text-xs font-medium text-muted-foreground">
+            Bus ID
+            <select value={busIdFilter} onChange={(event) => setBusIdFilter(event.target.value)} className="h-9 rounded-md border border-input bg-background px-2 text-sm text-foreground">
+              <option value="">All buses</option>
+              {busIdOptions.map((bus) => <option key={bus.id} value={bus.id}>{bus.label}</option>)}
+            </select>
+          </label>
+          <label className="grid gap-1 text-xs font-medium text-muted-foreground">
+            Route
+            <select value={routeFilter} onChange={(event) => setRouteFilter(event.target.value)} className="h-9 rounded-md border border-input bg-background px-2 text-sm text-foreground">
+              <option value="">All routes</option>
+              {routeOptions.map((route) => <option key={route.id} value={route.id}>{route.label}</option>)}
+            </select>
+          </label>
+          <label className="grid gap-1 text-xs font-medium text-muted-foreground">
+            Route start time
+            <select value={startTimeFilter} onChange={(event) => setStartTimeFilter(event.target.value)} className="h-9 rounded-md border border-input bg-background px-2 text-sm text-foreground">
+              <option value="">All start times</option>
+              {startTimeOptions.map((time) => <option key={time} value={time}>{time}</option>)}
+            </select>
+          </label>
+          <Button variant="outline" size="sm" className="self-end" disabled={!busIdFilter && !routeFilter && !startTimeFilter && tripPeriodFilter === "all"} onClick={() => {
+            setTripPeriodFilter("all");
+            setBusIdFilter("");
+            setRouteFilter("");
+            setStartTimeFilter("");
+          }}>Clear filters</Button>
+        </div>
       </div>
 
       {activeView === "layout" && <Card className="mb-6 shadow-lg rounded-2xl border-border">
@@ -281,7 +412,7 @@ export default function ManageBookings() {
           </div>
           <select
             aria-label="Select bus schedule for seat layout"
-            value={selectedScheduleId}
+            value={selectedSeatMapTrip?.scheduleId || ""}
             onChange={(event) => {
               setSelectedScheduleId(event.target.value);
               setHighlightedSeat("");
@@ -289,7 +420,7 @@ export default function ManageBookings() {
             className="h-10 min-w-64 max-w-full rounded-md border border-input bg-background px-3 text-sm"
             disabled={seatMapTrips.length === 0}
           >
-            {seatMapTrips.map((trip) => (
+            {filteredSeatMapTrips.map((trip) => (
               <option key={trip.scheduleId} value={trip.scheduleId}>
                 {trip.busNo || trip.busId} · {trip.route?.routeName || `${trip.route?.startStop || "Route"} → ${trip.route?.endStop || "Destination"}`} · {trip.schedule?.date || "Date unavailable"} {trip.schedule?.departureTime || ""}
               </option>
@@ -299,14 +430,20 @@ export default function ManageBookings() {
         <CardContent>
           {seatMapError && <p role="status" className="mb-4 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">{seatMapError}</p>}
           {selectedSeatMapTrip ? (
-            <AdminSeatMap trip={selectedSeatMapTrip} occupiedSeats={occupiedSeats} loading={seatMapLoading} highlightedSeat={highlightedSeat} />
+            <AdminSeatMap
+              trip={selectedSeatMapTrip}
+              occupiedSeats={occupiedSeats}
+              loading={seatMapLoading}
+              highlightedSeat={highlightedSeat}
+              onBookedSeatClick={showBookingForSeat}
+            />
           ) : (
             <p className="py-8 text-center text-sm text-muted-foreground">No scheduled buses are available to display.</p>
           )}
         </CardContent>
       </Card>}
 
-      {activeView === "bookings" && <Card className="shadow-lg rounded-2xl border-border">
+      {activeView === "bookings" && <Card id="admin-bookings-panel" className="shadow-lg rounded-2xl border-border">
         <CardHeader>
           <CardTitle>Bookings ({filteredBookings.length})</CardTitle>
           <CardDescription className="text-muted-foreground">
@@ -316,6 +453,15 @@ export default function ManageBookings() {
 
         <CardContent>
           {errorMessage && <p role="status" className="mb-4 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">{errorMessage}</p>}
+          {bookingFocus && (
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+              <span>Showing booking details for seat {bookingFocus.seatNumber} on the selected trip.</span>
+              <Button variant="outline" size="sm" onClick={() => {
+                setBookingFocus(null);
+                setExpandedIds(new Set());
+              }}>Show all bookings</Button>
+            </div>
+          )}
           {loading ? (
             <p className="text-center py-12 text-muted-foreground">Loading...</p>
           ) : filteredBookings.length === 0 ? (
@@ -361,15 +507,20 @@ export default function ManageBookings() {
                         <Button
                           variant="ghost"
                           size="icon"
-                          onClick={() => setExpandedId(expandedId === b.id ? null : b.id)}
-                          aria-label={expandedId === b.id ? "Hide booking details" : "Show booking details"}
-                          aria-expanded={expandedId === b.id}
+                          onClick={() => setExpandedIds((currentIds) => {
+                            const nextIds = new Set(currentIds);
+                            if (nextIds.has(b.id)) nextIds.delete(b.id);
+                            else nextIds.add(b.id);
+                            return nextIds;
+                          })}
+                          aria-label={expandedIds.has(b.id) ? "Hide booking details" : "Show booking details"}
+                          aria-expanded={expandedIds.has(b.id)}
                         >
-                          {expandedId === b.id ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                          {expandedIds.has(b.id) ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                         </Button>
                       </TableCell>
                     </TableRow>
-                    {expandedId === b.id && (
+                    {expandedIds.has(b.id) && (
                       <TableRow>
                         <TableCell colSpan={8} className="bg-muted/30 p-0">
                           <div className="p-5">
@@ -399,6 +550,13 @@ export default function ManageBookings() {
                                 if (!trip) return;
                                 setSelectedScheduleId(trip.scheduleId);
                                 setHighlightedSeat(String(b.seatNumber));
+                                setTripPeriodFilter(getTripDepartureTimestamp(trip) === null
+                                  ? "all"
+                                  : getTripDepartureTimestamp(trip) < Date.now() ? "expired" : "upcoming");
+                                setBusIdFilter(String(trip.schedule?.busId || trip.id || trip.busId));
+                                setRouteFilter(String(trip.schedule?.routeId || trip.route?.routeId || trip.route?.id || ""));
+                                setStartTimeFilter(trip.schedule?.departureTime || trip.departureTime || "");
+                                setBookingFocus(null);
                                 setActiveView("layout");
                                 window.requestAnimationFrame(() => {
                                   document.getElementById(`admin-seat-${b.seatNumber}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -438,7 +596,7 @@ function getRouteStops(route) {
   ];
 }
 
-function AdminSeatMap({ trip, occupiedSeats, loading, highlightedSeat }) {
+function AdminSeatMap({ trip, occupiedSeats, loading, highlightedSeat, onBookedSeatClick }) {
   const leftColumns = Number.parseInt(trip.leftColumns, 10) || 2;
   const rightColumns = Number.parseInt(trip.rightColumns, 10) || 2;
   const leftRows = Number.parseInt(trip.leftRows, 10) || 10;
@@ -469,11 +627,23 @@ function AdminSeatMap({ trip, occupiedSeats, loading, highlightedSeat }) {
     : occupied.has(seat)
     ? "border-red-400 bg-red-100 text-red-700"
     : "border-emerald-400 bg-emerald-50 text-emerald-700";
-  const seat = (label) => (
-    <div id={`admin-seat-${label}`} key={label} title={`${label}: ${loading ? "Loading" : occupied.has(label) ? "Booked" : "Available"}`} className={`flex h-9 w-9 shrink-0 items-end justify-center rounded-t-xl rounded-b border-2 pb-1 text-[10px] font-bold ${seatClass(label)} ${highlightedSeat === label ? "relative z-10 ring-4 ring-amber-400 ring-offset-2" : ""}`}>
-      {label}
-    </div>
-  );
+  const seat = (label) => {
+    const isBooked = occupied.has(label) && !loading;
+    return (
+      <button
+        id={`admin-seat-${label}`}
+        key={label}
+        type="button"
+        disabled={!isBooked}
+        onClick={() => onBookedSeatClick?.(label)}
+        aria-label={`Seat ${label}, ${isBooked ? "booked, view booking details" : loading ? "loading availability" : "available"}`}
+        title={`${label}: ${loading ? "Loading" : occupied.has(label) ? "Booked" : "Available"}`}
+        className={`flex h-9 w-9 shrink-0 items-end justify-center rounded-t-xl rounded-b border-2 pb-1 text-[10px] font-bold disabled:cursor-default disabled:opacity-100 ${seatClass(label)} ${isBooked ? "cursor-pointer hover:ring-2 hover:ring-red-500" : ""} ${highlightedSeat === label ? "relative z-10 ring-4 ring-amber-400 ring-offset-2" : ""}`}
+      >
+        {label}
+      </button>
+    );
+  };
 
   return (
     <div>
