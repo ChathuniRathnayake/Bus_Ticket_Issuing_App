@@ -13,23 +13,34 @@ function readStoredPayment(key) {
   }
 }
 
-function saveConfirmedBooking(payment) {
+function saveConfirmedBooking(payment, confirmedDetails, paymentStatus) {
   const bookings = readStoredPayment("userBookings") || [];
-  if (bookings.some((booking) => booking.bookingId === payment.bookingId)) return;
-
   const booking = {
     bookingId: payment.bookingId,
-    busId: payment.busId,
+    busId: confirmedDetails?.busId || payment.busId,
     busNo: payment.busNo,
-    routeId: payment.routeId,
-    scheduleId: payment.scheduleId,
+    routeId: confirmedDetails?.routeId || payment.routeId,
+    scheduleId: confirmedDetails?.scheduleId || payment.scheduleId,
+    startStop: payment.startStop,
+    endStop: payment.endStop,
+    boardingStop: confirmedDetails?.boardingStop || payment.boardingStop,
+    dropStop: confirmedDetails?.dropStop || payment.dropStop,
     date: payment.date,
     departureTime: payment.departureTime,
-    seat: payment.seat,
+    seat: confirmedDetails?.seatNumber || confirmedDetails?.seatNo || payment.seat,
     bookingDate: new Date().toISOString(),
     status: "Confirmed",
+    paymentStatus,
+    amountCents: confirmedDetails?.amountCents ?? payment.amountCents,
+    currency: confirmedDetails?.currency || payment.currency,
+    paymentId: payment.paymentId,
   };
-  localStorage.setItem("userBookings", JSON.stringify([booking, ...bookings]));
+  const existingIndex = bookings.findIndex((item) => item.bookingId === booking.bookingId);
+  const updatedBookings = existingIndex === -1
+    ? [booking, ...bookings]
+    : bookings.map((item, index) => index === existingIndex ? { ...item, ...booking } : item);
+  localStorage.setItem("userBookings", JSON.stringify(updatedBookings));
+  return booking;
 }
 
 export default function PaymentResult({ cancelled = false }) {
@@ -97,10 +108,11 @@ export default function PaymentResult({ cancelled = false }) {
         if (!response.ok) throw new Error(data.message || "Unable to verify payment");
 
         if (data.status === "SUCCEEDED" || data.booking?.status === "CONFIRMED") {
-          saveConfirmedBooking(payment);
-          localStorage.setItem("lastPayment", JSON.stringify(payment));
+          const booking = saveConfirmedBooking(payment, data.booking, data.status);
+          const confirmedPayment = { ...payment, ...booking };
+          localStorage.setItem("lastPayment", JSON.stringify(confirmedPayment));
           localStorage.removeItem("pendingPayment");
-          update({ status: "succeeded", payment });
+          update({ status: "succeeded", payment: confirmedPayment });
           return;
         }
 
@@ -111,7 +123,7 @@ export default function PaymentResult({ cancelled = false }) {
         }
 
         if (attempt >= 20) {
-          update({ status: "pending", payment });
+          update({ status: "pending", payment, paymentStatus: data.status });
           return;
         }
 
@@ -134,19 +146,27 @@ export default function PaymentResult({ cancelled = false }) {
   const isSuccess = result.status === "succeeded";
   const isCancelled = result.status === "cancelled";
   const isFailure = result.status === "failed" || result.status === "cancel-error" || result.status === "error" || result.status === "missing";
+  const paymentStatusLabel = isSuccess
+    ? "Successful"
+    : result.status === "pending"
+      ? "Processing"
+      : result.status === "loading"
+        ? "Verifying"
+        : result.paymentStatus || "Not completed";
   const Icon = isSuccess ? CheckCircle2 : isCancelled ? XCircle : isFailure ? AlertCircle : result.status === "pending" ? Clock3 : LoaderCircle;
+
   const styles = isSuccess
-    ? { bar: "bg-emerald-500", icon: "bg-emerald-50 text-emerald-600", button: "bg-emerald-700 hover:bg-emerald-800" }
+    ? { bar: "from-emerald-500 to-teal-500", icon: "bg-emerald-50 text-emerald-600", button: "bg-emerald-700 hover:bg-emerald-800" }
     : isCancelled
-      ? { bar: "bg-amber-500", icon: "bg-amber-50 text-amber-600", button: "" }
+      ? { bar: "from-amber-400 to-orange-500", icon: "bg-amber-50 text-amber-600", button: "" }
       : isFailure
-        ? { bar: "bg-rose-500", icon: "bg-rose-50 text-rose-600", button: "" }
-        : { bar: "bg-sky-500", icon: "bg-sky-50 text-sky-600", button: "" };
+        ? { bar: "from-rose-500 to-pink-600", icon: "bg-rose-50 text-rose-600", button: "" }
+        : { bar: "from-sky-400 to-blue-500", icon: "bg-sky-50 text-sky-600", button: "" };
 
   const heading = {
     loading: "Verifying your payment",
     pending: "Payment is still processing",
-    succeeded: "Your ticket is confirmed",
+    succeeded: "Payment successful!",
     cancelled: "Checkout was cancelled",
     failed: "Payment was not completed",
     "cancel-error": "Seat release needs attention",
@@ -155,7 +175,7 @@ export default function PaymentResult({ cancelled = false }) {
   }[result.status];
 
   const description = {
-    loading: "We’re waiting for secure confirmation from the payment provider.",
+    loading: "We're waiting for secure confirmation from the payment provider.",
     pending: "Your payment is taking longer than usual. You can check My Bookings again shortly.",
     succeeded: "Payment received. Your booking is now available in My Bookings.",
     cancelled: "No ticket was issued. The seat reservation has been released.",
@@ -166,36 +186,60 @@ export default function PaymentResult({ cancelled = false }) {
   }[result.status];
 
   return (
-    <section className="mx-auto flex min-h-[65vh] max-w-2xl items-center justify-center px-4 py-12">
-      <div className="w-full overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
-        <div className={`h-1.5 ${styles.bar}`} />
-        <div className="p-7 sm:p-10">
-          <div className={`mb-6 flex h-14 w-14 items-center justify-center rounded-full ${styles.icon}`}>
-            <Icon className={`h-7 w-7 ${result.status === "loading" ? "animate-spin" : ""}`} />
-          </div>
-          <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-slate-500">Ticket Go · Payment</p>
-          <h1 className="text-2xl font-semibold text-slate-950">{heading}</h1>
-          <p className="mt-3 max-w-lg text-sm leading-6 text-slate-600">{description}</p>
+    <section className="mx-auto flex min-h-[65vh] max-w-2xl items-center justify-center px-4 py-12 animate-fade-in">
+      <div className="w-full overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl dark:border-zinc-700 dark:bg-zinc-900">
 
+        {/* Gradient top bar */}
+        <div className={`h-1.5 bg-gradient-to-r ${styles.bar}`} />
+
+        <div className="p-7 sm:p-10">
+          {/* Icon */}
+          <div className={`mb-6 flex h-16 w-16 items-center justify-center rounded-2xl ${styles.icon} shadow-sm`}>
+            <Icon className={`h-8 w-8 ${result.status === "loading" ? "animate-spin" : ""}`} />
+          </div>
+
+          <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-slate-500 dark:text-zinc-400">TicketGo · Payment</p>
+          <h1 className="text-3xl font-bold text-slate-900 dark:text-white">{heading}</h1>
+          <p className="mt-3 max-w-lg text-sm leading-6 text-slate-600 dark:text-zinc-400">{description}</p>
+
+          {/* Trip details */}
           {payment && (
-            <div className="mt-7 grid grid-cols-2 gap-x-6 gap-y-4 border-y border-slate-200 py-5 text-sm">
+            <div className="mt-7 grid grid-cols-1 gap-x-6 gap-y-4 rounded-xl border border-slate-100 bg-slate-50 dark:border-zinc-700 dark:bg-zinc-800/50 p-5 text-sm sm:grid-cols-2">
               <div>
-                <p className="text-xs text-slate-500">ROUTE</p>
-                <p className="mt-1 font-medium text-slate-900">
-                  {payment.startStop && payment.endStop ? `${payment.startStop} to ${payment.endStop}` : payment.routeId || "Bus trip"}
+                <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Route</p>
+                <p className="mt-1 font-medium text-slate-900 dark:text-white">
+                  {payment.startStop && payment.endStop ? `${payment.startStop} → ${payment.endStop}` : payment.routeId || "Bus trip"}
                 </p>
               </div>
               <div>
-                <p className="text-xs text-slate-500">DATE · DEPARTURE</p>
-                <p className="mt-1 font-medium text-slate-900">{payment.date || "—"} · {payment.departureTime || "—"}</p>
+                <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Date · Departure</p>
+                <p className="mt-1 font-medium text-slate-900 dark:text-white">{payment.date || "—"} · {payment.departureTime || "—"}</p>
               </div>
               <div>
-                <p className="text-xs text-slate-500">BUS · SEAT</p>
-                <p className="mt-1 font-medium text-slate-900">{payment.busNo || payment.busId} · {payment.seat}</p>
+                <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Bus · Seat</p>
+                <p className="mt-1 font-medium text-slate-900 dark:text-white">{payment.busNo || payment.busId} · <span className="font-bold text-blue-600">Seat {payment.seat}</span></p>
               </div>
               <div>
-                <p className="text-xs text-slate-500">BOOKING REFERENCE</p>
-                <p className="mt-1 truncate font-mono text-xs text-slate-700">{payment.bookingId || payment.paymentId}</p>
+                <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Boarding · Drop-off</p>
+                <p className="mt-1 font-medium text-slate-900 dark:text-white">{payment.boardingStop || "—"} · {payment.dropStop || "—"}</p>
+              </div>
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Booking Reference</p>
+                <p className="mt-1 truncate font-mono text-xs text-slate-700 dark:text-zinc-300">{payment.bookingId || payment.paymentId}</p>
+              </div>
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Amount Paid</p>
+                <p className="mt-1 font-semibold text-slate-900 dark:text-white">
+                  {payment.amountCents != null
+                    ? `${(payment.amountCents / 100).toFixed(2)} ${(payment.currency || "").toUpperCase()}`.trim()
+                    : "—"}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Payment Status</p>
+                <p className={`mt-1 font-semibold ${isSuccess ? "text-emerald-700" : "text-amber-700"}`}>
+                  {paymentStatusLabel}
+                </p>
               </div>
             </div>
           )}

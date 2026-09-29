@@ -1,5 +1,5 @@
 // src/Admin/ManageBookings.jsx
-import { useState, useEffect } from "react";
+import { Fragment, useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 
@@ -15,31 +15,19 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { ArrowLeft, Ticket, XCircle } from "lucide-react";
+import { ArrowLeft, Ticket, ChevronDown, ChevronUp, RefreshCw, Search } from "lucide-react";
 
 export default function ManageBookings() {
   const navigate = useNavigate();
   const token = localStorage.getItem("token");
 
   const [bookings, setBookings] = useState([]);
-  const [filteredBookings, setFilteredBookings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [expandedId, setExpandedId] = useState(null);
+  const [errorMessage, setErrorMessage] = useState("");
 
-  /* =====================================================
-     FETCH BOOKINGS + BUSES + ROUTES, THEN ENRICH
-     ---------------------------------------------------
-     ⚠️ NOTE FOR BACKEND: this calls GET /api/booking to
-     get EVERY booking in the system. That admin-facing
-     endpoint doesn't exist on the backend yet (only
-     "/my" and "/schedule/:scheduleId" do). You'll need
-     to add something like:
-         router.get("/", verifyToken, verifyAdmin, getAllBookings);
-     to bookingRoutes.js + a matching getAllBookings
-     controller function before this page will show
-     real data. This file is frontend-only for now.
-  ===================================================== */
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     if (!token) {
       navigate("/admin-login");
       return;
@@ -47,131 +35,113 @@ export default function ManageBookings() {
 
     try {
       setLoading(true);
+      setErrorMessage("");
 
-      const [bookingsRes, busesRes, routesRes] = await Promise.all([
-        axios.get("http://localhost:5000/api/booking", {
-          headers: { Authorization: `Bearer ${token}` },
-        }),
-        axios.get("http://localhost:5000/api/bus", {
-          headers: { Authorization: `Bearer ${token}` },
-        }),
-        axios.get("http://localhost:5000/api/route", {
-          headers: { Authorization: `Bearer ${token}` },
-        }),
+      const [busesRes, routesRes, schedulesRes] = await Promise.all([
+        axios.get("http://localhost:5000/api/bus", { headers: { Authorization: `Bearer ${token}` } }),
+        axios.get("http://localhost:5000/api/route", { headers: { Authorization: `Bearer ${token}` } }),
+        axios.get("http://localhost:5000/api/schedule", { headers: { Authorization: `Bearer ${token}` } }),
       ]);
+      const buses = busesRes.data;
+      const routes = routesRes.data;
+      const schedules = schedulesRes.data;
 
-      const busesData = busesRes.data;
-      const routesData = routesRes.data;
+      const ticketResults = await Promise.allSettled(buses.map((bus) =>
+        axios.get(`http://localhost:5000/api/ticket/bus/${bus.id || bus.busId}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+      ));
+      const tickets = ticketResults.flatMap((result) =>
+        result.status === "fulfilled" && Array.isArray(result.value.data) ? result.value.data : []
+      );
 
-      // Fill in bus number + route name for each booking so the
-      // table is readable (bookings only store raw IDs).
-      const enriched = bookingsRes.data.map((booking) => {
-        const bus = busesData.find(
-          (b) => b.id === booking.busId || b.busId === booking.busId
-        );
-        const route = routesData.find(
-          (r) => r.routeId === booking.routeId || r.id === booking.routeId
-        );
-
+      const enriched = tickets.map((ticket) => {
+        const bus = buses.find((item) => item.id === ticket.busId || item.busId === ticket.busId);
+        const schedule = schedules.find((item) => item.id === ticket.scheduleId || item.scheduleId === ticket.scheduleId);
+        const routeId = ticket.routeId || schedule?.routeId;
+        const route = routes.find((item) => item.id === routeId || item.routeId === routeId);
         return {
-          ...booking,
-          busNo: bus?.busNo || "Unknown",
-          routeName: route
-            ? `${route.startStop} → ${route.endStop}`
-            : booking.routeId || "Unknown",
+          ...ticket,
+          id: ticket.bookingId || ticket.id || ticket.ticketId,
+          bookingId: ticket.bookingId || ticket.id || ticket.ticketId,
+          seatNumber: ticket.seatNumber ?? ticket.seatNo,
+          date: ticket.date || schedule?.date,
+          departureTime: ticket.departureTime || schedule?.departureTime,
+          busNo: bus?.busNo || ticket.busId || "Unknown",
+          routeName: route?.routeName || (route ? `${route.startStop} → ${route.endStop}` : routeId || "Unknown"),
+          route,
         };
       });
 
-      // Most recent bookings first
-      enriched.sort((a, b) => {
-        const dateA = a.createdAt?.seconds
-          ? a.createdAt.seconds * 1000
-          : new Date(a.createdAt || 0).getTime();
-        const dateB = b.createdAt?.seconds
-          ? b.createdAt.seconds * 1000
-          : new Date(b.createdAt || 0).getTime();
-        return dateB - dateA;
-      });
-
+      enriched.sort((a, b) => getTimestamp(getBookedAt(b)) - getTimestamp(getBookedAt(a)));
       setBookings(enriched);
-      setFilteredBookings(enriched);
+      if (ticketResults.some((result) => result.status === "rejected")) {
+        setErrorMessage("Some buses could not be loaded. Displaying tickets from the buses that responded.");
+      }
     } catch (error) {
       console.error("Fetch bookings error:", error);
-      alert(
-        error.response?.data?.message ||
-          "Failed to fetch bookings. (Is the /api/booking GET-all endpoint added on the backend yet?)"
-      );
+      setErrorMessage(error.response?.data?.message || "Failed to load bookings. Check that the backend is available.");
     } finally {
       setLoading(false);
     }
-  };
+  }, [navigate, token]);
 
   useEffect(() => {
     fetchData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [fetchData]);
 
-  // 🔎 Search across booking id, bus number, route name, seat, passenger id
-  useEffect(() => {
-    const q = search.toLowerCase();
-    setFilteredBookings(
-      bookings.filter(
-        (b) =>
-          b.bookingId?.toLowerCase().includes(q) ||
-          b.id?.toLowerCase().includes(q) ||
-          b.busNo?.toLowerCase().includes(q) ||
-          b.routeName?.toLowerCase().includes(q) ||
-          String(b.seatNumber || "").toLowerCase().includes(q) ||
-          b.userId?.toLowerCase().includes(q)
-      )
-    );
-  }, [search, bookings]);
+  const filteredBookings = bookings.filter((booking) =>
+    [booking.bookingId, booking.passengerName, booking.userId, booking.busNo, booking.routeName,
+      booking.seatNumber, booking.date, booking.boardingStop, booking.dropStop, booking.status]
+      .some((value) => String(value || "").toLowerCase().includes(search.toLowerCase()))
+  );
 
-  const formatDate = (createdAt) => {
-    if (!createdAt) return "-";
-    const date = createdAt.seconds
-      ? new Date(createdAt.seconds * 1000)
-      : new Date(createdAt);
+  function getTimestamp(value) {
+    if (typeof value?.toDate === "function") return value.toDate().getTime();
+    const seconds = value?.seconds ?? value?._seconds;
+    const nanoseconds = value?.nanoseconds ?? value?._nanoseconds ?? 0;
+    if (seconds !== undefined && Number.isFinite(Number(seconds))) {
+      return Number(seconds) * 1000 + Number(nanoseconds) / 1_000_000;
+    }
+    const timestamp = new Date(value || "").getTime();
+    return Number.isFinite(timestamp) ? timestamp : null;
+  }
+
+  function getBookedAt(booking) {
+    return booking.bookedAt || booking.confirmedAt || booking.createdAt;
+  }
+
+  const formatDate = (timestampValue) => {
+    if (!timestampValue) return "-";
+    const timestamp = getTimestamp(timestampValue);
+    if (timestamp === null) return "-";
+    const date = new Date(timestamp);
     if (isNaN(date.getTime())) return "-";
-    return date.toLocaleString("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+    return new Intl.DateTimeFormat("en-LK", {
+      timeZone: "Asia/Colombo",
+      dateStyle: "medium",
+      timeStyle: "short",
+    }).format(date);
   };
 
   const statusBadge = (status) => {
     const s = (status || "").toLowerCase();
-    if (s === "confirmed") {
+    if (["confirmed", "booked"].includes(s)) {
       return <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100">Confirmed</Badge>;
     }
     if (s === "cancelled") {
       return <Badge className="bg-red-100 text-red-700 hover:bg-red-100">Cancelled</Badge>;
     }
+    if (s.includes("payment")) return <Badge variant="secondary">Pending payment</Badge>;
     return <Badge variant="secondary">{status || "Unknown"}</Badge>;
   };
 
-  // ⚠️ Uses the existing PUT /api/booking/cancel/:bookingId endpoint.
-  // That endpoint currently only lets the OWNER of a booking cancel it,
-  // so an admin cancelling someone else's booking will need a small
-  // backend tweak (e.g. skip the ownership check when verifyAdmin passes).
-  // Kept here so the UI/UX is ready once that's added.
-  const handleCancel = async (bookingId) => {
-    if (!window.confirm("Cancel this booking?")) return;
-
-    try {
-      await axios.put(
-        `http://localhost:5000/api/booking/cancel/${bookingId}`,
-        {},
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      fetchData();
-    } catch (error) {
-      console.error(error);
-      alert(error.response?.data?.message || "Failed to cancel booking");
+  const formatFare = (booking) => {
+    if (Number.isFinite(Number(booking.amountCents))) {
+      return `${booking.currency || "USD"} ${(Number(booking.amountCents) / 100).toFixed(2)}`;
     }
+    if (booking.price !== undefined) return `${booking.currency || ""} ${booking.price}`.trim();
+    return "Not recorded";
   };
 
   return (
@@ -190,12 +160,20 @@ export default function ManageBookings() {
           <h2 className="text-3xl font-bold tracking-tight">Manage Bookings</h2>
         </div>
 
-        <Input
-          placeholder="Search by booking, bus, route, seat..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="w-72 h-10"
-        />
+        <div className="flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto">
+          <div className="relative w-full sm:w-72">
+            <Search className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search bookings, passenger, route..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="h-10 pl-9"
+            />
+          </div>
+          <Button variant="outline" size="icon" onClick={fetchData} disabled={loading} title="Refresh bookings" aria-label="Refresh bookings">
+            <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+          </Button>
+        </div>
       </div>
 
       <Card className="shadow-lg rounded-2xl border-border">
@@ -207,6 +185,7 @@ export default function ManageBookings() {
         </CardHeader>
 
         <CardContent>
+          {errorMessage && <p role="status" className="mb-4 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">{errorMessage}</p>}
           {loading ? (
             <p className="text-center py-12 text-muted-foreground">Loading...</p>
           ) : filteredBookings.length === 0 ? (
@@ -220,44 +199,71 @@ export default function ManageBookings() {
                 <TableHeader>
                   <TableRow className="bg-muted/50">
                     <TableHead>Booking ID</TableHead>
-                    <TableHead>Passenger (UID)</TableHead>
+                    <TableHead>Passenger</TableHead>
                     <TableHead>Bus No</TableHead>
                     <TableHead>Route</TableHead>
                     <TableHead>Seat</TableHead>
                     <TableHead>Booked At</TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
+                    <TableHead className="text-right">Details</TableHead>
                   </TableRow>
                 </TableHeader>
 
                 <TableBody>
                   {filteredBookings.map((b) => (
+                    <Fragment key={b.id || b.bookingId}>
                     <TableRow
-                      key={b.id || b.bookingId}
                       className="even:bg-muted/50 hover:bg-muted transition-all duration-300"
                     >
                       <TableCell className="font-mono text-xs">
                         {b.bookingId || b.id}
                       </TableCell>
-                      <TableCell className="font-mono text-xs">{b.userId}</TableCell>
+                      <TableCell>
+                        <div className="font-medium">{b.passengerName || "Passenger"}</div>
+                        <div className="font-mono text-xs text-muted-foreground">{b.userId || "UID unavailable"}</div>
+                      </TableCell>
                       <TableCell>{b.busNo}</TableCell>
                       <TableCell>{b.routeName}</TableCell>
                       <TableCell className="font-semibold">{b.seatNumber}</TableCell>
-                      <TableCell>{formatDate(b.createdAt)}</TableCell>
+                      <TableCell>{formatDate(getBookedAt(b))}</TableCell>
                       <TableCell>{statusBadge(b.status)}</TableCell>
                       <TableCell className="text-right">
-                        {b.status === "Confirmed" && (
-                          <Button
-                            size="sm"
-                            variant="destructive"
-                            onClick={() => handleCancel(b.id || b.bookingId)}
-                            className="gap-1 bg-red-600 hover:bg-red-700 text-white transition-all duration-300 cursor-pointer"
-                          >
-                            <XCircle className="h-4 w-4" /> Cancel
-                          </Button>
-                        )}
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => setExpandedId(expandedId === b.id ? null : b.id)}
+                          aria-label={expandedId === b.id ? "Hide booking details" : "Show booking details"}
+                          aria-expanded={expandedId === b.id}
+                        >
+                          {expandedId === b.id ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                        </Button>
                       </TableCell>
                     </TableRow>
+                    {expandedId === b.id && (
+                      <TableRow>
+                        <TableCell colSpan={8} className="bg-muted/30 p-0">
+                          <div className="grid gap-x-8 gap-y-5 p-5 sm:grid-cols-2 xl:grid-cols-4">
+                            <Detail label="Booking ID" value={b.bookingId} mono />
+                            <Detail label="Ticket ID" value={b.ticketId || b.id} mono />
+                            <Detail label="Passenger name" value={b.passengerName || "Not provided"} />
+                            <Detail label="Passenger UID" value={b.userId} mono />
+                            <Detail label="Bus" value={`${b.busNo}${b.busId ? ` (${b.busId})` : ""}`} />
+                            <Detail label="Route" value={b.routeName} />
+                            <Detail label="Travel date" value={b.date || "Not recorded"} />
+                            <Detail label="Departure" value={b.departureTime || "Not recorded"} />
+                            <Detail label="Seat" value={b.seatNumber} />
+                            <Detail label="Boarding stop" value={b.boardingStop || b.boardingStopId} />
+                            <Detail label="Drop-off stop" value={b.dropStop || b.dropStopId} />
+                            <Detail label="Fare" value={formatFare(b)} />
+                            <Detail label="Booking channel" value={b.bookingChannel || "Not recorded"} />
+                            <Detail label="Booked at" value={formatDate(getBookedAt(b))} />
+                            <Detail label="Ticket status" value={b.status} />
+                            <Detail label="Schedule ID" value={b.scheduleId} mono />
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    )}
+                    </Fragment>
                   ))}
                 </TableBody>
               </Table>
@@ -265,6 +271,15 @@ export default function ManageBookings() {
           )}
         </CardContent>
       </Card>
+    </div>
+  );
+}
+
+function Detail({ label, value, mono = false }) {
+  return (
+    <div className="min-w-0">
+      <p className="text-xs font-medium uppercase text-muted-foreground">{label}</p>
+      <p className={`mt-1 break-words text-sm ${mono ? "font-mono" : "font-medium"}`}>{value || "Not recorded"}</p>
     </div>
   );
 }

@@ -43,15 +43,16 @@ export default function AddSchedule() {
           }),
         ]);
 
-        const busesData = await busRes.json();
-        const routesData = await routeRes.json();
+        const [busesData, routesData] = await Promise.all([busRes.json(), routeRes.json()]);
+        if (!busRes.ok) throw new Error(busesData.message || "Failed to load buses");
+        if (!routeRes.ok) throw new Error(routesData.message || "Failed to load routes");
 
         setBuses(busesData);
         setRoutes(routesData);
 
       } catch (err) {
         console.error(err);
-        alert("Failed to load buses or routes");
+        alert(err.message || "Failed to load buses or routes");
       }
     };
 
@@ -86,13 +87,6 @@ export default function AddSchedule() {
 
     if (!scheduleId || !busId || !routeId || !date || !departureTime) {
       return alert("Please fill all required fields");
-    }
-
-    // Prevent duplicate schedule
-    const exists = false; // (optional backend validation preferred)
-
-    if (exists) {
-      return alert("Schedule already exists for this bus");
     }
 
     setLoading(true);
@@ -224,8 +218,8 @@ export default function AddSchedule() {
                 >
                   <option value="">-- Select Route --</option>
                   {routes.map((route) => (
-                    <option key={route.id} value={route.routeId}>
-                      {route.routeName} ({route.startStop} → {route.endStop})
+                    <option key={route.id} value={route.id}>
+                      {route.routeName || route.routeId} ({route.startStop} → {route.endStop})
                     </option>
                   ))}
                 </select>

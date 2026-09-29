@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ArrowLeft, Bus, Filter, Calendar, Clock } from "lucide-react";
+import { ArrowLeft, Bus, Filter, Calendar, Clock, MapPin, Search } from "lucide-react";
 
 export default function SearchBuses() {
   const navigate = useNavigate();
@@ -15,6 +15,7 @@ export default function SearchBuses() {
   const [routes, setRoutes] = useState([]);
   const [schedules, setSchedules] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [currentTime, setCurrentTime] = useState(() => new Date());
 
   const [startStopFilter, setStartStopFilter] = useState("");
   const [endStopFilter, setEndStopFilter] = useState("");
@@ -23,6 +24,11 @@ export default function SearchBuses() {
   const [dateFilter, setDateFilter] = useState("");
 
   const token = localStorage.getItem("token");
+
+  useEffect(() => {
+    const interval = window.setInterval(() => setCurrentTime(new Date()), 30_000);
+    return () => window.clearInterval(interval);
+  }, []);
 
   // Fetch data
   useEffect(() => {
@@ -74,14 +80,15 @@ export default function SearchBuses() {
 
       return {
         ...bus,
-        scheduleId: schedule.scheduleId || schedule.id,
+        scheduleId: schedule.id || schedule.scheduleId,
         routeId: schedule.routeId,
         tripDate: schedule.date,
         departureTime: schedule.departureTime,
         route,
       };
     })
-    .filter(Boolean);
+    .filter(Boolean)
+    .filter((trip) => new Date(`${trip.tripDate}T${trip.departureTime}`) > currentTime);
 
   const getStops = (route) => {
     if (Array.isArray(route?.stops) && route.stops.length > 0) {
@@ -142,8 +149,11 @@ export default function SearchBuses() {
     return route ? `${route.startStop} → ${route.endStop}` : "Unknown Route";
   };
 
+  const selectClass = "h-11 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-zinc-800 dark:border-zinc-600 dark:text-white";
+
   return (
     <div className="max-w-6xl mx-auto p-6 animate-fade-in">
+
       {/* Header */}
       <div className="flex items-center gap-4 mb-8">
         <Button
@@ -151,31 +161,35 @@ export default function SearchBuses() {
           onClick={() => navigate("/passenger-dashboard")}
           className="h-11 gap-2 hover:bg-muted"
         >
-          <ArrowLeft className="h-5 w-5" /> Back to Dashboard
+          <ArrowLeft className="h-5 w-5" /> Back
         </Button>
         <div>
-          <h2 className="text-4xl font-bold bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
+          <h2 className="text-4xl font-bold bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-600 bg-clip-text text-transparent">
             Search Buses
           </h2>
-          <p className="text-muted-foreground">Find and book your next journey</p>
+          <p className="text-muted-foreground mt-0.5">Find and book your next journey across Sri Lanka</p>
         </div>
       </div>
 
-      {/* Filters - Colorful Card */}
-      <Card className="mb-8 shadow-xl border-0 bg-gradient-to-br from-slate-50 to-blue-50">
+      {/* Filters */}
+      <Card className="mb-8 shadow-lg border border-blue-100 dark:border-zinc-700 bg-gradient-to-br from-white to-blue-50 dark:from-zinc-900 dark:to-zinc-800">
         <CardContent className="pt-6">
           <div className="flex items-center gap-3 mb-5">
-            <Filter className="h-6 w-6 text-purple-600" />
-            <h3 className="text-2xl font-semibold text-gray-800">Filter Your Journey</h3>
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-100 dark:bg-blue-950">
+              <Filter className="h-5 w-5 text-blue-600" />
+            </div>
+            <h3 className="text-xl font-semibold">Filter Your Journey</h3>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-5">
-            <div>
-              <Label className="text-sm font-medium text-gray-700">From</Label>
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+            <div className="space-y-1.5">
+              <Label className="flex items-center gap-1.5 text-sm font-medium text-slate-700 dark:text-zinc-300">
+                <MapPin className="h-3.5 w-3.5 text-blue-500" /> From
+              </Label>
               <select
                 value={startStopFilter}
                 onChange={(e) => setStartStopFilter(e.target.value)}
-                className="h-11 w-full rounded-xl border border-slate-200 bg-white px-4 focus:ring-2 focus:ring-purple-500"
+                className={selectClass}
               >
                 <option value="">All Starting Points</option>
                 {availableStartStops.map((stop) => (
@@ -184,12 +198,14 @@ export default function SearchBuses() {
               </select>
             </div>
 
-            <div>
-              <Label className="text-sm font-medium text-gray-700">To</Label>
+            <div className="space-y-1.5">
+              <Label className="flex items-center gap-1.5 text-sm font-medium text-slate-700 dark:text-zinc-300">
+                <MapPin className="h-3.5 w-3.5 text-emerald-500" /> To
+              </Label>
               <select
                 value={endStopFilter}
                 onChange={(e) => setEndStopFilter(e.target.value)}
-                className="h-11 w-full rounded-xl border border-slate-200 bg-white px-4 focus:ring-2 focus:ring-purple-500"
+                className={selectClass}
               >
                 <option value="">All Destinations</option>
                 {availableEndStops.map((stop) => (
@@ -198,33 +214,39 @@ export default function SearchBuses() {
               </select>
             </div>
 
-            <div>
-              <Label className="text-sm font-medium text-gray-700">Date</Label>
+            <div className="space-y-1.5">
+              <Label className="flex items-center gap-1.5 text-sm font-medium text-slate-700 dark:text-zinc-300">
+                <Calendar className="h-3.5 w-3.5 text-violet-500" /> Date
+              </Label>
               <Input
                 type="date"
                 value={dateFilter}
                 onChange={(e) => setDateFilter(e.target.value)}
-                className="h-11 rounded-xl border-slate-200 focus:ring-purple-500"
+                className="h-11 rounded-xl border-slate-200 focus:ring-blue-500"
               />
             </div>
 
-            <div>
-              <Label className="text-sm font-medium text-gray-700">After</Label>
+            <div className="space-y-1.5">
+              <Label className="flex items-center gap-1.5 text-sm font-medium text-slate-700 dark:text-zinc-300">
+                <Clock className="h-3.5 w-3.5 text-amber-500" /> After
+              </Label>
               <Input
                 type="time"
                 value={startTimeFilter}
                 onChange={(e) => setStartTimeFilter(e.target.value)}
-                className="h-11 rounded-xl border-slate-200 focus:ring-purple-500"
+                className="h-11 rounded-xl border-slate-200 focus:ring-blue-500"
               />
             </div>
 
-            <div>
-              <Label className="text-sm font-medium text-gray-700">Before</Label>
+            <div className="space-y-1.5">
+              <Label className="flex items-center gap-1.5 text-sm font-medium text-slate-700 dark:text-zinc-300">
+                <Clock className="h-3.5 w-3.5 text-rose-500" /> Before
+              </Label>
               <Input
                 type="time"
                 value={endTimeFilter}
                 onChange={(e) => setEndTimeFilter(e.target.value)}
-                className="h-11 rounded-xl border-slate-200 focus:ring-purple-500"
+                className="h-11 rounded-xl border-slate-200 focus:ring-blue-500"
               />
             </div>
           </div>
@@ -232,54 +254,68 @@ export default function SearchBuses() {
       </Card>
 
       {/* Results */}
-      <Card className="shadow-2xl border-0 bg-gradient-to-br from-white to-slate-50">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-3 text-2xl">
-            <Bus className="h-7 w-7 text-purple-600" />
-            Available Buses ({filteredBuses.length})
+      <Card className="shadow-xl border border-slate-100 dark:border-zinc-700">
+        <CardHeader className="flex flex-row items-center justify-between border-b border-slate-100 dark:border-zinc-700 pb-4">
+          <CardTitle className="flex items-center gap-3 text-xl">
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-100 dark:bg-blue-950">
+              <Bus className="h-5 w-5 text-blue-600" />
+            </div>
+            Available Buses
           </CardTitle>
+          <span className="rounded-full bg-blue-100 dark:bg-blue-950 px-3 py-1 text-sm font-semibold text-blue-700 dark:text-blue-300">
+            {filteredBuses.length} found
+          </span>
         </CardHeader>
 
-        <CardContent>
+        <CardContent className="pt-4">
           {loading ? (
-            <div className="text-center py-20 text-lg text-muted-foreground">
-              Loading available buses...
+            <div className="flex flex-col items-center justify-center py-20 gap-4">
+              <div className="h-12 w-12 rounded-full border-4 border-blue-200 border-t-blue-600 animate-spin" />
+              <p className="text-muted-foreground">Loading available buses...</p>
             </div>
           ) : filteredBuses.length === 0 ? (
             <div className="text-center py-20">
-              <Bus className="mx-auto h-16 w-16 text-slate-300 mb-4" />
-              <p className="text-xl text-gray-600">No scheduled buses match these filters</p>
-              <p className="mt-2 text-sm text-slate-500">Clear a filter or choose another travel date to see more trips.</p>
+              <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-slate-100 dark:bg-zinc-800">
+                <Search className="h-10 w-10 text-slate-300 dark:text-zinc-500" />
+              </div>
+              <p className="text-xl font-semibold text-slate-700 dark:text-zinc-300">No buses match these filters</p>
+              <p className="mt-2 text-sm text-muted-foreground">Clear a filter or choose another travel date to see more trips.</p>
             </div>
           ) : (
-            <div className="overflow-auto rounded-2xl border border-slate-100">
+            <div className="overflow-auto rounded-xl border border-slate-100 dark:border-zinc-700">
               <Table>
-                <TableHeader className="bg-slate-100">
+                <TableHeader className="bg-slate-50 dark:bg-zinc-800">
                   <TableRow>
-                    <TableHead className="font-semibold">Bus ID</TableHead>
-                    <TableHead className="font-semibold">Route</TableHead>
-                    <TableHead className="font-semibold">Date</TableHead>
-                    <TableHead className="font-semibold">Departure</TableHead>
-                    <TableHead className="font-semibold">Seats</TableHead>
-                    <TableHead className="font-semibold">Bus No</TableHead>
-                    <TableHead className="text-right font-semibold">Action</TableHead>
+                    <TableHead className="font-semibold text-slate-600 dark:text-zinc-300">Bus ID</TableHead>
+                    <TableHead className="font-semibold text-slate-600 dark:text-zinc-300">Route</TableHead>
+                    <TableHead className="font-semibold text-slate-600 dark:text-zinc-300">Date</TableHead>
+                    <TableHead className="font-semibold text-slate-600 dark:text-zinc-300">Departure</TableHead>
+                    <TableHead className="font-semibold text-slate-600 dark:text-zinc-300">Seats</TableHead>
+                    <TableHead className="font-semibold text-slate-600 dark:text-zinc-300">Bus No</TableHead>
+                    <TableHead className="text-right font-semibold text-slate-600 dark:text-zinc-300">Action</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filteredBuses.map((b) => (
-                    <TableRow key={b.scheduleId} className="hover:bg-blue-50/50 transition-all">
-                      <TableCell className="font-medium">{b.busId || b.id}</TableCell>
-                      <TableCell className="font-medium">{getRouteName(b.routeId)}</TableCell>
-                      <TableCell>{b.tripDate}</TableCell>
-                      <TableCell className="font-semibold text-emerald-600">
-                        {b.departureTime}
+                    <TableRow key={b.scheduleId} className="hover:bg-blue-50/60 dark:hover:bg-blue-950/20 transition-colors">
+                      <TableCell className="font-medium text-slate-700 dark:text-zinc-300">{b.busId || b.id}</TableCell>
+                      <TableCell className="font-medium">
+                        <span className="inline-flex items-center gap-1 text-blue-700 dark:text-blue-400">
+                          {getRouteName(b.routeId)}
+                        </span>
                       </TableCell>
-                      <TableCell>{b.totalSeats}</TableCell>
-                      <TableCell className="font-medium">{b.busNo}</TableCell>
+                      <TableCell className="text-slate-600 dark:text-zinc-400">{b.tripDate}</TableCell>
+                      <TableCell>
+                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 dark:bg-emerald-950 px-2.5 py-1 text-xs font-bold text-emerald-700 dark:text-emerald-300">
+                          <Clock className="h-3 w-3" /> {b.departureTime}
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-slate-600 dark:text-zinc-400">{b.totalSeats}</TableCell>
+                      <TableCell className="font-medium text-slate-700 dark:text-zinc-300">{b.busNo}</TableCell>
                       <TableCell className="text-right">
                         <Button
-                          size="lg"
-                          className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-lg"
+                          size="sm"
+                          className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-md hover:shadow-lg transition-all"
                           onClick={() =>
                             navigate("/passenger-dashboard/seat-layout", {
                               state: { bus: b },

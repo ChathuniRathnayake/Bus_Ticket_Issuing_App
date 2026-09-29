@@ -1,21 +1,38 @@
 // src/Passenger/MyBookings.jsx
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Ticket, Trash2, Calendar, Clock } from "lucide-react";
+import { ArrowLeft, Bus, Download, FileText, Ticket, Trash2, Clock } from "lucide-react";
+import QRCode from "qrcode";
 import TicketQRCode from "@/components/TicketQRCode";
+import { fetchPassengerBookings } from "@/utils/bookings";
 
 function getRoutes() {
   return JSON.parse(localStorage.getItem("routes")) || [];
 }
 
+function getPendingPayment() {
+  try {
+    return JSON.parse(localStorage.getItem("pendingPayment") || "null");
+  } catch {
+    return null;
+  }
+}
+
 export default function MyBookings() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [bookings, setBookings] = useState(() => JSON.parse(localStorage.getItem("userBookings") || "[]"));
   const [routes] = useState(getRoutes);
+  const [pendingPayment, setPendingPayment] = useState(getPendingPayment);
   const [cancelBookingId, setCancelBookingId] = useState(null);
+  const [currentTime, setCurrentTime] = useState(() => new Date());
+  const requestedStatus = searchParams.get("status");
+  const validStatuses = ["all", "confirmed", "processing", "expired"];
+  const selectedStatus = validStatuses.includes(requestedStatus) ? requestedStatus : "all";
+  const selectedBookingId = searchParams.get("bookingId");
 
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -24,6 +41,37 @@ export default function MyBookings() {
       return;
     }
   }, [navigate]);
+
+  useEffect(() => {
+    let active = true;
+    const restoreBookings = async () => {
+      const token = localStorage.getItem("token");
+      if (!token) return;
+      try {
+        const savedBookings = await fetchPassengerBookings(token);
+        if (!active) return;
+        setBookings(savedBookings);
+        localStorage.setItem("userBookings", JSON.stringify(savedBookings));
+      } catch (error) {
+        console.error("Failed to restore passenger bookings:", error);
+      }
+    };
+    restoreBookings();
+    return () => { active = false; };
+  }, []);
+
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      setCurrentTime(new Date());
+      setPendingPayment(getPendingPayment());
+    }, 30_000);
+    return () => window.clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    if (!selectedBookingId) return;
+    document.getElementById(`booking-detail-${selectedBookingId}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [selectedBookingId]);
 
   const handleCancelClick = (bookingId) => {
     setCancelBookingId(bookingId);
@@ -52,11 +100,111 @@ export default function MyBookings() {
   };
 
   const getRouteDetails = (routeId) => routes.find((r) => r.routeId === routeId);
+  const getQrValue = (booking, route) => (
+    `Ticket ID: ${booking.bookingId}\nBus: ${booking.busNo}\nSeat: ${booking.seat}\nRoute: ${route ? `${route.startStop} to ${route.endStop}` : booking.routeId}`
+  );
+  const getExportFilename = (booking) => String(booking.bookingId || "ticket").replace(/[^a-z0-9_-]/gi, "-");
+
+  const saveQrAsImage = async (booking, route) => {
+    try {
+      const dataUrl = await QRCode.toDataURL(getQrValue(booking, route), {
+        width: 600,
+        margin: 2,
+        color: { dark: "#0f172a", light: "#ffffff" },
+      });
+      const link = document.createElement("a");
+      link.href = dataUrl;
+      link.download = `${getExportFilename(booking)}-qr.png`;
+      link.click();
+    } catch (error) {
+      console.error("QR image export failed:", error);
+      window.alert("Could not save the QR image. Please try again.");
+    }
+  };
+
+  const saveTicketAsPdf = async (booking, route) => {
+    try {
+      const [{ jsPDF }, qrDataUrl] = await Promise.all([
+        import("jspdf"),
+        QRCode.toDataURL(getQrValue(booking, route), {
+          width: 600,
+          margin: 2,
+          color: { dark: "#0f172a", light: "#ffffff" },
+        }),
+      ]);
+      const pdf = new jsPDF();
+      const routeName = route
+        ? `${route.startStop} to ${route.endStop}`
+        : `${booking.startStop || "Starting point"} to ${booking.endStop || "Destination"}`;
+      const amount = booking.amountCents == null
+        ? "—"
+        : `${(booking.amountCents / 100).toFixed(2)} ${(booking.currency || "").toUpperCase()}`.trim();
+
+      pdf.setFontSize(20);
+      pdf.text("TicketGo Bus Ticket", 20, 22);
+      pdf.addImage(qrDataUrl, "PNG", 20, 32, 75, 75);
+      pdf.setFontSize(11);
+      pdf.text([
+        `Route: ${routeName}`,
+        `Date: ${booking.date || route?.date || "—"}`,
+        `Departure: ${booking.departureTime || route?.startTime || "—"}`,
+        `Boarding: ${booking.boardingStop || "—"}`,
+        `Drop-off: ${booking.dropStop || "—"}`,
+        `Bus: ${booking.busNo || booking.busId || "—"}`,
+        `Seat: ${booking.seat || "—"}`,
+        `Booking reference: ${booking.bookingId || "—"}`,
+        `Payment: ${booking.paymentStatus === "SUCCEEDED" ? "Successful" : booking.status || "Confirmed"}`,
+        `Amount paid: ${amount}`,
+      ], 20, 125);
+      pdf.save(`${getExportFilename(booking)}-ticket.pdf`);
+    } catch (error) {
+      console.error("Ticket PDF export failed:", error);
+      window.alert("Could not save the ticket PDF. Please try again.");
+    }
+  };
+
+  const bookingItems = bookings.map((booking) => {
+    const route = getRouteDetails(booking.routeId);
+    const departureAt = new Date(`${booking.date || route?.date || ""}T${booking.departureTime || route?.startTime || ""}`);
+    const isProcessing = ["PENDING_PAYMENT", "CHECKOUT_CREATED"].includes(String(booking.status || "").toUpperCase());
+    return {
+      ...booking,
+      displayStatus: isProcessing
+        ? "processing"
+        : !Number.isNaN(departureAt.getTime()) && departureAt <= currentTime ? "expired" : "confirmed",
+    };
+  });
+
+  if (pendingPayment && !bookings.some((booking) => booking.bookingId === pendingPayment.bookingId)) {
+    bookingItems.push({ ...pendingPayment, displayStatus: "processing", isPendingPayment: true });
+  }
+
+  const statusFilters = [
+    { value: "all", label: "All" },
+    { value: "confirmed", label: "Confirmed" },
+    { value: "processing", label: "Processing" },
+    { value: "expired", label: "Expired" },
+  ];
+  const statusCounts = bookingItems.reduce((counts, booking) => {
+    counts[booking.displayStatus] += 1;
+    return counts;
+  }, { confirmed: 0, processing: 0, expired: 0 });
+  const visibleBookings = selectedStatus === "all"
+    ? bookingItems
+    : bookingItems.filter((booking) => booking.displayStatus === selectedStatus);
+
+  const selectStatus = (status) => {
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.delete("bookingId");
+    if (status === "all") nextParams.delete("status");
+    else nextParams.set("status", status);
+    setSearchParams(nextParams);
+  };
 
   return (
     <div className="max-w-6xl mx-auto p-6 animate-fade-in">
       {/* Header */}
-      <div className="flex items-center gap-4 mb-8">
+      <div className="flex flex-wrap items-center gap-4 mb-8">
         <Button 
           variant="ghost" 
           onClick={() => navigate("/passenger-dashboard")} 
@@ -70,9 +218,36 @@ export default function MyBookings() {
           </h2>
           <p className="text-muted-foreground">Your upcoming and recent journeys</p>
         </div>
+        {bookingItems.length > 0 && (
+          <Button
+            onClick={() => navigate("/passenger-dashboard/search-buses")}
+            className="ml-auto bg-blue-600 hover:bg-blue-700"
+          >
+            <Bus className="mr-2 h-4 w-4" /> Book another trip
+          </Button>
+        )}
       </div>
 
-      {bookings.length === 0 ? (
+      {bookingItems.length > 0 && (
+        <div className="mb-6 flex flex-wrap gap-2" role="group" aria-label="Filter bookings by status">
+          {statusFilters.map((filter) => {
+            const count = filter.value === "all" ? bookingItems.length : statusCounts[filter.value];
+            return (
+              <Button
+                key={filter.value}
+                type="button"
+                variant={selectedStatus === filter.value ? "default" : "outline"}
+                aria-pressed={selectedStatus === filter.value}
+                onClick={() => selectStatus(filter.value)}
+              >
+                {filter.label} ({count})
+              </Button>
+            );
+          })}
+        </div>
+      )}
+
+      {bookingItems.length === 0 ? (
         <Card className="shadow-2xl border-0 bg-gradient-to-br from-violet-600 via-blue-600 to-indigo-600 text-white">
           <CardContent className="p-20 text-center">
             <Ticket className="w-24 h-24 mx-auto mb-6 opacity-90" />
@@ -87,10 +262,18 @@ export default function MyBookings() {
             </Button>
           </CardContent>
         </Card>
+      ) : visibleBookings.length === 0 ? (
+        <Card>
+          <CardContent className="py-12 text-center text-muted-foreground">
+            No bookings in {statusFilters.find((filter) => filter.value === selectedStatus)?.label.toLowerCase() || "this filter"}.
+          </CardContent>
+        </Card>
       ) : (
         <div className="space-y-8">
-          {bookings.map((booking) => {
+          {visibleBookings.map((booking) => {
             const route = getRouteDetails(booking.routeId);
+            const isExpired = booking.displayStatus === "expired";
+            const isProcessing = booking.displayStatus === "processing";
             
             let duration = "—";
             if (route?.startTime && route?.endTime) {
@@ -104,7 +287,8 @@ export default function MyBookings() {
             return (
               <Card 
                 key={booking.bookingId} 
-                className="overflow-hidden shadow-2xl border-0 bg-gradient-to-br from-slate-50 via-white to-blue-50 hover:shadow-3xl transition-all duration-300"
+                id={`booking-detail-${booking.bookingId || booking.paymentId}`}
+                className={`overflow-hidden shadow-2xl border-0 bg-gradient-to-br from-slate-50 via-white to-blue-50 hover:shadow-3xl transition-all duration-300 ${selectedBookingId === (booking.bookingId || booking.paymentId) ? "ring-2 ring-blue-500" : ""}`}
               >
                 <CardContent className="p-8">
                   <div className="flex flex-col lg:flex-row gap-10">
@@ -120,8 +304,13 @@ export default function MyBookings() {
                             {route?.routeName || "Express Route"}
                           </p>
                         </div>
-                        <Badge className="bg-gradient-to-r from-emerald-500 to-teal-500 text-white px-5 py-1.5 text-sm font-medium shadow">
-                          CONFIRMED
+                        <Badge className={isProcessing
+                          ? "bg-amber-500 text-white px-5 py-1.5 text-sm font-medium shadow"
+                          : isExpired
+                            ? "bg-rose-600 text-white px-5 py-1.5 text-sm font-medium shadow"
+                            : "bg-gradient-to-r from-emerald-500 to-teal-500 text-white px-5 py-1.5 text-sm font-medium shadow"}
+                        >
+                          {booking.displayStatus.toUpperCase()}
                         </Badge>
                       </div>
 
@@ -154,34 +343,75 @@ export default function MyBookings() {
                         </div>
                         <div>
                           <p className="text-xs text-muted-foreground">BOOKED ON</p>
-                          <p className="font-medium mt-1 text-gray-700">{formatDateTime(booking.bookingDate)}</p>
+                          <p className="font-medium mt-1 text-gray-700">{booking.bookingDate ? formatDateTime(booking.bookingDate) : "—"}</p>
                         </div>
                         <div>
                           <p className="text-xs text-muted-foreground">BOOKING ID</p>
                           <p className="font-mono text-sm text-gray-600 mt-1 break-all">{booking.bookingId}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground">BOARDING STOP</p>
+                          <p className="font-medium mt-1 text-gray-700">{booking.boardingStop || "—"}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground">DROP-OFF STOP</p>
+                          <p className="font-medium mt-1 text-gray-700">{booking.dropStop || "—"}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground">PAYMENT</p>
+                          <p className={`font-semibold mt-1 ${isProcessing ? "text-amber-700" : "text-emerald-700"}`}>
+                            {isProcessing ? "Processing" : booking.paymentStatus === "SUCCEEDED" ? "Successful" : booking.status}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground">AMOUNT PAID</p>
+                          <p className="font-medium mt-1 text-gray-700">
+                            {booking.amountCents != null
+                              ? `${(booking.amountCents / 100).toFixed(2)} ${(booking.currency || "").toUpperCase()}`.trim()
+                              : "—"}
+                          </p>
                         </div>
                       </div>
                     </div>
 
                     {/* QR Code Section - More Vibrant */}
                     <div className="lg:w-80 flex flex-col items-center justify-center bg-gradient-to-br from-white to-blue-50 rounded-3xl p-8 border border-blue-100">
-                      <div className="bg-white p-5 rounded-3xl shadow-xl">
-                        <TicketQRCode
-                          value={`Ticket ID: ${booking.bookingId}\nBus: ${booking.busNo}\nSeat: ${booking.seat}\nRoute: ${route ? `${route.startStop} → ${route.endStop}` : booking.routeId}`}
-                          size={170}
-                        />
-                      </div>
-                      <p className="text-center text-xs text-slate-500 mt-4">Scan at boarding point</p>
+                      {isProcessing ? (
+                        <>
+                          <Clock className="h-12 w-12 text-amber-600" />
+                          <p className="mt-4 text-center font-semibold text-slate-800">Payment is processing</p>
+                          <p className="mt-2 text-center text-sm text-slate-500">Your ticket will be available after payment is confirmed.</p>
+                        </>
+                      ) : (
+                        <>
+                          <div className="bg-white p-5 rounded-3xl shadow-xl">
+                            <TicketQRCode
+                              value={getQrValue(booking, route)}
+                              size={170}
+                            />
+                          </div>
+                          <p className="text-center text-xs text-slate-500 mt-4">Scan at boarding point</p>
 
-                      <Button
-                        variant="destructive"
-                        size="lg"
-                        className="mt-8 w-full bg-gradient-to-r from-red-500 to-rose-600 hover:from-red-600 hover:to-rose-700 shadow-lg"
-                        onClick={() => handleCancelClick(booking.bookingId)}
-                      >
-                        <Trash2 className="mr-2 h-5 w-5" />
-                        Cancel Ticket
-                      </Button>
+                          <div className="mt-5 grid w-full gap-2">
+                            <Button variant="outline" size="sm" onClick={() => saveQrAsImage(booking, route)}>
+                              <Download className="mr-2 h-4 w-4" /> Save QR as image
+                            </Button>
+                            <Button variant="outline" size="sm" onClick={() => saveTicketAsPdf(booking, route)}>
+                              <FileText className="mr-2 h-4 w-4" /> Save QR as PDF
+                            </Button>
+                          </div>
+
+                          <Button
+                            variant="destructive"
+                            size="lg"
+                            className="mt-8 w-full bg-gradient-to-r from-red-500 to-rose-600 hover:from-red-600 hover:to-rose-700 shadow-lg"
+                            onClick={() => handleCancelClick(booking.bookingId)}
+                          >
+                            <Trash2 className="mr-2 h-5 w-5" />
+                            Cancel Ticket
+                          </Button>
+                        </>
+                      )}
                     </div>
                   </div>
                 </CardContent>

@@ -85,6 +85,15 @@
   * {
     @apply border-border outline-ring/50;
   }
+  button:not(:disabled),
+  a[href],
+  [role="button"]:not([aria-disabled="true"]) {
+    cursor: pointer;
+  }
+  button:disabled,
+  [aria-disabled="true"] {
+    cursor: not-allowed;
+  }
   body {
     @apply bg-background text-foreground;
   }
@@ -122,4 +131,87 @@
 }
 .animate-soft-pulse {
   animation: soft-pulse 2.5s ease-in-out infinite;
+}
+
+/* ══ Page entrance fade-in ══ */
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-in {
+  animation: fade-in 0.6s ease-out both;
+}
+
+/* ══ Glass morphism ══ */
+.glass {
+  background: rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+/* ══ Gradient text ══ */
+.gradient-text {
+  background: linear-gradient(135deg, #3b82f6, #6366f1, #8b5cf6);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ══ Mobile slide-in menu ══ */
+@keyframes slide-in-left {
+  from { transform: translateX(-100%); opacity: 0; }
+  to   { transform: translateX(0);     opacity: 1; }
+}
+.animate-slide-in-left {
+  animation: slide-in-left 0.25s ease-out both;
+}
+
+/* ══ Count-up entrance animation ══ */
+@keyframes count-up {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-count {
+  animation: count-up 0.8s ease-out both;
+}
+
+/* ══ Ticket perforated border ══ */
+.ticket-perforation {
+  background-image: radial-gradient(circle, #e5e7eb 6px, transparent 6px);
+  background-size: 20px 20px;
+  background-position: 0 center;
+}
+
+/* ══ Smooth scrolling for the whole page ══ */
+html {
+  scroll-behavior: smooth;
+}
+
+/* ══ Better text selection colour ══ */
+::selection {
+  background: rgba(99, 102, 241, 0.25);
+}
+
+/* ══ Custom thin scrollbar ══ */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(148,163,184,0.5); border-radius: 9999px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(99,102,241,0.55); }
+
+/* ══ Card glow on hover (opt-in with .card-glow) ══ */
+.card-glow {
+  transition: box-shadow 0.3s ease;
+}
+.card-glow:hover {
+  box-shadow: 0 0 0 1px rgba(99,102,241,0.15), 0 8px 30px rgba(99,102,241,0.12);
+}
+
+/* ══ Slow spinner utility ══ */
+@keyframes spin-slow {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+.animate-spin-slow {
+  animation: spin-slow 2s linear infinite;
 }
