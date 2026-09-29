@@ -16,7 +16,25 @@ const serverError = (res, error) => {
   return res.status(500).json({ message: "Payment service error" });
 };
 
-const getTicketPriceCents = (schedule, route) => {
+// Cumulative per-stop fares: price a boarding→drop journey as the difference
+// between the two stops' cumulative fares so intermediate hops cost less.
+const journeyFareFromRoute = (route, boardingStopId, dropStopId) => {
+  const fares = route?.stopFareCents;
+  const stops = route?.stops;
+  if (!Array.isArray(fares) || !Array.isArray(stops) || fares.length !== stops.length) return null;
+  const from = stops.findIndex((stop) => stop.stopId === boardingStopId);
+  const to = stops.findIndex((stop) => stop.stopId === dropStopId);
+  if (from < 0 || to < 0 || to <= from) return null;
+  const start = Number(fares[from]);
+  const end = Number(fares[to]);
+  if (!Number.isFinite(start) || !Number.isFinite(end)) return null;
+  const difference = end - start;
+  return difference > 0 ? difference : null;
+};
+
+const getTicketPriceCents = (schedule, route, boardingStopId, dropStopId) => {
+  const segmentFare = journeyFareFromRoute(route, boardingStopId, dropStopId);
+  if (segmentFare) return segmentFare;
   const candidate = [
     schedule?.priceCents, schedule?.amountCents, schedule?.fareCents,
     route?.priceCents, route?.amountCents, route?.fareCents,
@@ -47,7 +65,7 @@ export const createCheckoutSession = async (req, res) => {
       const routeDoc = await db.collection("routes").doc(schedule.routeId).get();
       if (routeDoc.exists) route = routeDoc.data();
     }
-    const priceCents = getTicketPriceCents(schedule, route);
+    const priceCents = getTicketPriceCents(schedule, route, boardingStopId, dropStopId);
     if (amountCents !== undefined && Number(amountCents) !== priceCents) {
       return res.status(400).json({ message: "Ticket amount is invalid" });
     }

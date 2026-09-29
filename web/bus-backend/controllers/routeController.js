@@ -1,6 +1,20 @@
-import { db } from "../config/firebase.js";
+import { admin, db } from "../config/firebase.js";
 
 const slugStop = (name) => name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+
+// Cumulative per-stop fares: stopFareCents[i] is the price from the origin to
+// stop i, parallel to the stops array. Journeys are priced as the difference
+// between the drop and boarding entries.
+function normalizeStopFares(input, stopCount) {
+  if (input === undefined || input === null || input === "") return undefined;
+  if (!Array.isArray(input)) throw new Error("stopFareCents must be an array parallel to stops");
+  if (input.length !== stopCount) throw new Error("stopFareCents must have one entry per stop");
+  return input.map((value, index) => {
+    const cents = Math.round(Number(value));
+    if (!Number.isFinite(cents) || cents < 0) throw new Error(`Fare for stop ${index + 1} must be a non-negative amount`);
+    return cents;
+  });
+}
 
 function normalizeStops(input) {
   if (!Array.isArray(input) || input.length < 2) throw new Error("Routes require an ordered list of at least two stops");
@@ -46,6 +60,7 @@ export const createRoute = async (req, res) => {
       endTime,
       date,
       priceCents,
+      stopFareCents,
       stops,
     } = req.body;
 
@@ -94,6 +109,8 @@ export const createRoute = async (req, res) => {
       }
       routeDoc.priceCents = cents;
     }
+    const stopFares = normalizeStopFares(stopFareCents, orderedStops.length);
+    if (stopFares) routeDoc.stopFareCents = stopFares;
 
     await db.collection("routes").doc(routeId).set(routeDoc);
 
@@ -191,6 +208,7 @@ export const updateRoute = async (req, res) => {
       endTime,
       date,
       priceCents,
+      stopFareCents,
       stops,
     } = req.body;
 
@@ -220,6 +238,13 @@ export const updateRoute = async (req, res) => {
         return res.status(400).json({ message: "Fare must be a non-negative amount" });
       }
       updatePayload.priceCents = cents;
+    }
+    if (stopFareCents === null) {
+      // Admin cleared per-stop pricing — drop the field so the flat fare wins.
+      updatePayload.stopFareCents = admin.firestore.FieldValue.delete();
+    } else if (stopFareCents !== undefined && stopFareCents !== "") {
+      const stopCount = orderedStops ? orderedStops.length : (routeDoc.data().stops || []).length;
+      updatePayload.stopFareCents = normalizeStopFares(stopFareCents, stopCount);
     }
     await routeRef.update(updatePayload);
 

@@ -6,13 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { formatLkr, journeyFareCents } from "@/utils/fare";
 import { ArrowLeft, Bus, Filter, Calendar, Clock, MapPin, Search } from "lucide-react";
-
-const formatFare = (priceCents) => {
-  const cents = Number(priceCents);
-  if (!Number.isFinite(cents) || cents <= 0) return "—";
-  return `Rs ${(cents / 100).toLocaleString("en-LK", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-};
 
 export default function SearchBuses() {
   const navigate = useNavigate();
@@ -321,7 +316,12 @@ export default function SearchBuses() {
                       <TableCell className="font-medium text-slate-700 dark:text-zinc-300">{b.busNo}</TableCell>
                       <TableCell>
                         <span className="inline-flex items-center rounded-full bg-emerald-50 dark:bg-emerald-950 px-2.5 py-1 text-xs font-bold text-emerald-700 dark:text-emerald-300">
-                          {formatFare(b.route?.priceCents ?? b.priceCents)}
+                          {formatLkr(journeyFareCents(
+                            b.route,
+                            getStops(b.route),
+                            b.boardingStop?.stopId,
+                            b.dropStop?.stopId,
+                          )) ?? "—"}
                         </span>
                       </TableCell>
                       <TableCell className="text-right">

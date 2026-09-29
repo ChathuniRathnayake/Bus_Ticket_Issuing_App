@@ -2,13 +2,8 @@ import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { formatLkr, journeyFareCents } from "@/utils/fare";
 import { ArrowLeft, CreditCard } from "lucide-react";
-
-const formatFare = (priceCents) => {
-  const cents = Number(priceCents);
-  if (!Number.isFinite(cents) || cents <= 0) return null;
-  return `Rs ${(cents / 100).toLocaleString("en-LK", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-};
 
 // ─── Single seat button ────────────────────────────────────────────────────────
 function SeatBtn({ label, status, onClick }) {
@@ -237,7 +232,8 @@ export default function SeatLayout() {
   const bookedCount = layoutSeatNumbers.filter((seat) => bookedSeatSet.has(seat)).length;
   const availableCount = layoutSeatNumbers.length - bookedCount;
   const maxRows        = Math.max(leftRows, rightRows);
-  const fareLabel      = formatFare(bus.route?.priceCents ?? bus.priceCents);
+  const journeyFare    = journeyFareCents(bus.route, routeStops, boardingStopId, dropStopId);
+  const fareLabel      = formatLkr(journeyFare);
 
   // ── Render ────────────────────────────────────────────────────────────────────
   return (
@@ -295,6 +291,12 @@ export default function SeatLayout() {
               {destinationStops.map((stop) => <option key={stop.stopId} value={stop.stopId}>{stop.name}</option>)}
             </select>
           </label>
+          <div className="md:col-span-2 flex items-center justify-between rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
+            <span className="text-sm font-semibold text-emerald-800">Fare for this journey</span>
+            <span className="text-lg font-bold text-emerald-700">
+              {fareLabel ?? "Calculated at checkout"}
+            </span>
+          </div>
         </CardContent>
       </Card>
 

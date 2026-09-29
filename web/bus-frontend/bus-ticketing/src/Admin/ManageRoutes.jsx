@@ -13,6 +13,7 @@ import {
   TableRow
 } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
+import { fullFareCents } from "@/utils/fare";
 import { ArrowLeft, Pencil, Trash2, Map, ArrowUp, ArrowDown, Plus, Search, Route as RouteIcon } from "lucide-react";
 
 const MAX_VISIBLE_STOPS = 5;
@@ -25,6 +26,15 @@ const formatFare = (priceCents) => {
   const cents = Number(priceCents);
   if (!Number.isFinite(cents) || cents <= 0) return "—";
   return `Rs ${(cents / 100).toLocaleString("en-LK", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+};
+
+// Cumulative per-stop fares as editable rupee strings, parallel to the stops.
+// Stop 0 (the origin) is always 0; the rest default to 0 when not yet priced.
+const toFareInputs = (route, stopCount) => {
+  const fares = Array.isArray(route.stopFareCents) && route.stopFareCents.length === stopCount
+    ? route.stopFareCents
+    : Array.from({ length: stopCount }, () => 0);
+  return fares.map((cents, index) => (index === 0 ? "0" : String(Number(cents) / 100)));
 };
 
 // Normalize a route's stops into objects, falling back to the two terminals.
@@ -50,6 +60,7 @@ export default function ManageRoutes() {
   const [editId, setEditId] = useState(null);
   const [search, setSearch] = useState("");
   const [stopRecords, setStopRecords] = useState([]);
+  const [editStopFares, setEditStopFares] = useState([]);
   const [editForm, setEditForm] = useState(emptyEditForm);
   const [editPriceLkr, setEditPriceLkr] = useState("");
   const [expanded, setExpanded] = useState({});
@@ -101,8 +112,10 @@ export default function ManageRoutes() {
      EDIT
   ===================================================== */
   const handleEdit = (route) => {
+    const stops = toStopList(route);
     setEditId(route.id);
-    setStopRecords(toStopList(route));
+    setStopRecords(stops);
+    setEditStopFares(toFareInputs(route, stops.length));
     setEditForm({
       routeName: route.routeName || "",
       startStop: route.startStop || "",
@@ -116,6 +129,7 @@ export default function ManageRoutes() {
   const cancelEdit = () => {
     setEditId(null);
     setStopRecords([]);
+    setEditStopFares([]);
     setEditForm(emptyEditForm);
     setEditPriceLkr("");
   };
@@ -168,6 +182,33 @@ export default function ManageRoutes() {
         payload.priceCents = Math.round(rupees * 100);
       }
 
+      // Cumulative per-stop fares (rupees -> cents). Stop 0 is the origin and
+      // is always 0. Only persist the array when the admin actually priced a
+      // stop beyond the origin; otherwise send null so any stale/all-zero array
+      // is cleared and the flat full-route fare stays the source of truth.
+      const parsedFares = editStopFares.map((value) => Number(String(value ?? "").trim() || 0));
+      const hasStopFares = parsedFares.some((rupees, index) => index > 0 && Number.isFinite(rupees) && rupees > 0);
+      if (hasStopFares) {
+        if (editStopFares.length !== stops.length) {
+          throw new Error("Each stop needs a cumulative fare");
+        }
+        const stopFareCents = parsedFares.map((rupees, index) => {
+          if (!Number.isFinite(rupees) || rupees < 0) {
+            throw new Error(`Fare for stop ${index + 1} must be a non-negative amount in rupees`);
+          }
+          return Math.round(rupees * 100);
+        });
+        stopFareCents[0] = 0;
+        for (let index = 1; index < stopFareCents.length; index += 1) {
+          if (stopFareCents[index] < stopFareCents[index - 1]) {
+            throw new Error("Cumulative fares must not decrease along the route");
+          }
+        }
+        payload.stopFareCents = stopFareCents;
+      } else {
+        payload.stopFareCents = null;
+      }
+
       await axios.put(
         `http://localhost:5000/api/route/${id}`,
         payload,
@@ -214,6 +255,48 @@ export default function ManageRoutes() {
   );
 
   const toggleExpanded = (id) => setExpanded((prev) => ({ ...prev, [id]: !prev[id] }));
+
+  /* =====================================================
+     STOP + FARE EDITING (kept in lockstep)
+  ===================================================== */
+  const updateStopFare = (index, value) => {
+    setEditStopFares((items) => items.map((item, itemIndex) => (itemIndex === index ? value : item)));
+  };
+
+  const moveStop = (index, direction) => {
+    const target = index + direction;
+    if (target < 0 || target >= stopRecords.length) return;
+    setStopRecords((items) => {
+      const next = [...items];
+      [next[index], next[target]] = [next[target], next[index]];
+      return next;
+    });
+    setEditStopFares((items) => {
+      const next = [...items];
+      [next[index], next[target]] = [next[target], next[index]];
+      return next;
+    });
+  };
+
+  const removeStop = (index) => {
+    if (stopRecords.length <= 2) return;
+    setStopRecords((items) => items.filter((_, itemIndex) => itemIndex !== index));
+    setEditStopFares((items) => items.filter((_, itemIndex) => itemIndex !== index));
+  };
+
+  const addStop = (routeId) => {
+    const insertAt = Math.max(1, stopRecords.length - 1);
+    setStopRecords((items) => {
+      const next = [...items];
+      next.splice(insertAt, 0, { stopId: `${routeId}-stop-${Date.now()}`, name: "", stopType: "normal_road_waypoint", boardingAllowed: false, alightingAllowed: false });
+      return next;
+    });
+    setEditStopFares((items) => {
+      const next = [...items];
+      next.splice(insertAt, 0, "0");
+      return next;
+    });
+  };
 
   return (
     <div className="mx-auto max-w-7xl space-y-6 p-6 animate-fade-in">
@@ -335,7 +418,7 @@ export default function ManageRoutes() {
                           <TableCell>{r.distance ? r.distance : "—"}</TableCell>
                           <TableCell><span className="font-mono text-sm">{r.duration || "—"}</span></TableCell>
                           <TableCell>
-                            <span className="font-semibold text-emerald-700">{formatFare(r.priceCents)}</span>
+                            <span className="font-semibold text-emerald-700">{formatFare(fullFareCents(r))}</span>
                           </TableCell>
 
                           <TableCell className="text-right">
@@ -401,7 +484,7 @@ export default function ManageRoutes() {
                                       <Input value={editForm.duration} onChange={(event) => setEditForm((prev) => ({ ...prev, duration: event.target.value }))} placeholder="2:30" className="w-full min-w-0" />
                                     </div>
                                     <div className="min-w-0 space-y-1">
-                                      <label className="block text-xs font-medium text-slate-600">Fare (LKR)</label>
+                                      <label className="block text-xs font-medium text-slate-600">Full-route fare (LKR)</label>
                                       <Input type="number" min="0" step="0.01" value={editPriceLkr} onChange={(event) => setEditPriceLkr(event.target.value)} placeholder="450" className="w-full min-w-0" />
                                     </div>
                                   </div>
@@ -409,29 +492,27 @@ export default function ManageRoutes() {
 
                                 <div className="space-y-2">
                                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-600">Ordered route stops</p>
+                                <p className="text-xs text-slate-500">Set the cumulative fare from the origin to each stop. A passenger's fare is the difference between their boarding and drop stops.</p>
                                 {stopRecords.map((stop, index) => (
-                                  <div key={stop.stopId} className="grid grid-cols-1 items-center gap-2 rounded border bg-white p-2 md:grid-cols-[minmax(12rem,1fr)_12rem_auto_auto_auto]">
-                                    <Input aria-label={`Stop ${index + 1} name`} value={stop.name} onChange={(event) => setStopRecords((items) => items.map((item, itemIndex) => itemIndex === index ? { ...item, name: event.target.value } : item))} />
-                                    <select aria-label={`Stop ${index + 1} type`} value={stop.stopType || "normal_road_waypoint"} onChange={(event) => setStopRecords((items) => items.map((item, itemIndex) => itemIndex === index ? { ...item, stopType: event.target.value, boardingAllowed: event.target.value.startsWith("expressway_") ? false : item.boardingAllowed, alightingAllowed: event.target.value.startsWith("expressway_") ? false : item.alightingAllowed } : item))} className="h-10 rounded border border-slate-300 bg-white px-2 text-sm">
+                                  <div key={stop.stopId} className="grid grid-cols-1 items-center gap-2 rounded border bg-white p-2 md:grid-cols-[minmax(10rem,1fr)_10rem_7rem_auto_auto_auto]">
+                                    <Input aria-label={`Stop ${index + 1} name`} value={stop.name} onChange={(event) => setStopRecords((items) => items.map((item, itemIndex) => itemIndex === index ? { ...item, name: event.target.value } : item))} className="min-w-0" />
+                                    <select aria-label={`Stop ${index + 1} type`} value={stop.stopType || "normal_road_waypoint"} onChange={(event) => setStopRecords((items) => items.map((item, itemIndex) => itemIndex === index ? { ...item, stopType: event.target.value, boardingAllowed: event.target.value.startsWith("expressway_") ? false : item.boardingAllowed, alightingAllowed: event.target.value.startsWith("expressway_") ? false : item.alightingAllowed } : item))} className="h-10 min-w-0 rounded border border-slate-300 bg-white px-2 text-sm">
                                       <option value="terminal">Terminal</option>
                                       <option value="normal_road_waypoint">Normal road stop</option>
                                       <option value="expressway_interchange">Expressway interchange</option>
                                       <option value="expressway_segment">Expressway segment</option>
                                     </select>
+                                    <Input aria-label={`Cumulative fare from origin to stop ${index + 1} (LKR)`} type="number" min="0" step="0.01" value={editStopFares[index] ?? "0"} disabled={index === 0} onChange={(event) => updateStopFare(index, event.target.value)} placeholder="0" className="min-w-0" />
                                     <label className="flex items-center gap-1 text-xs"><input type="checkbox" checked={stop.boardingAllowed === true} disabled={stop.stopType?.startsWith("expressway_")} onChange={(event) => setStopRecords((items) => items.map((item, itemIndex) => itemIndex === index ? { ...item, boardingAllowed: event.target.checked } : item))} />Board</label>
                                     <label className="flex items-center gap-1 text-xs"><input type="checkbox" checked={stop.alightingAllowed === true} disabled={stop.stopType?.startsWith("expressway_")} onChange={(event) => setStopRecords((items) => items.map((item, itemIndex) => itemIndex === index ? { ...item, alightingAllowed: event.target.checked } : item))} />Alight</label>
                                     <div className="flex gap-1">
-                                      <Button size="icon" variant="ghost" title="Move stop up" disabled={index === 0} onClick={() => setStopRecords((items) => { const next = [...items]; [next[index - 1], next[index]] = [next[index], next[index - 1]]; return next; })}><ArrowUp className="h-4 w-4" /></Button>
-                                      <Button size="icon" variant="ghost" title="Move stop down" disabled={index === stopRecords.length - 1} onClick={() => setStopRecords((items) => { const next = [...items]; [next[index], next[index + 1]] = [next[index + 1], next[index]]; return next; })}><ArrowDown className="h-4 w-4" /></Button>
-                                      <Button size="icon" variant="ghost" title="Remove stop" disabled={stopRecords.length <= 2} onClick={() => setStopRecords((items) => items.filter((_, itemIndex) => itemIndex !== index))}><Trash2 className="h-4 w-4" /></Button>
+                                      <Button size="icon" variant="ghost" title="Move stop up" disabled={index === 0} onClick={() => moveStop(index, -1)}><ArrowUp className="h-4 w-4" /></Button>
+                                      <Button size="icon" variant="ghost" title="Move stop down" disabled={index === stopRecords.length - 1} onClick={() => moveStop(index, 1)}><ArrowDown className="h-4 w-4" /></Button>
+                                      <Button size="icon" variant="ghost" title="Remove stop" disabled={stopRecords.length <= 2} onClick={() => removeStop(index)}><Trash2 className="h-4 w-4" /></Button>
                                     </div>
                                   </div>
                                 ))}
-                                <Button size="sm" variant="outline" onClick={() => setStopRecords((items) => {
-                                  const next = [...items];
-                                  next.splice(Math.max(1, next.length - 1), 0, { stopId: `${r.routeId}-stop-${Date.now()}`, name: "", stopType: "normal_road_waypoint", boardingAllowed: false, alightingAllowed: false });
-                                  return next;
-                                })}><Plus className="mr-1 h-4 w-4" />Add stop</Button>
+                                <Button size="sm" variant="outline" onClick={() => addStop(r.routeId)}><Plus className="mr-1 h-4 w-4" />Add stop</Button>
                                 </div>
                               </div>
                             </TableCell>
