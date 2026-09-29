@@ -34,8 +34,6 @@ export function validateJourneySegment(route, boardingStopId, dropStopId) {
 	const dropIndex = stops.findIndex((stop) => stop.stopId === dropStopId);
 	if (boardingIndex < 0 || dropIndex < 0) throw new Error("Selected stop is not on this route");
 	if (boardingIndex >= dropIndex) throw new Error("Destination must follow boarding point");
-	if (stops[boardingIndex].boardingAllowed !== true) throw new Error("Boarding is not allowed at this stop");
-	if (stops[dropIndex].alightingAllowed !== true) throw new Error("Alighting is not allowed at this stop");
 	return {
 		stops,
 		boardingIndex,

@@ -37,3 +37,14 @@ test("rejects overlapping segments", () => {
 test("rejects reverse stop order", () => {
   assert.throws(() => validateJourneySegment(route, "middle", "origin"), /Destination must follow/);
 });
+
+test("allows boarding and alighting at any ordered route halt", () => {
+  const routeWithUnflaggedHalts = {
+    ...route,
+    stops: route.stops.map((stop) => ({ ...stop, boardingAllowed: false, alightingAllowed: false })),
+  };
+  const segment = validateJourneySegment(routeWithUnflaggedHalts, "middle", "destination");
+  assert.deepEqual(segment.segmentStopIds, ["middle"]);
+  assert.equal(segment.boardingStop.stopId, "middle");
+  assert.equal(segment.dropStop.stopId, "destination");
+});

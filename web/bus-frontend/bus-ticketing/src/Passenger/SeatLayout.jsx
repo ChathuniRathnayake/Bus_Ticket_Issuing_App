@@ -53,12 +53,12 @@ export default function SeatLayout() {
   const [routeStops] = useState(() => normalizeRouteStops(bus));
   const [boardingStopId, setBoardingStopId] = useState(() => (
     bus?.boardingStop?.stopId
-      || normalizeRouteStops(bus).find((stop) => stop.boardingAllowed === true)?.stopId
+      || normalizeRouteStops(bus)[0]?.stopId
       || ""
   ));
   const [dropStopId, setDropStopId] = useState(() => (
     bus?.dropStop?.stopId
-      || [...normalizeRouteStops(bus)].reverse().find((stop) => stop.alightingAllowed === true)?.stopId
+      || normalizeRouteStops(bus).at(-1)?.stopId
       || ""
   ));
 
@@ -67,8 +67,6 @@ export default function SeatLayout() {
   const leftRows         = parseInt(bus?.leftRows)     || 10;
   const rightRows        = parseInt(bus?.rightRows)    || 10;
   const backRowSeats     = parseInt(bus?.backRowSeats) || 5;
-  const totalSeats       = parseInt(bus?.totalSeats)   || 52;
-
   const hasFrontSingle =
     bus?.hasFrontSingle === "yes" || bus?.hasFrontSingle === true;
   const hasBackFullRow =
@@ -212,19 +210,26 @@ export default function SeatLayout() {
     );
   }
 
-  const boardingStops = routeStops.filter((stop) => stop.boardingAllowed === true);
+  const lastStopSequence = Math.max(...routeStops.map((stop) => stop.sequence));
+  const boardingStops = routeStops.filter((stop) => stop.sequence < lastStopSequence);
   const selectedBoarding = routeStops.find((stop) => stop.stopId === boardingStopId);
-  const destinationStops = routeStops.filter((stop) => stop.alightingAllowed === true
-    && stop.sequence > (selectedBoarding?.sequence ?? -1));
+  const destinationStops = routeStops.filter((stop) => stop.sequence > (selectedBoarding?.sequence ?? -1));
 
-  // ── Seat counts ───────────────────────────────────────────────────────────────
-  const generatedTotal =
-    leftRows  * leftSeatsPerRow +
-    rightRows * rightSeatsPerRow +
-    (hasFrontSingle ? 1 : 0) +
-    (hasBackFullRow ? backRowSeats : 0);
-
-  const availableCount = generatedTotal - bookedSeats.length;
+  const bookedSeatSet = new Set(bookedSeats);
+  const layoutSeatNumbers = [
+    ...(hasFrontSingle ? [conductorSeatLabel] : []),
+    ...Array.from({ length: leftRows }, (_, rowIdx) =>
+      Array.from({ length: leftSeatsPerRow }, (_, col) => getSeatNumber(rowIdx, col)),
+    ).flat(),
+    ...Array.from({ length: rightRows }, (_, rowIdx) =>
+      Array.from({ length: rightSeatsPerRow }, (_, col) => getSeatNumber(rowIdx, leftSeatsPerRow + col)),
+    ).flat(),
+    ...(hasBackFullRow
+      ? Array.from({ length: backRowSeats }, (_, col) => getBackSeatNumber(col))
+      : []),
+  ];
+  const bookedCount = layoutSeatNumbers.filter((seat) => bookedSeatSet.has(seat)).length;
+  const availableCount = layoutSeatNumbers.length - bookedCount;
   const maxRows        = Math.max(leftRows, rightRows);
 
   // ── Render ────────────────────────────────────────────────────────────────────
@@ -241,7 +246,7 @@ export default function SeatLayout() {
             Seat Layout — {bus.busNo}
           </h2>
           <p className="text-sm text-muted-foreground mt-0.5">
-            Route: {bus.routeId} &nbsp;·&nbsp; Total seats: {totalSeats}
+            Route: {bus.routeId} &nbsp;·&nbsp; Total seats: {layoutSeatNumbers.length}
           </p>
         </div>
       </div>
@@ -265,7 +270,7 @@ export default function SeatLayout() {
                 const nextStop = routeStops.find((stop) => stop.stopId === nextId);
                 setBoardingStopId(nextId);
                 if ((routeStops.find((stop) => stop.stopId === dropStopId)?.sequence ?? -1) <= (nextStop?.sequence ?? -1)) {
-                  setDropStopId(routeStops.find((stop) => stop.alightingAllowed === true && stop.sequence > nextStop.sequence)?.stopId || "");
+                  setDropStopId(routeStops.find((stop) => stop.sequence > nextStop.sequence)?.stopId || "");
                 }
               }}
               className="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -294,7 +299,7 @@ export default function SeatLayout() {
         </div>
         <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-red-50 border border-red-200 text-red-700 text-sm font-medium">
           <span className="w-3 h-3 rounded-sm bg-red-400 inline-block" />
-          Booked: {bookedSeats.length}
+          Booked: {bookedCount}
         </div>
         <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-blue-50 border border-blue-200 text-blue-700 text-sm font-medium">
           <span className="w-3 h-3 rounded-sm bg-blue-400 inline-block" />
