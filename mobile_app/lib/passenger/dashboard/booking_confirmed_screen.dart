@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 import '../../widgets/custom_button.dart';
 import '../passenger_bottom_nav.dart';
 import '../auth/passenger_login.dart';
@@ -18,6 +19,7 @@ class BookingConfirmedScreen extends StatefulWidget {
   final String email;
   final List<int> selectedSeats;
   final double totalAmount;
+  final String bookingId;
 
   const BookingConfirmedScreen({
     super.key,
@@ -31,6 +33,7 @@ class BookingConfirmedScreen extends StatefulWidget {
     required this.email,
     required this.selectedSeats,
     required this.totalAmount,
+    this.bookingId = 'BT-UNKNOWN',
   });
 
   @override
@@ -58,7 +61,7 @@ class _BookingConfirmedScreenState extends State<BookingConfirmedScreen> {
                     style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold)),
                 ),
                 pw.SizedBox(height: 20),
-                pw.Text('Booking ID: BT-${DateTime.now().millisecondsSinceEpoch}', 
+                pw.Text('Booking ID: ${widget.bookingId}', 
                   style: pw.TextStyle(fontSize: 12, color: PdfColors.grey700)),
                 pw.Divider(),
                 pw.SizedBox(height: 20),
@@ -87,7 +90,16 @@ class _BookingConfirmedScreenState extends State<BookingConfirmedScreen> {
                       style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 18, color: PdfColors.blue)),
                   ],
                 ),
-                pw.SizedBox(height: 50),
+                pw.SizedBox(height: 20),
+                pw.Center(
+                  child: pw.BarcodeWidget(
+                    data: widget.bookingId,
+                    barcode: pw.Barcode.qrCode(),
+                    width: 100,
+                    height: 100,
+                  ),
+                ),
+                pw.SizedBox(height: 20),
                 pw.Center(
                   child: pw.Text('Thank you for choosing our service!', style: pw.TextStyle(fontStyle: pw.FontStyle.italic)),
                 ),
@@ -143,9 +155,9 @@ class _BookingConfirmedScreenState extends State<BookingConfirmedScreen> {
             const Icon(
               Icons.check_circle,
               color: Colors.green,
-              size: 100,
+              size: 80,
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 16),
             const Text(
               'Thank You!',
               style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
@@ -154,7 +166,34 @@ class _BookingConfirmedScreenState extends State<BookingConfirmedScreen> {
               'Your booking has been confirmed.',
               style: TextStyle(fontSize: 16, color: Colors.grey),
             ),
-            const SizedBox(height: 40),
+            const SizedBox(height: 24),
+            
+            // QR Code
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.05),
+                    blurRadius: 10,
+                    offset: const Offset(0, 5),
+                  ),
+                ],
+              ),
+              child: QrImageView(
+                data: widget.bookingId,
+                version: QrVersions.auto,
+                size: 150.0,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Booking ID: ${widget.bookingId}',
+              style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black54),
+            ),
+            const SizedBox(height: 24),
             
             // Ticket Summary Card
             Container(

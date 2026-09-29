@@ -3,6 +3,7 @@ import '../../widgets/custom_button.dart';
 import '../passenger_bottom_nav.dart';
 import '../auth/passenger_login.dart';
 import '../../core/models/seat_status.dart';
+import '../../core/services/passenger_data_service.dart';
 import 'payment_details_screen.dart';
 
 class SeatBookingScreen extends StatefulWidget {
@@ -26,42 +27,13 @@ class SeatBookingScreen extends StatefulWidget {
 class _SeatBookingScreenState extends State<SeatBookingScreen> {
   int _selectedIndex = 1;
   final Set<int> _selectedSeatsByUser = {};
+  final PassengerDataService _dataService = PassengerDataService();
 
-  // Mock seat status data
-  final Map<int, SeatStatus> _seatStatuses = {
-    1: SeatStatus.booked,
-    2: SeatStatus.booked,
-    3: SeatStatus.available,
-    4: SeatStatus.available,
-    5: SeatStatus.droppingNext,
-    6: SeatStatus.available,
-    7: SeatStatus.booked,
-    8: SeatStatus.available,
-    9: SeatStatus.available,
-    10: SeatStatus.droppingNext,
-    11: SeatStatus.available,
-    12: SeatStatus.available,
-    13: SeatStatus.booked,
-    14: SeatStatus.booked,
-    15: SeatStatus.available,
-    16: SeatStatus.available,
-    17: SeatStatus.available,
-    18: SeatStatus.available,
-    19: SeatStatus.droppingNext,
-    20: SeatStatus.available,
-    21: SeatStatus.available,
-    22: SeatStatus.available,
-    23: SeatStatus.booked,
-    24: SeatStatus.available,
-    25: SeatStatus.available,
-    26: SeatStatus.available,
-    27: SeatStatus.available,
-    28: SeatStatus.available,
-    29: SeatStatus.available,
-    30: SeatStatus.available,
-    31: SeatStatus.available,
-    32: SeatStatus.available,
-  };
+  double _getSeatPrice() {
+    final priceStr = widget.bus['price'] ?? '0';
+    final numericStr = priceStr.replaceAll(RegExp(r'[^0-9.]'), '');
+    return double.tryParse(numericStr) ?? 0.0;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -106,7 +78,6 @@ class _SeatBookingScreenState extends State<SeatBookingScreen> {
               children: [
                 _buildLegendItem('Available', Colors.green),
                 _buildLegendItem('Booked', Colors.red),
-                _buildLegendItem('Next Stop', Colors.orange),
                 _buildLegendItem('Selected', Colors.blue),
               ],
             ),
@@ -115,40 +86,51 @@ class _SeatBookingScreenState extends State<SeatBookingScreen> {
           
           // Seat Map
           Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                children: [
-                  // Seat Grid (2-way aisle)
-                  GridView.builder(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 5, // 2 seats - gap - 2 seats
-                      mainAxisSpacing: 15,
-                      crossAxisSpacing: 10,
-                      childAspectRatio: 1,
-                    ),
-                    itemCount: 40, // 8 rows of 5 slots
-                    itemBuilder: (context, index) {
-                      int row = index ~/ 5;
-                      int col = index % 5;
-                      
-                      // If it's the 3rd column (index 2), it's the aisle
-                      if (col == 2) {
-                        return const SizedBox.shrink();
-                      }
-                      
-                      // Map grid index to seat number
-                      int seatIndex = (row * 4) + (col > 2 ? col - 1 : col) + 1;
-                      
-                      if (seatIndex > 32) return const SizedBox.shrink();
-                      
-                      return _buildSeat(seatIndex);
-                    },
+            child: StreamBuilder<List<int>>(
+              stream: _dataService.getBookedSeatsStream(widget.bus['id'] ?? '', widget.date),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+
+                final bookedSeats = snapshot.data ?? [];
+
+                return SingleChildScrollView(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    children: [
+                      // Seat Grid (2-way aisle)
+                      GridView.builder(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 5, // 2 seats - gap - 2 seats
+                          mainAxisSpacing: 15,
+                          crossAxisSpacing: 10,
+                          childAspectRatio: 1,
+                        ),
+                        itemCount: 40, // 8 rows of 5 slots
+                        itemBuilder: (context, index) {
+                          int row = index ~/ 5;
+                          int col = index % 5;
+                          
+                          // If it's the 3rd column (index 2), it's the aisle
+                          if (col == 2) {
+                            return const SizedBox.shrink();
+                          }
+                          
+                          // Map grid index to seat number
+                          int seatIndex = (row * 4) + (col > 2 ? col - 1 : col) + 1;
+                          
+                          if (seatIndex > 32) return const SizedBox.shrink();
+                          
+                          return _buildSeat(seatIndex, bookedSeats);
+                        },
+                      ),
+                    ],
                   ),
-                ],
-              ),
+                );
+              }
             ),
           ),
           
@@ -176,7 +158,7 @@ class _SeatBookingScreenState extends State<SeatBookingScreen> {
                       style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                     ),
                     Text(
-                      'Total: Rs. ${(_selectedSeatsByUser.length * 450).toStringAsFixed(2)}',
+                      'Total: Rs. ${(_selectedSeatsByUser.length * _getSeatPrice()).toStringAsFixed(2)}',
                       style: const TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 18,
@@ -199,7 +181,7 @@ class _SeatBookingScreenState extends State<SeatBookingScreen> {
                             to: widget.to,
                             date: widget.date,
                             selectedSeats: _selectedSeatsByUser.toList()..sort(),
-                            totalAmount: _selectedSeatsByUser.length * 450.0,
+                            totalAmount: _selectedSeatsByUser.length * _getSeatPrice(),
                           ),
                         ),
                       );
@@ -244,8 +226,8 @@ class _SeatBookingScreenState extends State<SeatBookingScreen> {
     );
   }
 
-  Widget _buildSeat(int seatNo) {
-    SeatStatus status = _seatStatuses[seatNo] ?? SeatStatus.available;
+  Widget _buildSeat(int seatNo, List<int> bookedSeats) {
+    SeatStatus status = bookedSeats.contains(seatNo) ? SeatStatus.booked : SeatStatus.available;
     bool isSelected = _selectedSeatsByUser.contains(seatNo);
     
     Color color;
@@ -260,13 +242,13 @@ class _SeatBookingScreenState extends State<SeatBookingScreen> {
           color = Colors.red;
           break;
         case SeatStatus.droppingNext:
-          color = Colors.orange;
-          break;
+          // TODO: Handle this case.
+          throw UnimplementedError();
       }
     }
 
     return GestureDetector(
-      onTap: (status == SeatStatus.available || status == SeatStatus.droppingNext)
+      onTap: (status == SeatStatus.available)
           ? () {
               setState(() {
                 if (_selectedSeatsByUser.contains(seatNo)) {

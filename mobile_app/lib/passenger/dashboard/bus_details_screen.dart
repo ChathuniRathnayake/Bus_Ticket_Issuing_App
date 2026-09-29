@@ -186,26 +186,39 @@ class _BusDetailsScreenState extends State<BusDetailsScreen> {
 
             // Seat Availability Card
             _buildSectionHeader('Seat Availability'),
-            Row(
-              children: [
-                Expanded(
-                  child: _buildAvailabilityCard(
-                    Icons.event_seat,
-                    'Available',
-                    '32',
-                    Colors.green,
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: _buildAvailabilityCard(
-                    Icons.event_seat_outlined,
-                    'Booked',
-                    '8',
-                    Colors.orange,
-                  ),
-                ),
-              ],
+            StreamBuilder<List<int>>(
+              stream: _dataService.getBookedSeatsStream(widget.bus['id'] ?? '', widget.date),
+              builder: (context, snapshot) {
+                final bookedSeats = snapshot.data ?? [];
+                // Total seats default to 32 since that is the bus layout on the booking screen (40 grid cells, 8 aisle).
+                // It can also be fetched from widget.bus['totalSeats'] if available, but layout supports 32 max.
+                int totalSeats = int.tryParse(widget.bus['totalSeats'] ?? '32') ?? 32;
+                if (totalSeats > 32) totalSeats = 32; // Limit to UI design
+                int bookedCount = bookedSeats.length;
+                int availableCount = totalSeats - bookedCount;
+
+                return Row(
+                  children: [
+                    Expanded(
+                      child: _buildAvailabilityCard(
+                        Icons.event_seat,
+                        'Available',
+                        availableCount.toString(),
+                        Colors.green,
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: _buildAvailabilityCard(
+                        Icons.event_seat_outlined,
+                        'Booked',
+                        bookedCount.toString(),
+                        Colors.orange,
+                      ),
+                    ),
+                  ],
+                );
+              }
             ),
             const SizedBox(height: 32),
 

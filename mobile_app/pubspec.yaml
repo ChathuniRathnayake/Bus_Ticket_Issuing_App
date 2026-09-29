@@ -49,6 +49,7 @@ dependencies:
   cloud_firestore: ^6.1.2
   geolocator: ^14.0.2
   geocoding: ^4.0.0
+  qr_flutter: ^4.1.0
   
 
 dev_dependencies:

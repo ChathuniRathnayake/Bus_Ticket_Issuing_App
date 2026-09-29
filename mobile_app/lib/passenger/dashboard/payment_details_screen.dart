@@ -3,6 +3,7 @@ import '../../widgets/custom_button.dart';
 import '../../widgets/custom_textfield.dart';
 import '../passenger_bottom_nav.dart';
 import '../auth/passenger_login.dart';
+import '../../core/services/passenger_data_service.dart';
 import 'booking_confirmed_screen.dart';
 
 class PaymentDetailsScreen extends StatefulWidget {
@@ -35,6 +36,9 @@ class _PaymentDetailsScreenState extends State<PaymentDetailsScreen> {
   final _phoneController = TextEditingController();
   final _nicController = TextEditingController();
   final _emailController = TextEditingController();
+  
+  final PassengerDataService _dataService = PassengerDataService();
+  bool _isLoading = false;
 
   @override
   void dispose() {
@@ -192,30 +196,62 @@ class _PaymentDetailsScreenState extends State<PaymentDetailsScreen> {
               ),
               const SizedBox(height: 40),
 
-              CustomButton(
-                text: 'Pay Now',
-                onTap: () {
-                  if (_formKey.currentState!.validate()) {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => BookingConfirmedScreen(
-                          bus: widget.bus,
-                          from: widget.from,
-                          to: widget.to,
-                          date: widget.date,
-                          passengerName: _nameController.text,
-                          phone: _phoneController.text,
-                          nic: _nicController.text,
-                          email: _emailController.text,
-                          selectedSeats: widget.selectedSeats,
-                          totalAmount: widget.totalAmount,
-                        ),
-                      ),
-                    );
-                  }
-                },
-              ),
+              _isLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : CustomButton(
+                      text: 'Pay Now',
+                      onTap: () async {
+                        if (_formKey.currentState!.validate()) {
+                          setState(() => _isLoading = true);
+                          try {
+                            String bookingId = await _dataService.bookTickets(
+                              busId: widget.bus['id'] ?? '',
+                              from: widget.from,
+                              to: widget.to,
+                              date: widget.date,
+                              selectedSeats: widget.selectedSeats,
+                              totalAmount: widget.totalAmount,
+                              passengerName: _nameController.text,
+                              phone: _phoneController.text,
+                              nic: _nicController.text,
+                              email: _emailController.text,
+                            );
+
+                            if (mounted) {
+                              Navigator.pushReplacement(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => BookingConfirmedScreen(
+                                    bus: widget.bus,
+                                    from: widget.from,
+                                    to: widget.to,
+                                    date: widget.date,
+                                    passengerName: _nameController.text,
+                                    phone: _phoneController.text,
+                                    nic: _nicController.text,
+                                    email: _emailController.text,
+                                    selectedSeats: widget.selectedSeats,
+                                    totalAmount: widget.totalAmount,
+                                    bookingId: bookingId,
+                                  ),
+                                ),
+                              );
+                            }
+                          } catch (e) {
+                            print("Error booking tickets: \$e");
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Failed to book tickets. Please try again.')),
+                              );
+                            }
+                          } finally {
+                            if (mounted) {
+                              setState(() => _isLoading = false);
+                            }
+                          }
+                        }
+                      },
+                    ),
               const SizedBox(height: 20),
             ],
           ),

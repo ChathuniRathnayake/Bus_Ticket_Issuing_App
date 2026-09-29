@@ -1,17 +1,15 @@
 import 'package:flutter/material.dart';
-import '../auth/passenger_login.dart';
 import '../passenger_bottom_nav.dart';
 import 'bus_details_screen.dart';
 import '../../core/services/passenger_data_service.dart';
-import '../../models/route_model.dart';
 import 'dashboard_screen.dart';
 import 'my_tickets_screen.dart';
 import 'profile_screen.dart';
 import '../../widgets/passenger_app_bar.dart';
 
 class BusResultsScreen extends StatefulWidget {
-  final String from;
-  final String to;
+  final String from; // empty = date-only search
+  final String to;   // empty = date-only search
   final String date;
 
   const BusResultsScreen({
@@ -26,10 +24,12 @@ class BusResultsScreen extends StatefulWidget {
 }
 
 class _BusResultsScreenState extends State<BusResultsScreen> {
-  int _selectedIndex = 1; // "Find" tab active by default
+  int _selectedIndex = 1;
   final PassengerDataService _dataService = PassengerDataService();
   List<Map<String, String>> _availableBuses = [];
   bool _isLoading = true;
+
+  bool get _isDateOnly => widget.from.isEmpty && widget.to.isEmpty;
 
   @override
   void initState() {
@@ -39,16 +39,32 @@ class _BusResultsScreenState extends State<BusResultsScreen> {
 
   Future<void> _loadBuses() async {
     try {
-      final buses = await _dataService.getBusesForRoute(widget.from, widget.to);
-      final routes = await _dataService.searchRoutes(widget.from, widget.to);
-      final routePrice = routes.isNotEmpty ? routes.first.price ?? "Rs. 0" : "Rs. 0";
+      List<Map<String, dynamic>> buses;
+
+      if (_isDateOnly) {
+        buses = await _dataService.getAllBusesForDate(widget.date);
+      } else {
+        buses = await _dataService.getBusesForRoute(
+            widget.from, widget.to, widget.date);
+      }
 
       setState(() {
         _availableBuses = buses.map((bus) {
+          final dep = bus['departureTime']?.toString() ?? '';
+          final arr = bus['arrivalTime']?.toString() ?? '';
+          final time = dep.isNotEmpty && arr.isNotEmpty
+              ? '$dep – $arr'
+              : dep.isNotEmpty
+                  ? dep
+                  : 'Scheduled';
+
           return <String, String>{
-            'busName': (bus['routeName'] ?? bus['model'] ?? 'Unknown Route').toString(),
-            'time': 'Scheduled',
-            'price': (bus['price'] ?? routePrice).toString(),
+            'busName': (bus['routeName'] ?? bus['model'] ?? 'Unknown Route')
+                .toString(),
+            'from': (bus['startStop'] ?? widget.from).toString(),
+            'to': (bus['endStop'] ?? widget.to).toString(),
+            'time': time,
+            'price': (bus['price'] ?? 'N/A').toString(),
             'type': (bus['plateNumber'] ?? bus['model'] ?? '').toString(),
             'id': (bus['id'] ?? '').toString(),
             'routeId': (bus['routeId'] ?? '').toString(),
@@ -57,52 +73,71 @@ class _BusResultsScreenState extends State<BusResultsScreen> {
         _isLoading = false;
       });
     } catch (e) {
-      print("Error loading buses: $e");
+      debugPrint('Error loading buses: $e');
       setState(() => _isLoading = false);
     }
   }
 
+  String get _appBarTitle {
+    if (_isDateOnly) return 'All Buses';
+    return '${widget.from} → ${widget.to}';
+  }
+
   @override
   Widget build(BuildContext context) {
-
-
     return Scaffold(
       backgroundColor: const Color(0xFFF5F5F5),
       appBar: PassengerAppBar(
-        title: '${widget.from} to ${widget.to}',
-        showBackButton: true,
-      ),
+          title: _appBarTitle, showBackButton: true, showTitle: true),
       body: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             color: Colors.white,
             child: Row(
               children: [
                 const Icon(Icons.calendar_today, size: 16, color: Colors.blue),
                 const SizedBox(width: 8),
-                Text(
-                  'Date: ${widget.date}',
-                  style: const TextStyle(fontWeight: FontWeight.w500),
-                ),
+                Text('Date: ${widget.date}',
+                    style: const TextStyle(fontWeight: FontWeight.w500)),
+                if (!_isDateOnly) ...[
+                  const Spacer(),
+                  const Icon(Icons.route, size: 16, color: Colors.blue),
+                  const SizedBox(width: 6),
+                  Text('${widget.from} → ${widget.to}',
+                      style: const TextStyle(fontWeight: FontWeight.w500)),
+                ],
               ],
             ),
           ),
           const Divider(height: 1),
           Expanded(
-            child: _isLoading 
-              ? const Center(child: CircularProgressIndicator())
-              : _availableBuses.isEmpty
-                ? const Center(child: Text("No buses available for this route"))
-                : ListView.builder(
-                    padding: const EdgeInsets.all(16),
-                    itemCount: _availableBuses.length,
-                    itemBuilder: (context, index) {
-                      final bus = _availableBuses[index];
-                      return _buildBusCard(context, bus);
-                    },
-                  ),
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : _availableBuses.isEmpty
+                    ? Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(Icons.directions_bus,
+                                size: 64, color: Colors.grey),
+                            const SizedBox(height: 12),
+                            Text(
+                              _isDateOnly
+                                  ? 'No buses scheduled for this date'
+                                  : 'No buses available for this route',
+                              style: const TextStyle(
+                                  color: Colors.grey, fontSize: 16),
+                            ),
+                          ],
+                        ),
+                      )
+                    : ListView.builder(
+                        padding: const EdgeInsets.all(16),
+                        itemCount: _availableBuses.length,
+                        itemBuilder: (context, index) =>
+                            _buildBusCard(_availableBuses[index]),
+                      ),
           ),
         ],
       ),
@@ -110,44 +145,35 @@ class _BusResultsScreenState extends State<BusResultsScreen> {
         currentIndex: _selectedIndex,
         onTap: (index) {
           if (index == _selectedIndex) return;
-          
           if (index == 0) {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(builder: (_) => const PassengerDashboard()),
-            );
+            Navigator.pushReplacement(context,
+                MaterialPageRoute(builder: (_) => const PassengerDashboard()));
           } else if (index == 2) {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(builder: (_) => const MyTicketsScreen()),
-            );
+            Navigator.pushReplacement(context,
+                MaterialPageRoute(builder: (_) => const MyTicketsScreen()));
           } else if (index == 3) {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(builder: (_) => const ProfileScreen()),
-            );
+            Navigator.pushReplacement(context,
+                MaterialPageRoute(builder: (_) => const ProfileScreen()));
           } else {
-            setState(() {
-              _selectedIndex = index;
-            });
+            setState(() => _selectedIndex = index);
           }
         },
       ),
     );
   }
-  Widget _buildBusCard(BuildContext context, Map<String, String> bus) {
+
+  Widget _buildBusCard(Map<String, String> bus) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 16),
+      margin: const EdgeInsets.only(bottom: 14),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 5),
-          ),
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 10,
+              offset: const Offset(0, 5))
         ],
       ),
       child: Column(
@@ -155,82 +181,66 @@ class _BusResultsScreenState extends State<BusResultsScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    bus['busName']!,
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF333333),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(bus['busName']!,
+                        style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF333333))),
+                    const SizedBox(height: 2),
+                    Text(
+                      _isDateOnly
+                          ? '${bus['from']} → ${bus['to']}'
+                          : bus['type']!,
+                      style: TextStyle(fontSize: 13, color: Colors.grey[600]),
                     ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    bus['type']!,
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey[600],
-                    ),
-                  ),
-                ],
-              ),
-              Text(
-                bus['price']!,
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.blue,
+                  ],
                 ),
               ),
+              Text(bus['price']!,
+                  style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.blue)),
             ],
           ),
-          const SizedBox(height: 16),
-          const Divider(),
-          const SizedBox(height: 12),
+          const Divider(height: 20),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Row(
                 children: [
-                  const Icon(Icons.access_time, size: 18, color: Colors.grey),
-                  const SizedBox(width: 8),
-                  Text(
-                    bus['time']!,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w500,
-                      fontSize: 15,
-                    ),
-                  ),
+                  const Icon(Icons.access_time, size: 16, color: Colors.grey),
+                  const SizedBox(width: 6),
+                  Text(bus['time']!,
+                      style: const TextStyle(
+                          fontWeight: FontWeight.w500, fontSize: 14)),
                 ],
               ),
-              TextButton(
+              TextButton.icon(
                 onPressed: () {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
                       builder: (_) => BusDetailsScreen(
                         bus: bus,
-                        from: widget.from,
-                        to: widget.to,
+                        from: bus['from'] ?? widget.from,
+                        to: bus['to'] ?? widget.to,
                         date: widget.date,
                       ),
                     ),
                   );
                 },
-                child: const Row(
-                  children: [
-                    Text(
-                      'View Details',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: Colors.blue,
-                      ),
-                    ),
-                    Icon(Icons.chevron_right, size: 18, color: Colors.blue),
-                  ],
-                ),
+                icon: const Icon(Icons.chevron_right,
+                    size: 18, color: Colors.blue),
+                label: const Text('View Details',
+                    style: TextStyle(
+                        fontWeight: FontWeight.bold, color: Colors.blue)),
+                style:
+                    TextButton.styleFrom(padding: EdgeInsets.zero),
               ),
             ],
           ),

@@ -4,7 +4,6 @@ import 'ticket_model.dart';
 enum SeatStatus {
   available,
   booked,
-  droppingNext,
 }
 
 class Seat {
@@ -45,11 +44,6 @@ class Seat {
     status = SeatStatus.booked;
   }
 
-  // Mark seat as dropping next
-  void markDroppingNext() {
-    ticket = null;
-    status = SeatStatus.droppingNext;
-  }
 
   // Free the seat
   void free() {
