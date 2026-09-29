@@ -8,6 +8,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ArrowLeft, Bus, Filter, Calendar, Clock, MapPin, Search } from "lucide-react";
 
+const formatFare = (priceCents) => {
+  const cents = Number(priceCents);
+  if (!Number.isFinite(cents) || cents <= 0) return "—";
+  return `Rs ${(cents / 100).toLocaleString("en-LK", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+};
+
 export default function SearchBuses() {
   const navigate = useNavigate();
 
@@ -292,6 +298,7 @@ export default function SearchBuses() {
                     <TableHead className="font-semibold text-slate-600 dark:text-zinc-300">Departure</TableHead>
                     <TableHead className="font-semibold text-slate-600 dark:text-zinc-300">Seats</TableHead>
                     <TableHead className="font-semibold text-slate-600 dark:text-zinc-300">Bus No</TableHead>
+                    <TableHead className="font-semibold text-slate-600 dark:text-zinc-300">Fare</TableHead>
                     <TableHead className="text-right font-semibold text-slate-600 dark:text-zinc-300">Action</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -312,6 +319,11 @@ export default function SearchBuses() {
                       </TableCell>
                       <TableCell className="text-slate-600 dark:text-zinc-400">{b.totalSeats}</TableCell>
                       <TableCell className="font-medium text-slate-700 dark:text-zinc-300">{b.busNo}</TableCell>
+                      <TableCell>
+                        <span className="inline-flex items-center rounded-full bg-emerald-50 dark:bg-emerald-950 px-2.5 py-1 text-xs font-bold text-emerald-700 dark:text-emerald-300">
+                          {formatFare(b.route?.priceCents ?? b.priceCents)}
+                        </span>
+                      </TableCell>
                       <TableCell className="text-right">
                         <Button
                           size="sm"

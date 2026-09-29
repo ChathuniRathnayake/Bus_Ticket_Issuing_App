@@ -4,6 +4,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, CreditCard } from "lucide-react";
 
+const formatFare = (priceCents) => {
+  const cents = Number(priceCents);
+  if (!Number.isFinite(cents) || cents <= 0) return null;
+  return `Rs ${(cents / 100).toLocaleString("en-LK", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+};
+
 // ─── Single seat button ────────────────────────────────────────────────────────
 function SeatBtn({ label, status, onClick }) {
   const isBooked   = status === "booked";
@@ -231,6 +237,7 @@ export default function SeatLayout() {
   const bookedCount = layoutSeatNumbers.filter((seat) => bookedSeatSet.has(seat)).length;
   const availableCount = layoutSeatNumbers.length - bookedCount;
   const maxRows        = Math.max(leftRows, rightRows);
+  const fareLabel      = formatFare(bus.route?.priceCents ?? bus.priceCents);
 
   // ── Render ────────────────────────────────────────────────────────────────────
   return (
@@ -496,8 +503,13 @@ export default function SeatLayout() {
                 <p className="text-sm text-muted-foreground">
                   {bus.busNo} &nbsp;|&nbsp; {bus.route?.startStop} to {bus.route?.endStop}
                 </p>
+                {fareLabel && (
+                  <p className="text-2xl font-bold text-emerald-600">{fareLabel}</p>
+                )}
                 <p className="text-xs text-muted-foreground">
-                  Your seat is reserved while you complete secure checkout. The confirmed fare is shown by Stripe.
+                  {fareLabel
+                    ? "Your seat is reserved while you complete secure checkout at this fare."
+                    : "Your seat is reserved while you complete secure checkout. The confirmed fare is shown by Stripe."}
                 </p>
               </div>
               {checkoutError && (

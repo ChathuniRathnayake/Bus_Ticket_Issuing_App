@@ -16,10 +16,12 @@ const serverError = (res, error) => {
   return res.status(500).json({ message: "Payment service error" });
 };
 
-const getTicketPriceCents = (schedule) => {
-  const schedulePrice = [schedule.priceCents, schedule.amountCents, schedule.fareCents]
-    .find((value) => Number.isInteger(Number(value)) && Number(value) > 0);
-  return schedulePrice ? Number(schedulePrice) : configuredPriceCents;
+const getTicketPriceCents = (schedule, route) => {
+  const candidate = [
+    schedule?.priceCents, schedule?.amountCents, schedule?.fareCents,
+    route?.priceCents, route?.amountCents, route?.fareCents,
+  ].find((value) => Number.isInteger(Number(value)) && Number(value) > 0);
+  return candidate ? Number(candidate) : configuredPriceCents;
 };
 
 export const createCheckoutSession = async (req, res) => {
@@ -40,7 +42,12 @@ export const createCheckoutSession = async (req, res) => {
     if (!scheduleDoc.exists) return res.status(404).json({ message: "Schedule not found" });
     const schedule = scheduleDoc.data();
     if (schedule.busId !== busId) return res.status(400).json({ message: "Bus does not match schedule" });
-    const priceCents = getTicketPriceCents(schedule);
+    let route = null;
+    if (schedule.routeId) {
+      const routeDoc = await db.collection("routes").doc(schedule.routeId).get();
+      if (routeDoc.exists) route = routeDoc.data();
+    }
+    const priceCents = getTicketPriceCents(schedule, route);
     if (amountCents !== undefined && Number(amountCents) !== priceCents) {
       return res.status(400).json({ message: "Ticket amount is invalid" });
     }

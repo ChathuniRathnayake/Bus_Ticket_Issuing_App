@@ -45,6 +45,7 @@ export const createRoute = async (req, res) => {
       startTime,
       endTime,
       date,
+      priceCents,
       stops,
     } = req.body;
 
@@ -54,10 +55,7 @@ export const createRoute = async (req, res) => {
       !startStop ||
       !endStop ||
       !distance ||
-      !duration ||
-      !startTime ||
-      !endTime ||
-      !date
+      !duration
     ) {
       return res.status(400).json({ message: "All fields are required" });
     }
@@ -73,19 +71,31 @@ export const createRoute = async (req, res) => {
       { name: endStop, stopType: "terminal", alightingAllowed: true },
     ]);
 
-    await db.collection("routes").doc(routeId).set({
+    // A route is path-only; timing lives on schedules. Persist legacy
+    // timing fields only when explicitly supplied so Firestore never
+    // receives undefined values.
+    const routeDoc = {
       routeId,
       routeName,
       startStop,
       endStop,
       distance,
       duration,
-      startTime,
-      endTime,
-      date,
       stops: orderedStops,
       createdAt: new Date(),
-    });
+    };
+    if (startTime) routeDoc.startTime = startTime;
+    if (endTime) routeDoc.endTime = endTime;
+    if (date) routeDoc.date = date;
+    if (priceCents !== undefined && priceCents !== null && priceCents !== "") {
+      const cents = Math.round(Number(priceCents));
+      if (!Number.isFinite(cents) || cents < 0) {
+        return res.status(400).json({ message: "Fare must be a non-negative amount" });
+      }
+      routeDoc.priceCents = cents;
+    }
+
+    await db.collection("routes").doc(routeId).set(routeDoc);
 
     res.status(201).json({ message: "Route created successfully" });
 
@@ -108,11 +118,11 @@ export const getRoutes = async (req, res) => {
       ...doc.data(),
     }));
 
-    // Sort by date and time in ascending order
+    // Sort alphabetically by route name (routes are path-only, no timing).
     routes.sort((a, b) => {
-      const dateA = new Date(`${a.date}T${a.startTime}`);
-      const dateB = new Date(`${b.date}T${b.startTime}`);
-      return dateA - dateB;
+      const nameA = String(a.routeName || a.routeId || "");
+      const nameB = String(b.routeName || b.routeId || "");
+      return nameA.localeCompare(nameB);
     });
 
     res.status(200).json(routes);
@@ -128,9 +138,9 @@ export const getAvailableRoutes = async (req, res) => {
     const snapshot = await db.collection("routes").get();
     const routes = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
     routes.sort((a, b) => {
-      const dateA = new Date(`${a.date}T${a.startTime}`);
-      const dateB = new Date(`${b.date}T${b.startTime}`);
-      return dateA - dateB;
+      const nameA = String(a.routeName || a.routeId || "");
+      const nameB = String(b.routeName || b.routeId || "");
+      return nameA.localeCompare(nameB);
     });
     res.json(routes);
   } catch (error) {
@@ -180,6 +190,7 @@ export const updateRoute = async (req, res) => {
       startTime,
       endTime,
       date,
+      priceCents,
       stops,
     } = req.body;
 
@@ -191,7 +202,7 @@ export const updateRoute = async (req, res) => {
     }
 
     const orderedStops = stops === undefined ? undefined : normalizeStops(stops);
-    await routeRef.update({
+    const updatePayload = {
       ...(routeName && { routeName }),
       ...(startStop && { startStop }),
       ...(endStop && { endStop }),
@@ -202,7 +213,15 @@ export const updateRoute = async (req, res) => {
       ...(date && { date }),
       ...(orderedStops && { stops: orderedStops }),
       updatedAt: new Date(),
-    });
+    };
+    if (priceCents !== undefined && priceCents !== null && priceCents !== "") {
+      const cents = Math.round(Number(priceCents));
+      if (!Number.isFinite(cents) || cents < 0) {
+        return res.status(400).json({ message: "Fare must be a non-negative amount" });
+      }
+      updatePayload.priceCents = cents;
+    }
+    await routeRef.update(updatePayload);
 
     res.status(200).json({ message: "Route updated successfully" });
 
