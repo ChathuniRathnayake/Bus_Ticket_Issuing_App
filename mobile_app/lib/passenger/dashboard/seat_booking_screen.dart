@@ -162,16 +162,9 @@ class _SeatBookingScreenState extends State<SeatBookingScreen> {
 
   Future<void> _fetchBookedSeats() async {
     try {
-      final bookingsSnapshot = await FirebaseFirestore.instance
-          .collection('bookings')
-          .where('scheduleId', isEqualTo: widget.bus.id)
-          .where('date', isEqualTo: widget.date)
-          .get();
-
       final seatsSnapshot = await FirebaseFirestore.instance
           .collection('seats')
-          .where('busId', isEqualTo: widget.bus.busId)
-          .where('date', isEqualTo: widget.date)
+          .where('scheduleId', isEqualTo: widget.bus.id)
           .get();
 
       Map<int, SeatStatus> fetchedStatuses = {};
@@ -179,16 +172,6 @@ class _SeatBookingScreenState extends State<SeatBookingScreen> {
       // Initialize all seats as available
       for (int i = 1; i <= totalSeats; i++) {
         fetchedStatuses[i] = SeatStatus.available;
-      }
-
-      for (var doc in bookingsSnapshot.docs) {
-        final data = doc.data();
-        if (data['selectedSeats'] != null) {
-          final List<dynamic> seats = data['selectedSeats'];
-          for (var seat in seats) {
-            fetchedStatuses[int.parse(seat.toString())] = SeatStatus.booked;
-          }
-        }
       }
 
       for (var doc in seatsSnapshot.docs) {
@@ -269,41 +252,81 @@ class _SeatBookingScreenState extends State<SeatBookingScreen> {
           
           // Seat Map
           Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                children: [
-                  // Seat Grid (2-way aisle)
-                  GridView.builder(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 5, // 2 seats - gap - 2 seats
-                      mainAxisSpacing: 15,
-                      crossAxisSpacing: 10,
-                      childAspectRatio: 1,
-                    ),
-                    itemCount: (totalSeats / 4).ceil() * 5, // Dynamically calculate rows
-                    itemBuilder: (context, index) {
-                      int row = index ~/ 5;
-                      int col = index % 5;
-                      
-                      // If it's the 3rd column (index 2), it's the aisle
-                      if (col == 2) {
-                        return const SizedBox.shrink();
-                      }
-                      
-                      // Map grid index to seat number
-                      int seatIndex = (row * 4) + (col > 2 ? col - 1 : col) + 1;
-                      
-                      if (seatIndex > totalSeats) return const SizedBox.shrink();
-                      
-                      return _buildSeat(seatIndex);
-                    },
-                  ),
-                ],
-              ),
-            ),
+            child: LayoutBuilder(builder: (context, constraints) {
+              final seatWidth = (constraints.maxWidth - 48) / 5; // 5 columns width (48 is 24*2 padding)
+              
+              bool hasFiveSeatLastRow = (totalSeats % 4 == 1) || (totalSeats == 5);
+              int seatsForStandardRows = hasFiveSeatLastRow ? totalSeats - 5 : totalSeats;
+              int numStandardRows = (seatsForStandardRows / 4).ceil();
+              int totalRows = hasFiveSeatLastRow ? numStandardRows + 1 : numStandardRows;
+
+              return SingleChildScrollView(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  children: List.generate(totalRows, (rowIndex) {
+                    bool isLastRow = rowIndex == totalRows - 1;
+                    
+                    if (isLastRow && hasFiveSeatLastRow) {
+                      int startingSeat = seatsForStandardRows + 1;
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: List.generate(5, (i) {
+                            return SizedBox(
+                              width: seatWidth - 8,
+                              height: 55,
+                              child: _buildSeat(startingSeat + i),
+                            );
+                          }),
+                        ),
+                      );
+                    }
+
+                    int startingSeat = rowIndex * 4 + 1;
+                    int remainingSeatsInStandard = seatsForStandardRows - startingSeat + 1;
+                    int seatsInThisRow = remainingSeatsInStandard > 4 ? 4 : remainingSeatsInStandard;
+                    
+                    if (seatsInThisRow <= 0) return const SizedBox.shrink();
+
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Row(
+                            children: List.generate(2, (i) {
+                              if (i >= seatsInThisRow) return SizedBox(width: seatWidth);
+                              return Padding(
+                                padding: const EdgeInsets.only(right: 8),
+                                child: SizedBox(
+                                  width: seatWidth - 8,
+                                  height: 55,
+                                  child: _buildSeat(startingSeat + i),
+                                ),
+                              );
+                            }),
+                          ),
+                          Row(
+                            children: List.generate(2, (i) {
+                              if (i + 2 >= seatsInThisRow) return SizedBox(width: seatWidth);
+                              return Padding(
+                                padding: const EdgeInsets.only(left: 8),
+                                child: SizedBox(
+                                  width: seatWidth - 8,
+                                  height: 55,
+                                  child: _buildSeat(startingSeat + 2 + i),
+                                ),
+                              );
+                            }),
+                          ),
+                        ],
+                      ),
+                    );
+                  }),
+                ),
+              );
+            }),
           ),
           
           // Bottom Payment Section

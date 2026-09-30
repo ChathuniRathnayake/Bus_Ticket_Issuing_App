@@ -44,7 +44,7 @@ class _BusDetailsScreenState extends State<BusDetailsScreen> {
   
   int _bookedSeatsCount = 0;
   bool _isLoadingSeats = true;
-  int get _totalSeats => 40;
+  int get _totalSeats => int.tryParse(widget.bus.totalSeats ?? '40') ?? 40;
 
   @override
   void initState() {
@@ -55,17 +55,20 @@ class _BusDetailsScreenState extends State<BusDetailsScreen> {
 
   Future<void> _loadSeatsCount() async {
     try {
+      // Query the shared 'seats' collection using scheduleId to include both
+      // passenger-booked and conductor-issued tickets!
       final snapshot = await FirebaseFirestore.instance
-          .collection('bookings')
+          .collection('seats')
           .where('scheduleId', isEqualTo: widget.bus.id)
           .get();
 
       int count = 0;
       for (var doc in snapshot.docs) {
         final data = doc.data();
-        if (data['selectedSeats'] != null) {
-          final List<dynamic> seats = data['selectedSeats'];
-          count += seats.length;
+        final status = data['status']?.toString().toLowerCase();
+        // Only count active (non-cancelled/released) seats
+        if (status == null || (status != 'cancelled' && status != 'released')) {
+          count++;
         }
       }
 

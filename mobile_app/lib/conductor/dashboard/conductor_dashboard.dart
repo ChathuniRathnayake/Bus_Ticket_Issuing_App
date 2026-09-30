@@ -270,18 +270,31 @@ class _ConductorDashboardState extends State<ConductorDashboard> {
                         final today = DateTime.now();
                         final fallbackDateStr = "${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}";
                         final activeDate = scheduleSnapshot.data?['date']?.toString() ?? fallbackDateStr;
+                        final activeScheduleId = scheduleSnapshot.data?['id']?.toString() ?? '';
 
                         return StreamBuilder<QuerySnapshot>(
-                          stream: FirebaseFirestore.instance
-                              .collection('seats')
-                              .where('busId', isEqualTo: widget.bus!.id)
-                              .where('date', isEqualTo: activeDate)
-                              .snapshots(),
+                          stream: activeScheduleId.isNotEmpty 
+                            ? FirebaseFirestore.instance
+                                .collection('seats')
+                                .where('scheduleId', isEqualTo: activeScheduleId)
+                                .snapshots()
+                            : FirebaseFirestore.instance
+                                .collection('seats')
+                                .where('busId', isEqualTo: widget.bus!.id)
+                                .where('date', isEqualTo: activeDate)
+                                .snapshots(),
                           builder: (context, seatsSnapshot) {
                             // Count all seats for this bus - matches exactly what the seat map shows in red.
-                            final bookedCount = seatsSnapshot.hasData
-                                ? seatsSnapshot.data!.docs.length
-                                : 0;
+                            int bookedCount = 0;
+                            if (seatsSnapshot.hasData) {
+                              for (var doc in seatsSnapshot.data!.docs) {
+                                final data = doc.data() as Map<String, dynamic>;
+                                final status = data['status']?.toString().toLowerCase();
+                                if (status == null || (status != 'cancelled' && status != 'released')) {
+                                  bookedCount++;
+                                }
+                              }
+                            }
 
                         final total =
                             widget.bus?.totalSeats ??

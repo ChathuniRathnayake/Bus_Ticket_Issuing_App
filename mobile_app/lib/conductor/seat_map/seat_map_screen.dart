@@ -131,13 +131,19 @@ class SeatMapScreen extends StatelessWidget {
                         final today = DateTime.now();
                         final fallbackDateStr = "${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}";
                         final activeDate = scheduleSnap.data?['date']?.toString() ?? fallbackDateStr;
+                        final activeScheduleId = scheduleSnap.data?['id']?.toString() ?? '';
 
                         return StreamBuilder<QuerySnapshot>(
-                          stream: FirebaseFirestore.instance
-                              .collection('seats')
-                              .where('busId', isEqualTo: bus?.id)
-                              .where('date', isEqualTo: activeDate)
-                              .snapshots(),
+                          stream: activeScheduleId.isNotEmpty
+                            ? FirebaseFirestore.instance
+                                .collection('seats')
+                                .where('scheduleId', isEqualTo: activeScheduleId)
+                                .snapshots()
+                            : FirebaseFirestore.instance
+                                .collection('seats')
+                                .where('busId', isEqualTo: bus?.id)
+                                .where('date', isEqualTo: activeDate)
+                                .snapshots(),
                           builder: (context, snapshot) {
                             if (snapshot.hasError) {
                           return Center(child: Text("Error fetching seats: ${snapshot.error}"));
