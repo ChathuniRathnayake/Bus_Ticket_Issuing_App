@@ -1,4 +1,4 @@
-const BOOKING_API = "http://localhost:5000/api/booking/my";
+const BOOKING_API = "/api/booking/my";
 const VISIBLE_BOOKING_STATUSES = new Set(["CONFIRMED", "BOOKED", "PENDING_PAYMENT", "CHECKOUT_CREATED"]);
 
 export async function fetchPassengerBookings(token) {
@@ -28,7 +28,7 @@ export async function fetchPassengerBookings(token) {
 }
 
 export async function cancelPassengerBooking(token, bookingId) {
-  const response = await fetch(`http://localhost:5000/api/booking/cancel/${encodeURIComponent(bookingId)}`, {
+  const response = await fetch(`/api/booking/cancel/${encodeURIComponent(bookingId)}`, {
     method: "PUT",
     headers: { Authorization: `Bearer ${token}` },
   });

@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { AlertCircle, ArrowRight, CheckCircle2, Clock3, CreditCard, LoaderCircle, Ticket, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
-const PAYMENT_API = "http://localhost:5000/api/payments";
+const PAYMENT_API = "/api/payments";
 
 function readStoredPayment(key) {
   try {

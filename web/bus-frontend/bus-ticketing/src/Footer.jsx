@@ -1,6 +1,7 @@
 // src/components/Footer.jsx
 import { useNavigate } from "react-router-dom";
 import { Facebook, Instagram, Youtube, MapPin, Phone, Mail } from "lucide-react";
+import logo from "./assets/logo.png";
 
 export default function Footer() {
   const navigate = useNavigate();
@@ -29,7 +30,7 @@ export default function Footer() {
           <div>
             <div className="flex items-center gap-3 mb-4">
               <img
-                src="/src/assets/logo.png"
+                src={logo}
                 alt="TicketGo Logo"
                 className="h-11 w-auto object-contain drop-shadow"
               />

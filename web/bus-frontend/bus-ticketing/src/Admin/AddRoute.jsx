@@ -121,7 +121,7 @@ export default function AddRoute({ routes, setRoutes }) {
       if (priceCents !== undefined) payload.priceCents = priceCents;
 
       const res = await axios.post(
-        "http://localhost:5000/api/route",
+        "/api/route",
         payload,
         {
           headers: { Authorization: `Bearer ${token}` },

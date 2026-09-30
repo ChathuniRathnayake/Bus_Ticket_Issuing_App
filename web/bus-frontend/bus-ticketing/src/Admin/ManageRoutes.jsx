@@ -73,7 +73,7 @@ export default function ManageRoutes() {
       setLoading(true);
 
       const res = await axios.get(
-        "http://localhost:5000/api/route",
+        "/api/route",
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
@@ -210,7 +210,7 @@ export default function ManageRoutes() {
       }
 
       await axios.put(
-        `http://localhost:5000/api/route/${id}`,
+        `/api/route/${id}`,
         payload,
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -233,7 +233,7 @@ export default function ManageRoutes() {
 
     try {
       await axios.delete(
-        `http://localhost:5000/api/route/${id}`,
+        `/api/route/${id}`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
 

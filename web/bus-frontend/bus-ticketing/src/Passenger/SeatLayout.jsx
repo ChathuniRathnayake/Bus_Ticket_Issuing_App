@@ -91,7 +91,7 @@ export default function SeatLayout() {
         const token = localStorage.getItem("token");
         const busId = bus.id || bus.busId;
         const query = new URLSearchParams({ scheduleId: bus.scheduleId, busId, boardingStopId, dropStopId });
-        const res = await fetch(`http://localhost:5000/api/ticket/availability?${query}`, {
+        const res = await fetch(`/api/ticket/availability?${query}`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         const data = await res.json();
@@ -157,7 +157,7 @@ export default function SeatLayout() {
     setCheckoutError("");
     try {
       const token = localStorage.getItem("token");
-      const res = await fetch("http://localhost:5000/api/payments/checkout-session", {
+      const res = await fetch("/api/payments/checkout-session", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

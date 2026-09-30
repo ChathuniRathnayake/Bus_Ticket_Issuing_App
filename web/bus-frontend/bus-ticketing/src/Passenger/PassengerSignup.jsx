@@ -47,7 +47,7 @@ export default function PassengerSignup() {
 
     try {
       setLoading(true);
-      const res = await fetch("http://localhost:5000/api/passenger/register", {
+      const res = await fetch("/api/passenger/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: form.name, email: form.email, password: form.password }),

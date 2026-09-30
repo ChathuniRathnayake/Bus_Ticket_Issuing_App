@@ -145,13 +145,13 @@ export default function ManageSchedules() {
       setLoading(true);
 
       const [scheduleRes, busRes, routeRes] = await Promise.all([
-        axios.get("http://localhost:5000/api/schedule", {
+        axios.get("/api/schedule", {
           headers: { Authorization: `Bearer ${token}` },
         }),
-        axios.get("http://localhost:5000/api/bus", {
+        axios.get("/api/bus", {
           headers: { Authorization: `Bearer ${token}` },
         }),
-        axios.get("http://localhost:5000/api/route", {
+        axios.get("/api/route", {
           headers: { Authorization: `Bearer ${token}` },
         }),
       ]);
@@ -227,7 +227,7 @@ export default function ManageSchedules() {
 
   const handleSave = async (id) => {
     try {
-      await axios.put(`http://localhost:5000/api/schedule/${id}`, form, {
+      await axios.put(`/api/schedule/${id}`, form, {
         headers: { Authorization: `Bearer ${token}` },
       });
       cancelEdit();
@@ -241,7 +241,7 @@ export default function ManageSchedules() {
   const handleDelete = async (id) => {
     if (!window.confirm("Delete this schedule?")) return;
     try {
-      await axios.delete(`http://localhost:5000/api/schedule/${id}`, {
+      await axios.delete(`/api/schedule/${id}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       await loadData();

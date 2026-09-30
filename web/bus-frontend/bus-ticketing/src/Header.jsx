@@ -3,6 +3,7 @@ import { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { LogOut, Bus, Users, Map, ShieldCheck, Ticket, Search, Home as HomeIcon, Menu, X } from "lucide-react";
+import logo from "./assets/logo.png";
 
 // Pages where a logged-OUT visitor should see ONLY a "Home" link
 // (no About / Contact clutter — they're here to log in, not browse).
@@ -54,7 +55,7 @@ export default function Header() {
           onClick={handleLogoClick}
         >
           <img
-            src="/src/assets/logo.png"
+            src={logo}
             alt="TicketGo Logo"
             className="h-11 w-auto object-contain drop-shadow-sm"
           />

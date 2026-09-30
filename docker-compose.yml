@@ -1,0 +1,27 @@
+services:
+  backend:
+    build:
+      context: ./web/bus-backend
+    container_name: bus-backend
+    restart: unless-stopped
+
+    env_file:
+      - ./web/bus-backend/.env
+
+    expose:
+      - "5000"
+
+    volumes:
+      - ./web/bus-backend/config/serviceAccountKey.json:/app/config/serviceAccountKey.json:ro
+
+  frontend:
+    build:
+      context: ./web/bus-frontend/bus-ticketing
+    container_name: bus-frontend
+    restart: unless-stopped
+
+    ports:
+      - "80:80"
+
+    depends_on:
+      - backend

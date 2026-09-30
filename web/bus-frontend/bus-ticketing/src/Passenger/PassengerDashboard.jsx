@@ -88,7 +88,7 @@ export default function PassengerDashboard() {
     const fetchRoutes = async () => {
       try {
         const token = localStorage.getItem("token");
-        const res = await fetch("http://localhost:5000/api/route", {
+        const res = await fetch("/api/route", {
           headers: { Authorization: `Bearer ${token}` },
         });
         if (res.ok) {

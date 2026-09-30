@@ -46,13 +46,13 @@ export default function AddSchedule() {
     const fetchData = async () => {
       try {
         const [busRes, routeRes, scheduleRes] = await Promise.all([
-          fetch("http://localhost:5000/api/bus", {
+          fetch("/api/bus", {
             headers: { Authorization: `Bearer ${token}` },
           }),
-          fetch("http://localhost:5000/api/route", {
+          fetch("/api/route", {
             headers: { Authorization: `Bearer ${token}` },
           }),
-          fetch("http://localhost:5000/api/schedule", {
+          fetch("/api/schedule", {
             headers: { Authorization: `Bearer ${token}` },
           }),
         ]);
@@ -120,7 +120,7 @@ export default function AddSchedule() {
         createdAt: new Date().toISOString(),
       };
 
-      const res = await fetch("http://localhost:5000/api/schedule", {
+      const res = await fetch("/api/schedule", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

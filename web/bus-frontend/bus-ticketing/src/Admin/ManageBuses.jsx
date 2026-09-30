@@ -36,10 +36,10 @@ export default function ManageBuses() {
     try {
       setLoading(true);
       const [busRes, routeRes] = await Promise.all([
-        axios.get("http://localhost:5000/api/bus", {
+        axios.get("/api/bus", {
           headers: { Authorization: `Bearer ${token}` },
         }),
-        axios.get("http://localhost:5000/api/route", {
+        axios.get("/api/route", {
           headers: { Authorization: `Bearer ${token}` },
         }),
       ]);
@@ -111,7 +111,7 @@ export default function ManageBuses() {
   const handleSave = async (id) => {
     try {
       await axios.put(
-        `http://localhost:5000/api/bus/${id}`,
+        `/api/bus/${id}`,
         form,
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -127,7 +127,7 @@ export default function ManageBuses() {
     if (!confirm("Delete this bus?")) return;
 
     try {
-      await axios.delete(`http://localhost:5000/api/bus/${id}`, {
+      await axios.delete(`/api/bus/${id}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       fetchBuses();

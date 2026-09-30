@@ -31,7 +31,7 @@ export default function ManageAdmins() {
     }
     try {
       setLoading(true);
-      const res = await axios.get("http://localhost:5000/api/admin", {
+      const res = await axios.get("/api/admin", {
         headers: { Authorization: `Bearer ${token}` },
       });
       setAdmins(res.data);
@@ -75,7 +75,7 @@ export default function ManageAdmins() {
     const admin = admins[index]; // ✅ use admin.id
     try {
       await axios.put(
-        `http://localhost:5000/api/admin/${admin.id}`,
+        `/api/admin/${admin.id}`,
         { email: form.email, password: form.password },
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -94,7 +94,7 @@ export default function ManageAdmins() {
     if (!confirm("Delete this admin?")) return;
 
     try {
-      await axios.delete(`http://localhost:5000/api/admin/${admin.id}`, {
+      await axios.delete(`/api/admin/${admin.id}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       alert("Admin deleted successfully");

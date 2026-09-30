@@ -37,13 +37,13 @@ export default function SearchBuses() {
       try {
         setLoading(true);
         const [busRes, routeRes, scheduleRes] = await Promise.all([
-          fetch("http://localhost:5000/api/bus/available", {
+          fetch("/api/bus/available", {
             headers: { Authorization: `Bearer ${token}` },
           }),
-          fetch("http://localhost:5000/api/route/available", {
+          fetch("/api/route/available", {
             headers: { Authorization: `Bearer ${token}` },
           }),
-          fetch("http://localhost:5000/api/schedule/available", {
+          fetch("/api/schedule/available", {
             headers: { Authorization: `Bearer ${token}` },
           }),
         ]);

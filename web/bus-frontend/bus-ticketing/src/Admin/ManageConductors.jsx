@@ -30,7 +30,7 @@ export default function ManageConductors() {
     try {
       setLoading(true);
 
-      const res = await axios.get("http://localhost:5000/api/conductor", {
+      const res = await axios.get("/api/conductor", {
         headers: { Authorization: `Bearer ${token}` },
       });
 
@@ -75,7 +75,7 @@ export default function ManageConductors() {
   const handleSave = async (id) => {
     try {
       await axios.put(
-        `http://localhost:5000/api/conductor/${id}`,
+        `/api/conductor/${id}`,
         {
           name: form.name,
           password: form.password || undefined,
@@ -99,7 +99,7 @@ export default function ManageConductors() {
     if (!confirm("Delete this conductor?")) return;
 
     try {
-      await axios.delete(`http://localhost:5000/api/conductor/${id}`, {
+      await axios.delete(`/api/conductor/${id}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
 

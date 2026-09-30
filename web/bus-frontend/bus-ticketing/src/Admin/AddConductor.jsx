@@ -53,7 +53,7 @@ export default function AddConductor() {
       }
 
       const res = await axios.post(
-        "http://localhost:5000/api/conductor",
+        "/api/conductor",
         {
           email: form.email,
           name: form.name,

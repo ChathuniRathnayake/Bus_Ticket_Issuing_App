@@ -51,9 +51,9 @@ export default function ManageBookings() {
       setErrorMessage("");
 
       const [busesRes, routesRes, schedulesRes] = await Promise.all([
-        axios.get("http://localhost:5000/api/bus", { headers: { Authorization: `Bearer ${token}` } }),
-        axios.get("http://localhost:5000/api/route", { headers: { Authorization: `Bearer ${token}` } }),
-        axios.get("http://localhost:5000/api/schedule", { headers: { Authorization: `Bearer ${token}` } }),
+        axios.get("/api/bus", { headers: { Authorization: `Bearer ${token}` } }),
+        axios.get("/api/route", { headers: { Authorization: `Bearer ${token}` } }),
+        axios.get("/api/schedule", { headers: { Authorization: `Bearer ${token}` } }),
       ]);
       const buses = busesRes.data;
       const routes = routesRes.data;
@@ -74,7 +74,7 @@ export default function ManageBookings() {
       );
 
       const ticketResults = await Promise.allSettled(buses.map((bus) =>
-        axios.get(`http://localhost:5000/api/ticket/bus/${bus.id || bus.busId}`, {
+        axios.get(`/api/ticket/bus/${bus.id || bus.busId}`, {
           headers: { Authorization: `Bearer ${token}` },
         })
       ));
@@ -185,7 +185,7 @@ export default function ManageBookings() {
           boardingStopId: firstStop.stopId,
           dropStopId: lastStop.stopId,
         });
-        const response = await axios.get(`http://localhost:5000/api/ticket/availability?${params}`, {
+        const response = await axios.get(`/api/ticket/availability?${params}`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         if (isCurrent) {

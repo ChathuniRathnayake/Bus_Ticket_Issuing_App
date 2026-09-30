@@ -66,7 +66,7 @@ export default function AddBus({ routes }) {
     try {
       const token = localStorage.getItem("token");
 
-      const res = await fetch("http://localhost:5000/api/bus", {
+      const res = await fetch("/api/bus", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
