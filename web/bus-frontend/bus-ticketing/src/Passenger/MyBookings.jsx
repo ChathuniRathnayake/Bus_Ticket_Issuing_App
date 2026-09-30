@@ -1,5 +1,6 @@
 // src/Passenger/MyBookings.jsx
 import { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -7,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, Bus, Download, FileText, Ticket, Trash2, Clock } from "lucide-react";
 import QRCode from "qrcode";
 import TicketQRCode from "@/components/TicketQRCode";
-import { fetchPassengerBookings } from "@/utils/bookings";
+import { cancelPassengerBooking, fetchPassengerBookings } from "@/utils/bookings";
 
 function getRoutes() {
   return JSON.parse(localStorage.getItem("routes")) || [];
@@ -28,6 +29,8 @@ export default function MyBookings() {
   const [routes] = useState(getRoutes);
   const [pendingPayment, setPendingPayment] = useState(getPendingPayment);
   const [cancelBookingId, setCancelBookingId] = useState(null);
+  const [cancelling, setCancelling] = useState(false);
+  const [cancelError, setCancelError] = useState("");
   const [currentTime, setCurrentTime] = useState(() => new Date());
   const requestedStatus = searchParams.get("status");
   const validStatuses = ["all", "confirmed", "processing", "expired"];
@@ -73,19 +76,46 @@ export default function MyBookings() {
     document.getElementById(`booking-detail-${selectedBookingId}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
   }, [selectedBookingId]);
 
-  const handleCancelClick = (bookingId) => {
-    setCancelBookingId(bookingId);
+  const isBookingExpired = (booking, now = currentTime) => {
+    const route = routes.find((item) => item.routeId === booking.routeId);
+    const departureAt = new Date(`${booking.date || route?.date || ""}T${booking.departureTime || route?.startTime || ""}`);
+    return !Number.isNaN(departureAt.getTime()) && departureAt <= now;
   };
 
-  const confirmCancel = () => {
+  const handleCancelClick = (bookingId) => {
+    const booking = bookings.find((item) => item.bookingId === bookingId);
+    if (!booking || isBookingExpired(booking, new Date())) return;
+    setCancelBookingId(bookingId);
+    setCancelError("");
+  };
+
+  const confirmCancel = async () => {
     if (!cancelBookingId) return;
-    
-    const updatedBookings = bookings.filter((b) => b.bookingId !== cancelBookingId);
-    setBookings(updatedBookings);
-    localStorage.setItem("userBookings", JSON.stringify(updatedBookings));
-    
-    setCancelBookingId(null);
-    alert("✅ Booking cancelled successfully!");
+    const booking = bookings.find((item) => item.bookingId === cancelBookingId);
+    if (!booking) return;
+    if (isBookingExpired(booking, new Date())) {
+      setCancelError("This trip has departed and can no longer be cancelled.");
+      return;
+    }
+    const token = localStorage.getItem("token");
+    if (!token) {
+      navigate("/passenger-login");
+      return;
+    }
+
+    setCancelling(true);
+    setCancelError("");
+    try {
+      await cancelPassengerBooking(token, cancelBookingId);
+      const updatedBookings = bookings.filter((booking) => booking.bookingId !== cancelBookingId);
+      setBookings(updatedBookings);
+      localStorage.setItem("userBookings", JSON.stringify(updatedBookings));
+      setCancelBookingId(null);
+    } catch (error) {
+      setCancelError(error.message || "Could not cancel this booking. Please try again.");
+    } finally {
+      setCancelling(false);
+    }
   };
 
   const formatDateTime = (isoString) => {
@@ -164,14 +194,12 @@ export default function MyBookings() {
   };
 
   const bookingItems = bookings.map((booking) => {
-    const route = getRouteDetails(booking.routeId);
-    const departureAt = new Date(`${booking.date || route?.date || ""}T${booking.departureTime || route?.startTime || ""}`);
     const isProcessing = ["PENDING_PAYMENT", "CHECKOUT_CREATED"].includes(String(booking.status || "").toUpperCase());
     return {
       ...booking,
       displayStatus: isProcessing
         ? "processing"
-        : !Number.isNaN(departureAt.getTime()) && departureAt <= currentTime ? "expired" : "confirmed",
+        : isBookingExpired(booking) ? "expired" : "confirmed",
     };
   });
 
@@ -401,15 +429,21 @@ export default function MyBookings() {
                             </Button>
                           </div>
 
-                          <Button
-                            variant="destructive"
-                            size="lg"
-                            className="mt-8 w-full bg-gradient-to-r from-red-500 to-rose-600 hover:from-red-600 hover:to-rose-700 shadow-lg"
-                            onClick={() => handleCancelClick(booking.bookingId)}
-                          >
-                            <Trash2 className="mr-2 h-5 w-5" />
-                            Cancel Ticket
-                          </Button>
+                          {isExpired ? (
+                            <p className="mt-6 text-center text-sm font-medium text-slate-500">
+                              Cancellation is unavailable after departure.
+                            </p>
+                          ) : (
+                            <Button
+                              variant="destructive"
+                              size="lg"
+                              className="mt-8 w-full bg-gradient-to-r from-red-500 to-rose-600 hover:from-red-600 hover:to-rose-700 shadow-lg"
+                              onClick={() => handleCancelClick(booking.bookingId)}
+                            >
+                              <Trash2 className="mr-2 h-5 w-5" />
+                              Cancel Ticket
+                            </Button>
+                          )}
                         </>
                       )}
                     </div>
@@ -422,37 +456,83 @@ export default function MyBookings() {
       )}
 
       {/* Cancel Confirmation Modal - More Colorful */}
-      {cancelBookingId && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
-          <Card className="w-full max-w-md mx-4 bg-gradient-to-br from-slate-900 to-zinc-900 border-0 text-white">
-            <CardContent className="p-10 text-center">
-              <div className="text-red-500 mb-6">
-                <Trash2 className="w-16 h-16 mx-auto" />
-              </div>
-              <h3 className="text-2xl font-semibold mb-3">Cancel this booking?</h3>
-              <p className="text-slate-400 mb-8">
-                This action cannot be undone. Are you sure?
-              </p>
-              <div className="flex gap-4">
-                <Button 
-                  variant="outline" 
-                  className="flex-1 border-slate-600 text-white hover:bg-slate-800"
-                  onClick={() => setCancelBookingId(null)}
-                >
-                  No, Keep It
-                </Button>
-                <Button 
-                  variant="destructive" 
-                  className="flex-1 bg-red-600 hover:bg-red-700"
-                  onClick={confirmCancel}
-                >
-                  Yes, Cancel Ticket
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
+      {cancelBookingId && (() => {
+        const booking = bookingItems.find((item) => item.bookingId === cancelBookingId);
+        if (!booking) return null;
+        const route = getRouteDetails(booking.routeId);
+        const routeName = route
+          ? `${route.startStop} to ${route.endStop}`
+          : `${booking.startStop || "Starting point"} to ${booking.endStop || "Destination"}`;
+        return createPortal(
+          <div className="fixed inset-0 z-100 grid place-items-center overflow-y-auto bg-black/60 p-4 backdrop-blur-sm">
+            <Card
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="cancel-booking-title"
+              className="my-auto w-full max-w-lg border border-slate-200 bg-white text-slate-900 shadow-2xl"
+            >
+              <CardContent className="p-6 sm:p-8">
+                <div className="flex items-start gap-4">
+                  <div className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-red-100 text-red-700">
+                    <Trash2 className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <h3 id="cancel-booking-title" className="text-xl font-semibold">Cancel this ticket?</h3>
+                    <p className="mt-1 text-sm text-slate-600">Review the ticket details before confirming.</p>
+                  </div>
+                </div>
+                <dl className="mt-6 grid grid-cols-2 gap-x-5 gap-y-4 rounded-md border border-slate-200 bg-slate-50 p-4 text-sm">
+                  <div className="col-span-2">
+                    <dt className="text-xs font-medium uppercase text-slate-500">Journey</dt>
+                    <dd className="mt-1 font-semibold">{routeName}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs font-medium uppercase text-slate-500">Travel date</dt>
+                    <dd className="mt-1 font-medium">{booking.date || route?.date || "—"}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs font-medium uppercase text-slate-500">Departure</dt>
+                    <dd className="mt-1 font-medium">{booking.departureTime || route?.startTime || "—"}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs font-medium uppercase text-slate-500">Bus</dt>
+                    <dd className="mt-1 font-medium">{booking.busNo || booking.busId || "—"}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs font-medium uppercase text-slate-500">Seat</dt>
+                    <dd className="mt-1 font-medium">{booking.seat || booking.seatNumber || "—"}</dd>
+                  </div>
+                  <div className="col-span-2">
+                    <dt className="text-xs font-medium uppercase text-slate-500">Booking reference</dt>
+                    <dd className="mt-1 break-all font-mono text-xs">{booking.bookingId}</dd>
+                  </div>
+                </dl>
+                {cancelError && <p role="alert" className="mt-4 text-sm text-red-700">{cancelError}</p>}
+                <p className="mt-4 text-sm text-slate-600">This action cannot be undone.</p>
+                <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <Button
+                    variant="outline"
+                    className="min-h-11 w-full"
+                    disabled={cancelling}
+                    onClick={() => setCancelBookingId(null)}
+                  >
+                    Keep Ticket
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    className="min-h-11 w-full bg-red-600 text-white hover:bg-red-700 disabled:bg-red-400"
+                    disabled={cancelling}
+                    onClick={confirmCancel}
+                  >
+                    {cancelling ? "Cancelling..." : "Cancel Ticket"}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>,
+          document.body,
+        );
+      })()}
     </div>
   );
 }

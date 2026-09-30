@@ -13,7 +13,42 @@ import {
   TableRow
 } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
+import { fullFareCents } from "@/utils/fare";
 import { ArrowLeft, Pencil, Trash2, Map, ArrowUp, ArrowDown, Plus, Search, Route as RouteIcon } from "lucide-react";
+
+const MAX_VISIBLE_STOPS = 5;
+const EXPRESSWAY_TYPES = ["expressway_interchange", "expressway_segment"];
+const DURATION_PATTERN = /^\d+:[0-5]?\d$/;
+
+const emptyEditForm = { routeName: "", startStop: "", endStop: "", distance: "", duration: "" };
+
+const formatFare = (priceCents) => {
+  const cents = Number(priceCents);
+  if (!Number.isFinite(cents) || cents <= 0) return "—";
+  return `Rs ${(cents / 100).toLocaleString("en-LK", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+};
+
+// Cumulative per-stop fares as editable rupee strings, parallel to the stops.
+// Stop 0 (the origin) is always 0; the rest default to 0 when not yet priced.
+const toFareInputs = (route, stopCount) => {
+  const fares = Array.isArray(route.stopFareCents) && route.stopFareCents.length === stopCount
+    ? route.stopFareCents
+    : Array.from({ length: stopCount }, () => 0);
+  return fares.map((cents, index) => (index === 0 ? "0" : String(Number(cents) / 100)));
+};
+
+// Normalize a route's stops into objects, falling back to the two terminals.
+function toStopList(route) {
+  if (!Array.isArray(route.stops) || route.stops.length === 0) {
+    return [
+      { stopId: `${route.routeId}-origin`, name: route.startStop, stopType: "terminal", boardingAllowed: true, alightingAllowed: false },
+      { stopId: `${route.routeId}-destination`, name: route.endStop, stopType: "terminal", boardingAllowed: false, alightingAllowed: true },
+    ];
+  }
+  return route.stops.map((stop, index) => typeof stop === "string"
+    ? { stopId: `${route.routeId}-${index + 1}`, name: stop, stopType: "normal_road_waypoint", boardingAllowed: index === 0, alightingAllowed: index === route.stops.length - 1 }
+    : { ...stop });
+}
 
 export default function ManageRoutes() {
 
@@ -24,31 +59,11 @@ export default function ManageRoutes() {
   const [loading, setLoading] = useState(false);
   const [editId, setEditId] = useState(null);
   const [search, setSearch] = useState("");
-  const [stopText, setStopText] = useState("");
-  const [editingStops, setEditingStops] = useState([]);
   const [stopRecords, setStopRecords] = useState([]);
-
-  const [form, setForm] = useState({
-    startTime: "",
-    endTime: "",
-    date: "",
-    duration: "",
-  });
-
-  // Auto-calculate end time based on start time + duration
-  const calculateEndTime = (startTime, durationStr) => {
-    if (!startTime || !durationStr) return "";
-    const [startHours, startMinutes] = startTime.split(":").map(Number);
-    const [durHours, durMinutes] = durationStr.split(":").map(Number);
-    let endHours = startHours + durHours;
-    let endMinutes = startMinutes + durMinutes;
-    if (endMinutes >= 60) {
-      endHours += Math.floor(endMinutes / 60);
-      endMinutes = endMinutes % 60;
-    }
-    endHours = endHours % 24;
-    return `${String(endHours).padStart(2, "0")}:${String(endMinutes).padStart(2, "0")}`;
-  };
+  const [editStopFares, setEditStopFares] = useState([]);
+  const [editForm, setEditForm] = useState(emptyEditForm);
+  const [editPriceLkr, setEditPriceLkr] = useState("");
+  const [expanded, setExpanded] = useState({});
 
   /* =====================================================
      FETCH ROUTES
@@ -59,16 +74,12 @@ export default function ManageRoutes() {
 
       const res = await axios.get(
         "http://localhost:5000/api/route",
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
+        { headers: { Authorization: `Bearer ${token}` } }
       );
 
-      setRoutes(res.data.sort((a, b) => {
-        const dateA = new Date(`${a.date}T${a.startTime}`);
-        const dateB = new Date(`${b.date}T${b.startTime}`);
-        return dateA - dateB;
-      }));
+      setRoutes(res.data.sort((a, b) =>
+        String(a.routeName || a.routeId || "").localeCompare(String(b.routeName || b.routeId || ""))
+      ));
 
     } catch (error) {
       console.error(error);
@@ -88,7 +99,6 @@ export default function ManageRoutes() {
       return;
     }
 
-    // Optional: Check if token looks valid (basic check)
     if (token.length < 100) {
       alert("Invalid token. Please login again.");
       navigate("/admin-login");
@@ -102,31 +112,26 @@ export default function ManageRoutes() {
      EDIT
   ===================================================== */
   const handleEdit = (route) => {
+    const stops = toStopList(route);
     setEditId(route.id);
-    const stops = Array.isArray(route.stops) && route.stops.length
-      ? route.stops.map((stop, sequence) => typeof stop === "string"
-        ? { stopId: `${route.routeId}-${sequence + 1}`, name: stop, sequence, stopType: "normal_road_waypoint", boardingAllowed: sequence === 0, alightingAllowed: sequence === route.stops.length - 1 }
-        : { ...stop })
-      : [
-        { stopId: `${route.routeId}-origin`, name: route.startStop, sequence: 0, stopType: "terminal", boardingAllowed: true, alightingAllowed: false },
-        { stopId: `${route.routeId}-destination`, name: route.endStop, sequence: 1, stopType: "terminal", boardingAllowed: false, alightingAllowed: true },
-      ];
-    setEditingStops(stops);
-    setStopText(stops.map((stop) => `${stop.name} | ${stop.stopType || "normal_road_waypoint"} | ${stop.boardingAllowed === true} | ${stop.alightingAllowed === true}`).join("\n"));
-    setStopRecords(Array.isArray(route.stops) && route.stops.length
-      ? route.stops.map((stop, index) => typeof stop === "string"
-        ? { stopId: `${route.routeId}-${index + 1}`, name: stop, stopType: "normal_road_waypoint", boardingAllowed: index === 0, alightingAllowed: index === route.stops.length - 1 }
-        : { ...stop })
-      : [
-        { stopId: `${route.routeId}-origin`, name: route.startStop, stopType: "terminal", boardingAllowed: true, alightingAllowed: false },
-        { stopId: `${route.routeId}-destination`, name: route.endStop, stopType: "terminal", boardingAllowed: false, alightingAllowed: true },
-      ]);
-    setForm({
-      startTime: route.startTime || "",
-      endTime: route.endTime || "",
-      date: route.date || "",
+    setStopRecords(stops);
+    setEditStopFares(toFareInputs(route, stops.length));
+    setEditForm({
+      routeName: route.routeName || "",
+      startStop: route.startStop || "",
+      endStop: route.endStop || "",
+      distance: route.distance !== undefined && route.distance !== null ? String(route.distance) : "",
       duration: route.duration || "",
     });
+    setEditPriceLkr(Number.isFinite(Number(route.priceCents)) ? String(Number(route.priceCents) / 100) : "");
+  };
+
+  const cancelEdit = () => {
+    setEditId(null);
+    setStopRecords([]);
+    setEditStopFares([]);
+    setEditForm(emptyEditForm);
+    setEditPriceLkr("");
   };
 
   /* =====================================================
@@ -134,42 +139,84 @@ export default function ManageRoutes() {
   ===================================================== */
   const handleSave = async (id) => {
     try {
-      const stops = stopText.split("\n").map((line) => line.trim()).filter(Boolean).map((line, sequence) => {
-        const [name, stopType = "normal_road_waypoint", boarding = "false", alighting = "false"] = line.split("|").map((part) => part.trim());
-        const preservedId = editingStops.find((stop) => stop.name === name)?.stopId || editingStops[sequence]?.stopId;
-        const isExpresswayElement = stopType === "expressway_interchange" || stopType === "expressway_segment";
+      const stops = stopRecords.map((stop, sequence) => {
+        const isExpressway = EXPRESSWAY_TYPES.includes(stop.stopType);
         return {
-          stopId: preservedId,
-          name,
+          stopId: stop.stopId,
+          name: (stop.name || "").trim(),
           sequence,
-          stopType,
-          boardingAllowed: !isExpresswayElement && boarding.toLowerCase() === "true",
-          alightingAllowed: !isExpresswayElement && alighting.toLowerCase() === "true",
+          stopType: stop.stopType || "normal_road_waypoint",
+          boardingAllowed: !isExpressway && stop.boardingAllowed === true,
+          alightingAllowed: !isExpressway && stop.alightingAllowed === true,
         };
       });
+
       if (stops.length < 2 || stops.some((stop) => !stop.name)) {
         throw new Error("Add at least two named stops in route order");
       }
-      const updateData = {
-        startTime: form.startTime,
-        endTime: form.endTime,
-        date: form.date,
-          stops,
-      };
-      
+
+      const payload = { stops };
+      const routeName = editForm.routeName.trim();
+      const startStop = editForm.startStop.trim();
+      const endStop = editForm.endStop.trim();
+      const distance = editForm.distance.trim();
+      const duration = editForm.duration.trim();
+
+      if (routeName) payload.routeName = routeName;
+      if (startStop) payload.startStop = startStop;
+      if (endStop) payload.endStop = endStop;
+      if (distance) payload.distance = distance;
+      if (duration) {
+        if (!DURATION_PATTERN.test(duration)) {
+          throw new Error("Duration must be in H:MM format, e.g. 2:30");
+        }
+        payload.duration = duration;
+      }
+
+      const fareTrimmed = String(editPriceLkr ?? "").trim();
+      if (fareTrimmed !== "") {
+        const rupees = Number(fareTrimmed);
+        if (!Number.isFinite(rupees) || rupees < 0) {
+          throw new Error("Fare must be a non-negative amount in rupees");
+        }
+        payload.priceCents = Math.round(rupees * 100);
+      }
+
+      // Cumulative per-stop fares (rupees -> cents). Stop 0 is the origin and
+      // is always 0. Only persist the array when the admin actually priced a
+      // stop beyond the origin; otherwise send null so any stale/all-zero array
+      // is cleared and the flat full-route fare stays the source of truth.
+      const parsedFares = editStopFares.map((value) => Number(String(value ?? "").trim() || 0));
+      const hasStopFares = parsedFares.some((rupees, index) => index > 0 && Number.isFinite(rupees) && rupees > 0);
+      if (hasStopFares) {
+        if (editStopFares.length !== stops.length) {
+          throw new Error("Each stop needs a cumulative fare");
+        }
+        const stopFareCents = parsedFares.map((rupees, index) => {
+          if (!Number.isFinite(rupees) || rupees < 0) {
+            throw new Error(`Fare for stop ${index + 1} must be a non-negative amount in rupees`);
+          }
+          return Math.round(rupees * 100);
+        });
+        stopFareCents[0] = 0;
+        for (let index = 1; index < stopFareCents.length; index += 1) {
+          if (stopFareCents[index] < stopFareCents[index - 1]) {
+            throw new Error("Cumulative fares must not decrease along the route");
+          }
+        }
+        payload.stopFareCents = stopFareCents;
+      } else {
+        payload.stopFareCents = null;
+      }
+
       await axios.put(
         `http://localhost:5000/api/route/${id}`,
-        updateData,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
+        payload,
+        { headers: { Authorization: `Bearer ${token}` } }
       );
 
       alert("Route updated successfully");
-      setEditId(null);
-      setEditingStops([]);
-      setStopText("");
-      setStopRecords([]);
+      cancelEdit();
       fetchRoutes();
 
     } catch (error) {
@@ -187,9 +234,7 @@ export default function ManageRoutes() {
     try {
       await axios.delete(
         `http://localhost:5000/api/route/${id}`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
+        { headers: { Authorization: `Bearer ${token}` } }
       );
 
       alert("Route deleted successfully");
@@ -209,6 +254,50 @@ export default function ManageRoutes() {
     r.routeId?.toLowerCase().includes(search.toLowerCase())
   );
 
+  const toggleExpanded = (id) => setExpanded((prev) => ({ ...prev, [id]: !prev[id] }));
+
+  /* =====================================================
+     STOP + FARE EDITING (kept in lockstep)
+  ===================================================== */
+  const updateStopFare = (index, value) => {
+    setEditStopFares((items) => items.map((item, itemIndex) => (itemIndex === index ? value : item)));
+  };
+
+  const moveStop = (index, direction) => {
+    const target = index + direction;
+    if (target < 0 || target >= stopRecords.length) return;
+    setStopRecords((items) => {
+      const next = [...items];
+      [next[index], next[target]] = [next[target], next[index]];
+      return next;
+    });
+    setEditStopFares((items) => {
+      const next = [...items];
+      [next[index], next[target]] = [next[target], next[index]];
+      return next;
+    });
+  };
+
+  const removeStop = (index) => {
+    if (stopRecords.length <= 2) return;
+    setStopRecords((items) => items.filter((_, itemIndex) => itemIndex !== index));
+    setEditStopFares((items) => items.filter((_, itemIndex) => itemIndex !== index));
+  };
+
+  const addStop = (routeId) => {
+    const insertAt = Math.max(1, stopRecords.length - 1);
+    setStopRecords((items) => {
+      const next = [...items];
+      next.splice(insertAt, 0, { stopId: `${routeId}-stop-${Date.now()}`, name: "", stopType: "normal_road_waypoint", boardingAllowed: false, alightingAllowed: false });
+      return next;
+    });
+    setEditStopFares((items) => {
+      const next = [...items];
+      next.splice(insertAt, 0, "0");
+      return next;
+    });
+  };
+
   return (
     <div className="mx-auto max-w-7xl space-y-6 p-6 animate-fade-in">
 
@@ -224,7 +313,11 @@ export default function ManageRoutes() {
             <ArrowLeft className="h-5 w-5" /> Back to Dashboard
           </Button>
 
-          <div><p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-600">Network planning</p><h2 className="mt-2 text-3xl font-bold tracking-tight text-slate-950">Route registry</h2><p className="mt-1 text-sm text-slate-500">Manage corridors, ordered stops, permissions, and timing metadata.</p></div>
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-600">Network planning</p>
+            <h2 className="mt-2 text-3xl font-bold tracking-tight text-slate-950">Route registry</h2>
+            <p className="mt-1 text-sm text-slate-500">Manage corridors, ordered stops, and boarding permissions.</p>
+          </div>
         </div>
 
         <div className="relative">
@@ -239,29 +332,24 @@ export default function ManageRoutes() {
 
       </div>
 
-        <Card className="rounded-2xl border-slate-200 shadow-sm">
+      <Card className="rounded-2xl border-slate-200 shadow-sm">
 
         <CardHeader>
-          <CardTitle className="flex items-center gap-2"><RouteIcon className="h-5 w-5 text-emerald-600" /> Routes <span className="text-sm font-normal text-slate-500">({filteredRoutes.length})</span></CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            <RouteIcon className="h-5 w-5 text-emerald-600" /> Routes <span className="text-sm font-normal text-slate-500">({filteredRoutes.length})</span>
+          </CardTitle>
         </CardHeader>
 
         <CardContent>
 
           {loading ? (
-            <p className="text-center py-12 text-muted-foreground">
-              Loading...
-            </p>
+            <p className="text-center py-12 text-muted-foreground">Loading...</p>
           ) : filteredRoutes.length === 0 ? (
-
             <div className="text-center py-12">
               <Map className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-              <p className="text-muted-foreground">
-                No routes found.
-              </p>
+              <p className="text-muted-foreground">No routes found.</p>
             </div>
-
           ) : (
-
             <div className="overflow-auto rounded-xl border border-border">
 
               <Table>
@@ -269,188 +357,176 @@ export default function ManageRoutes() {
                 <TableHeader>
                   <TableRow className="bg-slate-50">
                     <TableHead>Route ID</TableHead>
-                    <TableHead>Name</TableHead>
+                    <TableHead>Name &amp; stops</TableHead>
                     <TableHead>Start Stop</TableHead>
                     <TableHead>End Stop</TableHead>
                     <TableHead>Distance (km)</TableHead>
                     <TableHead>Duration</TableHead>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Start Time</TableHead>
-                    <TableHead>End Time</TableHead>
+                    <TableHead>Fare</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
 
                 <TableBody>
 
-                  {filteredRoutes.map((r) => (
-                    <Fragment key={r.id}>
-                    <TableRow
-                      className="even:bg-muted/50 hover:bg-muted transition-all duration-300"
-                    >
+                  {filteredRoutes.map((r) => {
+                    const stops = toStopList(r);
+                    const intermediate = stops.slice(1, -1);
+                    const visible = expanded[r.id] ? intermediate : intermediate.slice(0, MAX_VISIBLE_STOPS);
+                    const hiddenCount = intermediate.length - MAX_VISIBLE_STOPS;
 
-                      <TableCell><span className="rounded-md bg-slate-100 px-2 py-1 font-mono text-xs font-semibold text-slate-700">{r.routeId}</span></TableCell>
-                      <TableCell>
-                        <div className="font-medium">{r.routeName}</div>
-                        {editId === r.id ? (
-                          <div className="mt-2 space-y-1">
-                            <label htmlFor={`stops-${r.id}`} className="text-xs font-medium text-slate-600">Ordered stops: name | type | boarding | alighting</label>
-                            <textarea
-                              id={`stops-${r.id}`}
-                              value={stopText}
-                              onChange={(event) => setStopText(event.target.value)}
-                              className="min-h-36 w-full rounded border border-slate-300 bg-white p-2 text-xs"
-                            />
-                          </div>
-                        ) : Array.isArray(r.stops) && r.stops.length > 0 && (
-                          <ol className="mt-2 space-y-1 text-xs text-muted-foreground">
-                            {r.stops.map((stop, index) => {
-                              const stopName = typeof stop === "string" ? stop : stop.name;
-                              const stopType = typeof stop === "string" ? "stop" : stop.stopType;
-                              return (
-                                <li key={typeof stop === "string" ? `${r.id}-${index}` : stop.stopId}>
-                                  {index + 1}. {stopName} <span className="text-slate-400">({stopType})</span>
-                                </li>
-                              );
-                            })}
-                          </ol>
-                        )}
-                      </TableCell>
-                      <TableCell>{r.startStop}</TableCell>
-                      <TableCell>{r.endStop}</TableCell>
-                      <TableCell>{r.distance}</TableCell>
-                      <TableCell>{r.duration}</TableCell>
-                      <TableCell><span className="font-medium text-slate-800">{r.startStop}</span></TableCell>
-                      <TableCell><span className="font-medium text-slate-800">{r.endStop}</span></TableCell>
-                      <TableCell>{r.distance || "—"}</TableCell>
-                      <TableCell><span className="font-mono text-sm">{r.duration || "—"}</span></TableCell>
+                    return (
+                      <Fragment key={r.id}>
+                        <TableRow className="even:bg-muted/50 hover:bg-muted transition-all duration-300 align-top">
 
-                      {/* Date */}
-                      <TableCell>
-                        {editId === r.id ? (
-                          <Input
-                            type="date"
-                            value={form.date}
-                            onChange={(e) =>
-                              setForm({ ...form, date: e.target.value })
-                            }
-                          />
-                        ) : (
-                          r.date || "-"
-                        )}
-                      </TableCell>
+                          <TableCell>
+                            <span className="rounded-md bg-slate-100 px-2 py-1 font-mono text-xs font-semibold text-slate-700">{r.routeId}</span>
+                          </TableCell>
 
-                      {/* Start Time */}
-                      <TableCell>
-                        {editId === r.id ? (
-                          <Input
-                            type="time"
-                            value={form.startTime}
-                            onChange={(e) => {
-                              const newStartTime = e.target.value;
-                              const calculatedEndTime = calculateEndTime(newStartTime, form.duration);
-                              setForm({
-                                ...form,
-                                startTime: newStartTime,
-                                endTime: calculatedEndTime,
-                              });
-                            }}
-                          />
-                        ) : (
-                          r.startTime || "-"
-                        )}
-                      </TableCell>
+                          <TableCell>
+                            <div className="font-medium text-slate-900">{r.routeName}</div>
 
-                      {/* End Time */}
-                      <TableCell>
-                        {editId === r.id ? (
-                          <Input
-                            type="time"
-                            value={form.endTime}
-                            readOnly
-                            className="bg-gray-50 cursor-not-allowed"
-                          />
-                        ) : (
-                          r.endTime || "-"
-                        )}
-                      </TableCell>
+                            {editId !== r.id && intermediate.length > 0 && (
+                              <div className="mt-2 flex flex-wrap items-center gap-1">
+                                {visible.map((stop, index) => (
+                                  <span
+                                    key={stop.stopId || `${r.id}-stop-${index}`}
+                                    className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] text-slate-600"
+                                  >
+                                    {stop.name}
+                                  </span>
+                                ))}
+                                {hiddenCount > 0 && (
+                                  <button
+                                    type="button"
+                                    onClick={() => toggleExpanded(r.id)}
+                                    className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700 hover:bg-emerald-100"
+                                  >
+                                    {expanded[r.id] ? "Show less" : `+${hiddenCount} more`}
+                                  </button>
+                                )}
+                              </div>
+                            )}
 
-                      {/* Actions */}
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
+                            {editId !== r.id && intermediate.length === 0 && (
+                              <div className="mt-1 text-xs text-slate-400">Direct — no intermediate stops</div>
+                            )}
+                          </TableCell>
 
-                        {editId === r.id ? (
-                          <Button
-                            size="sm"
-                            onClick={() => handleSave(r.id)}
-                            className="bg-emerald-600 hover:bg-emerald-700 text-white"
-                          >
-                            Save
-                          </Button>
-                        ) : (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleEdit(r)}
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                        )}
+                          <TableCell>{r.startStop}</TableCell>
+                          <TableCell>{r.endStop}</TableCell>
+                          <TableCell>{r.distance ? r.distance : "—"}</TableCell>
+                          <TableCell><span className="font-mono text-sm">{r.duration || "—"}</span></TableCell>
+                          <TableCell>
+                            <span className="font-semibold text-emerald-700">{formatFare(fullFareCents(r))}</span>
+                          </TableCell>
 
-                        <Button
-                          size="sm"
-                          onClick={() => handleDelete(r.id)}
-                          className="bg-red-600 hover:bg-red-700 text-white"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                          <TableCell className="text-right">
+                            <div className="flex justify-end gap-2">
 
-                        </div>
-                      </TableCell>
+                              {editId === r.id ? (
+                                <>
+                                  <Button
+                                    size="sm"
+                                    onClick={() => handleSave(r.id)}
+                                    className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                                  >
+                                    Save
+                                  </Button>
+                                  <Button size="sm" variant="outline" onClick={cancelEdit}>
+                                    Cancel
+                                  </Button>
+                                </>
+                              ) : (
+                                <Button size="sm" variant="outline" onClick={() => handleEdit(r)}>
+                                  <Pencil className="h-4 w-4" />
+                                </Button>
+                              )}
 
-                    </TableRow>
-                    {editId === r.id && (
-                      <TableRow>
-                        <TableCell colSpan={10} className="bg-slate-50">
-                          <div className="space-y-2">
-                            <p className="text-xs font-semibold uppercase tracking-wide text-slate-600">Ordered route stops</p>
-                            {stopRecords.map((stop, index) => (
-                              <div key={stop.stopId} className="grid grid-cols-1 items-center gap-2 rounded border bg-white p-2 md:grid-cols-[minmax(12rem,1fr)_12rem_auto_auto_auto]">
-                                <Input aria-label={`Stop ${index + 1} name`} value={stop.name} onChange={(event) => setStopRecords((items) => items.map((item, itemIndex) => itemIndex === index ? { ...item, name: event.target.value } : item))} />
-                                <select aria-label={`Stop ${index + 1} type`} value={stop.stopType || "normal_road_waypoint"} onChange={(event) => setStopRecords((items) => items.map((item, itemIndex) => itemIndex === index ? { ...item, stopType: event.target.value, boardingAllowed: event.target.value.startsWith("expressway_") ? false : item.boardingAllowed, alightingAllowed: event.target.value.startsWith("expressway_") ? false : item.alightingAllowed } : item))} className="h-10 rounded border border-slate-300 bg-white px-2 text-sm">
-                                  <option value="terminal">Terminal</option>
-                                  <option value="normal_road_waypoint">Normal road stop</option>
-                                  <option value="expressway_interchange">Expressway interchange</option>
-                                  <option value="expressway_segment">Expressway segment</option>
-                                </select>
-                                <label className="flex items-center gap-1 text-xs"><input type="checkbox" checked={stop.boardingAllowed === true} disabled={stop.stopType?.startsWith("expressway_")} onChange={(event) => setStopRecords((items) => items.map((item, itemIndex) => itemIndex === index ? { ...item, boardingAllowed: event.target.checked } : item))} />Board</label>
-                                <label className="flex items-center gap-1 text-xs"><input type="checkbox" checked={stop.alightingAllowed === true} disabled={stop.stopType?.startsWith("expressway_")} onChange={(event) => setStopRecords((items) => items.map((item, itemIndex) => itemIndex === index ? { ...item, alightingAllowed: event.target.checked } : item))} />Alight</label>
-                                <div className="flex gap-1">
-                                  <Button size="icon" variant="ghost" title="Move stop up" disabled={index === 0} onClick={() => setStopRecords((items) => { const next = [...items]; [next[index - 1], next[index]] = [next[index], next[index - 1]]; return next; })}><ArrowUp className="h-4 w-4" /></Button>
-                                  <Button size="icon" variant="ghost" title="Move stop down" disabled={index === stopRecords.length - 1} onClick={() => setStopRecords((items) => { const next = [...items]; [next[index], next[index + 1]] = [next[index + 1], next[index]]; return next; })}><ArrowDown className="h-4 w-4" /></Button>
-                                  <Button size="icon" variant="ghost" title="Remove stop" disabled={stopRecords.length <= 2} onClick={() => setStopRecords((items) => items.filter((_, itemIndex) => itemIndex !== index))}><Trash2 className="h-4 w-4" /></Button>
+                              <Button
+                                size="sm"
+                                onClick={() => handleDelete(r.id)}
+                                className="bg-red-600 hover:bg-red-700 text-white"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+
+                            </div>
+                          </TableCell>
+
+                        </TableRow>
+
+                        {editId === r.id && (
+                          <TableRow>
+                            <TableCell colSpan={8} className="bg-slate-50">
+                              <div className="space-y-4">
+                                <div className="space-y-2">
+                                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-600">Route details</p>
+                                  <div className="grid grid-cols-1 gap-3 rounded border bg-white p-3 md:grid-cols-[repeat(6,minmax(0,1fr))]">
+                                    <div className="min-w-0 space-y-1">
+                                      <label className="block text-xs font-medium text-slate-600">Route name</label>
+                                      <Input value={editForm.routeName} onChange={(event) => setEditForm((prev) => ({ ...prev, routeName: event.target.value }))} className="w-full min-w-0" />
+                                    </div>
+                                    <div className="min-w-0 space-y-1">
+                                      <label className="block text-xs font-medium text-slate-600">Start stop</label>
+                                      <Input value={editForm.startStop} onChange={(event) => setEditForm((prev) => ({ ...prev, startStop: event.target.value }))} className="w-full min-w-0" />
+                                    </div>
+                                    <div className="min-w-0 space-y-1">
+                                      <label className="block text-xs font-medium text-slate-600">End stop</label>
+                                      <Input value={editForm.endStop} onChange={(event) => setEditForm((prev) => ({ ...prev, endStop: event.target.value }))} className="w-full min-w-0" />
+                                    </div>
+                                    <div className="min-w-0 space-y-1">
+                                      <label className="block text-xs font-medium text-slate-600">Distance (km)</label>
+                                      <Input type="number" min="0.1" step="0.1" value={editForm.distance} onChange={(event) => setEditForm((prev) => ({ ...prev, distance: event.target.value }))} className="w-full min-w-0" />
+                                    </div>
+                                    <div className="min-w-0 space-y-1">
+                                      <label className="block text-xs font-medium text-slate-600">Duration (H:MM)</label>
+                                      <Input value={editForm.duration} onChange={(event) => setEditForm((prev) => ({ ...prev, duration: event.target.value }))} placeholder="2:30" className="w-full min-w-0" />
+                                    </div>
+                                    <div className="min-w-0 space-y-1">
+                                      <label className="block text-xs font-medium text-slate-600">Full-route fare (LKR)</label>
+                                      <Input type="number" min="0" step="0.01" value={editPriceLkr} onChange={(event) => setEditPriceLkr(event.target.value)} placeholder="450" className="w-full min-w-0" />
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <div className="space-y-2">
+                                <p className="text-xs font-semibold uppercase tracking-wide text-slate-600">Ordered route stops</p>
+                                <p className="text-xs text-slate-500">Set the cumulative fare from the origin to each stop. A passenger's fare is the difference between their boarding and drop stops.</p>
+                                {stopRecords.map((stop, index) => (
+                                  <div key={stop.stopId} className="grid grid-cols-1 items-center gap-2 rounded border bg-white p-2 md:grid-cols-[minmax(10rem,1fr)_10rem_7rem_auto_auto_auto]">
+                                    <Input aria-label={`Stop ${index + 1} name`} value={stop.name} onChange={(event) => setStopRecords((items) => items.map((item, itemIndex) => itemIndex === index ? { ...item, name: event.target.value } : item))} className="min-w-0" />
+                                    <select aria-label={`Stop ${index + 1} type`} value={stop.stopType || "normal_road_waypoint"} onChange={(event) => setStopRecords((items) => items.map((item, itemIndex) => itemIndex === index ? { ...item, stopType: event.target.value, boardingAllowed: event.target.value.startsWith("expressway_") ? false : item.boardingAllowed, alightingAllowed: event.target.value.startsWith("expressway_") ? false : item.alightingAllowed } : item))} className="h-10 min-w-0 rounded border border-slate-300 bg-white px-2 text-sm">
+                                      <option value="terminal">Terminal</option>
+                                      <option value="normal_road_waypoint">Normal road stop</option>
+                                      <option value="expressway_interchange">Expressway interchange</option>
+                                      <option value="expressway_segment">Expressway segment</option>
+                                    </select>
+                                    <Input aria-label={`Cumulative fare from origin to stop ${index + 1} (LKR)`} type="number" min="0" step="0.01" value={editStopFares[index] ?? "0"} disabled={index === 0} onChange={(event) => updateStopFare(index, event.target.value)} placeholder="0" className="min-w-0" />
+                                    <label className="flex items-center gap-1 text-xs"><input type="checkbox" checked={stop.boardingAllowed === true} disabled={stop.stopType?.startsWith("expressway_")} onChange={(event) => setStopRecords((items) => items.map((item, itemIndex) => itemIndex === index ? { ...item, boardingAllowed: event.target.checked } : item))} />Board</label>
+                                    <label className="flex items-center gap-1 text-xs"><input type="checkbox" checked={stop.alightingAllowed === true} disabled={stop.stopType?.startsWith("expressway_")} onChange={(event) => setStopRecords((items) => items.map((item, itemIndex) => itemIndex === index ? { ...item, alightingAllowed: event.target.checked } : item))} />Alight</label>
+                                    <div className="flex gap-1">
+                                      <Button size="icon" variant="ghost" title="Move stop up" disabled={index === 0} onClick={() => moveStop(index, -1)}><ArrowUp className="h-4 w-4" /></Button>
+                                      <Button size="icon" variant="ghost" title="Move stop down" disabled={index === stopRecords.length - 1} onClick={() => moveStop(index, 1)}><ArrowDown className="h-4 w-4" /></Button>
+                                      <Button size="icon" variant="ghost" title="Remove stop" disabled={stopRecords.length <= 2} onClick={() => removeStop(index)}><Trash2 className="h-4 w-4" /></Button>
+                                    </div>
+                                  </div>
+                                ))}
+                                <Button size="sm" variant="outline" onClick={() => addStop(r.routeId)}><Plus className="mr-1 h-4 w-4" />Add stop</Button>
                                 </div>
                               </div>
-                            ))}
-                            <Button size="sm" variant="outline" onClick={() => setStopRecords((items) => {
-                              const next = [...items];
-                              next.splice(Math.max(1, next.length - 1), 0, { stopId: `${r.routeId}-stop-${Date.now()}`, name: "", stopType: "normal_road_waypoint", boardingAllowed: false, alightingAllowed: false });
-                              return next;
-                            })}><Plus className="mr-1 h-4 w-4" />Add stop</Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    )}
-                    </Fragment>
-
-                  ))}
+                            </TableCell>
+                          </TableRow>
+                        )}
+                      </Fragment>
+                    );
+                  })}
 
                 </TableBody>
 
               </Table>
 
             </div>
-
           )}
 
         </CardContent>

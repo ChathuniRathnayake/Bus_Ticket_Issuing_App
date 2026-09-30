@@ -17,59 +17,46 @@ export default function AddRoute({ routes, setRoutes }) {
     endStop: "",
     distance: "",
     duration: "",
-    startTime: "",
-    endTime: "",
-    date: "",
+    fare: "",
   });
 
   const [durationHours, setDurationHours] = useState("");
   const [durationMinutes, setDurationMinutes] = useState("");
   const [intermediateStopsText, setIntermediateStopsText] = useState("");
+  const [customStopFields, setCustomStopFields] = useState({ startStop: false, endStop: false });
 
-  // Auto-calculate end time based on start time + duration
-  const calculateEndTime = (startTime, durationStr) => {
-    if (!startTime || !durationStr) return "";
-    const [startHours, startMinutes] = startTime.split(":").map(Number);
-    const [durHours, durMinutes] = durationStr.split(":").map(Number);
-    let endHours = startHours + durHours;
-    let endMinutes = startMinutes + durMinutes;
-    if (endMinutes >= 60) {
-      endHours += Math.floor(endMinutes / 60);
-      endMinutes = endMinutes % 60;
-    }
-    endHours = endHours % 24;
-    return `${String(endHours).padStart(2, "0")}:${String(endMinutes).padStart(2, "0")}`;
-  };
   const [loading, setLoading] = useState(false);
 
   const navigate = useNavigate();
   const token = localStorage.getItem("token");
 
-
-
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setForm((prev) => {
-      const newForm = { ...prev, [name]: value };
-      // Auto-calculate end time when start time changes
-      if (name === "startTime" && newForm.duration) {
-        newForm.endTime = calculateEndTime(value, newForm.duration);
-      }
-      return newForm;
-    });
+    setForm((prev) => ({ ...prev, [name]: value }));
   };
 
+  const handleStopSelection = (event) => {
+    const { name, value } = event.target;
+    if (value === "__add_new_stop__") {
+      setCustomStopFields((prev) => ({ ...prev, [name]: true }));
+      setForm((prev) => ({ ...prev, [name]: "" }));
+      return;
+    }
+    setForm((prev) => ({ ...prev, [name]: value }));
+  };
 
+  const useExistingStops = (fieldName) => {
+    setCustomStopFields((prev) => ({ ...prev, [fieldName]: false }));
+    setForm((prev) => ({ ...prev, [fieldName]: "" }));
+  };
 
-  const handleDurationChange = () => {
-    const hours = durationHours.trim() === "" ? "0" : durationHours;
-    const minutes = durationMinutes.trim() === "" ? "0" : durationMinutes;
-    const formatted = `${hours}:${minutes.padStart(2, "0")}`;
-    setForm((prev) => {
-      const newForm = { ...prev, duration: formatted };
-      const calculatedEndTime = calculateEndTime(newForm.startTime, formatted);
-      return { ...newForm, endTime: calculatedEndTime };
-    });
+  // Build the "H:MM" duration string from the explicit hour/minute inputs.
+  // Values are passed in directly to avoid reading stale state right after
+  // setDurationHours/setDurationMinutes.
+  const updateDuration = (hoursValue, minutesValue) => {
+    const hours = String(hoursValue ?? "").trim() === "" ? "0" : String(hoursValue).trim();
+    const minutes = String(minutesValue ?? "").trim() === "" ? "0" : String(minutesValue).trim();
+    setForm((prev) => ({ ...prev, duration: `${hours}:${minutes.padStart(2, "0")}` }));
   };
 
 
@@ -85,9 +72,6 @@ export default function AddRoute({ routes, setRoutes }) {
       endStop,
       distance,
       duration,
-      startTime,
-      endTime,
-      date,
     } = form;
 
     if (
@@ -96,10 +80,7 @@ export default function AddRoute({ routes, setRoutes }) {
       !startStop ||
       !endStop ||
       !distance ||
-      !duration ||
-      !startTime ||
-      !endTime ||
-      !date
+      !duration
     ) {
       return alert("Please fill all fields");
     }
@@ -107,6 +88,16 @@ export default function AddRoute({ routes, setRoutes }) {
     const [h, m] = duration.split(":").map(Number);
     if (isNaN(h) || isNaN(m) || m < 0 || m > 59) {
       return alert("Duration minutes must be between 0 and 59");
+    }
+
+    const fareTrimmed = String(form.fare ?? "").trim();
+    let priceCents;
+    if (fareTrimmed !== "") {
+      const rupees = Number(fareTrimmed);
+      if (!Number.isFinite(rupees) || rupees < 0) {
+        return alert("Fare must be a non-negative amount in rupees");
+      }
+      priceCents = Math.round(rupees * 100);
     }
 
     setLoading(true);
@@ -125,10 +116,13 @@ export default function AddRoute({ routes, setRoutes }) {
         }),
         { name: endStop, stopType: "terminal", boardingAllowed: false, alightingAllowed: true },
       ];
-     
+
+      const payload = { routeId, routeName, startStop, endStop, distance, duration, stops };
+      if (priceCents !== undefined) payload.priceCents = priceCents;
+
       const res = await axios.post(
         "http://localhost:5000/api/route",
-        { ...form, stops },
+        payload,
         {
           headers: { Authorization: `Bearer ${token}` },
         }
@@ -137,7 +131,7 @@ export default function AddRoute({ routes, setRoutes }) {
       alert(res.data.message || "Route added successfully");
 
       // Refresh routes locally
-      setRoutes([...routes, form]);
+      setRoutes([...routes, payload]);
 
       // Reset form
       setForm({
@@ -147,14 +141,13 @@ export default function AddRoute({ routes, setRoutes }) {
         endStop: "",
         distance: "",
         duration: "",
-        startTime: "",
-        endTime: "",
-        date: "",
+        fare: "",
       });
 
       setDurationHours("");
       setDurationMinutes("");
       setIntermediateStopsText("");
+      setCustomStopFields({ startStop: false, endStop: false });
 
       navigate("/admin-dashboard/manage-routes");
 
@@ -246,21 +239,37 @@ export default function AddRoute({ routes, setRoutes }) {
               <Label htmlFor="startStop" className="text-sm font-medium">
                 Start Stop
               </Label>
-              <select
-                id="startStop"
-                name="startStop"
-                value={form.startStop}
-                onChange={handleChange}
-                className="h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 transition-all"
-                required
-              >
-                <option value="">-- Select Start Stop --</option>
-                {availableStops.map((stop) => (
-                  <option key={stop} value={stop}>
-                    {stop}
-                  </option>
-                ))}
-              </select>
+              {customStopFields.startStop ? (
+                <div className="flex gap-2">
+                  <Input
+                    id="startStop"
+                    name="startStop"
+                    value={form.startStop}
+                    onChange={handleChange}
+                    placeholder="Enter a new start stop"
+                    className="h-11"
+                    required
+                  />
+                  <Button type="button" variant="outline" onClick={() => useExistingStops("startStop")}>
+                    Choose existing
+                  </Button>
+                </div>
+              ) : (
+                <select
+                  id="startStop"
+                  name="startStop"
+                  value={form.startStop}
+                  onChange={handleStopSelection}
+                  className="h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-sm transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
+                  required
+                >
+                  <option value="">-- Select Start Stop --</option>
+                  {availableStops.map((stop) => (
+                    <option key={stop} value={stop}>{stop}</option>
+                  ))}
+                  <option value="__add_new_stop__">+ Add a new stop...</option>
+                </select>
+              )}
             </div>
 
 
@@ -270,23 +279,39 @@ export default function AddRoute({ routes, setRoutes }) {
               <Label htmlFor="endStop" className="text-sm font-medium">
                 End Stop
               </Label>
-              <select
-                id="endStop"
-                name="endStop"
-                value={form.endStop}
-                onChange={handleChange}
-                className="h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 transition-all"
-                required
-              >
-                <option value="">-- Select End Stop --</option>
-                {availableStops
-                  .filter((stop) => stop !== form.startStop)
-                  .map((stop) => (
-                    <option key={stop} value={stop}>
-                      {stop}
-                    </option>
-                  ))}
-              </select>
+              {customStopFields.endStop ? (
+                <div className="flex gap-2">
+                  <Input
+                    id="endStop"
+                    name="endStop"
+                    value={form.endStop}
+                    onChange={handleChange}
+                    placeholder="Enter a new end stop"
+                    className="h-11"
+                    required
+                  />
+                  <Button type="button" variant="outline" onClick={() => useExistingStops("endStop")}>
+                    Choose existing
+                  </Button>
+                </div>
+              ) : (
+                <select
+                  id="endStop"
+                  name="endStop"
+                  value={form.endStop}
+                  onChange={handleStopSelection}
+                  className="h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-sm transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
+                  required
+                >
+                  <option value="">-- Select End Stop --</option>
+                  {availableStops
+                    .filter((stop) => stop !== form.startStop)
+                    .map((stop) => (
+                      <option key={stop} value={stop}>{stop}</option>
+                    ))}
+                  <option value="__add_new_stop__">+ Add a new stop...</option>
+                </select>
+              )}
             </div>
 
 
@@ -342,7 +367,7 @@ export default function AddRoute({ routes, setRoutes }) {
                     value={durationHours}
                     onChange={(e) => {
                       setDurationHours(e.target.value);
-                      handleDurationChange();
+                      updateDuration(e.target.value, durationMinutes);
                     }}
                     className="h-11 focus:ring-2 focus:ring-emerald-500"
                   />
@@ -359,7 +384,7 @@ export default function AddRoute({ routes, setRoutes }) {
                     value={durationMinutes}
                     onChange={(e) => {
                       setDurationMinutes(e.target.value);
-                      handleDurationChange();
+                      updateDuration(durationHours, e.target.value);
                     }}
                     className="h-11 focus:ring-2 focus:ring-emerald-500"
                   />
@@ -370,51 +395,25 @@ export default function AddRoute({ routes, setRoutes }) {
 
 
 
-            {/* Date */}
+            {/* Fare */}
             <div className="space-y-2">
-              <Label htmlFor="date" className="text-sm font-medium">
-                Route Date
+              <Label htmlFor="fare" className="text-sm font-medium">
+                Fare to destination (LKR)
               </Label>
               <Input
-                id="date"
-                name="date"
-                type="date"
-                value={form.date}
+                id="fare"
+                name="fare"
+                type="number"
+                min="0"
+                step="0.01"
+                value={form.fare}
                 onChange={handleChange}
-                className="h-11 focus:ring-2 focus:ring-emerald-500"
-                required
+                placeholder="e.g., 450"
+                className="h-11 transition-all focus:ring-2 focus:ring-emerald-500"
               />
-            </div>
-
-            {/* Times */}
-            <div className="grid grid-cols-2 gap-4">
-
-              <div className="space-y-2">
-                <Label className="text-sm font-medium">
-                  Start Time
-                </Label>
-                <Input
-                  name="startTime"
-                  type="time"
-                  value={form.startTime}
-                  onChange={handleChange}
-                  className="h-11 focus:ring-2 focus:ring-emerald-500"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label className="text-sm font-medium">
-                  End Time (Auto-calculated)
-                </Label>
-                <Input
-                  name="endTime"
-                  type="time"
-                  value={form.endTime}
-                  readOnly
-                  className="h-11 bg-gray-50 cursor-not-allowed focus:ring-2 focus:ring-emerald-500"
-                />
-              </div>
-
+              <p className="text-xs text-muted-foreground">
+                Optional. This fare is charged when a passenger books a ticket on this route.
+              </p>
             </div>
 
 

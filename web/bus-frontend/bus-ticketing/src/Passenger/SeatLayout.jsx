@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { formatLkr, journeyFareCents } from "@/utils/fare";
 import { ArrowLeft, CreditCard } from "lucide-react";
 
 // ─── Single seat button ────────────────────────────────────────────────────────
@@ -53,12 +54,12 @@ export default function SeatLayout() {
   const [routeStops] = useState(() => normalizeRouteStops(bus));
   const [boardingStopId, setBoardingStopId] = useState(() => (
     bus?.boardingStop?.stopId
-      || normalizeRouteStops(bus).find((stop) => stop.boardingAllowed === true)?.stopId
+      || normalizeRouteStops(bus)[0]?.stopId
       || ""
   ));
   const [dropStopId, setDropStopId] = useState(() => (
     bus?.dropStop?.stopId
-      || [...normalizeRouteStops(bus)].reverse().find((stop) => stop.alightingAllowed === true)?.stopId
+      || normalizeRouteStops(bus).at(-1)?.stopId
       || ""
   ));
 
@@ -67,8 +68,6 @@ export default function SeatLayout() {
   const leftRows         = parseInt(bus?.leftRows)     || 10;
   const rightRows        = parseInt(bus?.rightRows)    || 10;
   const backRowSeats     = parseInt(bus?.backRowSeats) || 5;
-  const totalSeats       = parseInt(bus?.totalSeats)   || 52;
-
   const hasFrontSingle =
     bus?.hasFrontSingle === "yes" || bus?.hasFrontSingle === true;
   const hasBackFullRow =
@@ -212,20 +211,29 @@ export default function SeatLayout() {
     );
   }
 
-  const boardingStops = routeStops.filter((stop) => stop.boardingAllowed === true);
+  const lastStopSequence = Math.max(...routeStops.map((stop) => stop.sequence));
+  const boardingStops = routeStops.filter((stop) => stop.sequence < lastStopSequence);
   const selectedBoarding = routeStops.find((stop) => stop.stopId === boardingStopId);
-  const destinationStops = routeStops.filter((stop) => stop.alightingAllowed === true
-    && stop.sequence > (selectedBoarding?.sequence ?? -1));
+  const destinationStops = routeStops.filter((stop) => stop.sequence > (selectedBoarding?.sequence ?? -1));
 
-  // ── Seat counts ───────────────────────────────────────────────────────────────
-  const generatedTotal =
-    leftRows  * leftSeatsPerRow +
-    rightRows * rightSeatsPerRow +
-    (hasFrontSingle ? 1 : 0) +
-    (hasBackFullRow ? backRowSeats : 0);
-
-  const availableCount = generatedTotal - bookedSeats.length;
+  const bookedSeatSet = new Set(bookedSeats);
+  const layoutSeatNumbers = [
+    ...(hasFrontSingle ? [conductorSeatLabel] : []),
+    ...Array.from({ length: leftRows }, (_, rowIdx) =>
+      Array.from({ length: leftSeatsPerRow }, (_, col) => getSeatNumber(rowIdx, col)),
+    ).flat(),
+    ...Array.from({ length: rightRows }, (_, rowIdx) =>
+      Array.from({ length: rightSeatsPerRow }, (_, col) => getSeatNumber(rowIdx, leftSeatsPerRow + col)),
+    ).flat(),
+    ...(hasBackFullRow
+      ? Array.from({ length: backRowSeats }, (_, col) => getBackSeatNumber(col))
+      : []),
+  ];
+  const bookedCount = layoutSeatNumbers.filter((seat) => bookedSeatSet.has(seat)).length;
+  const availableCount = layoutSeatNumbers.length - bookedCount;
   const maxRows        = Math.max(leftRows, rightRows);
+  const journeyFare    = journeyFareCents(bus.route, routeStops, boardingStopId, dropStopId);
+  const fareLabel      = formatLkr(journeyFare);
 
   // ── Render ────────────────────────────────────────────────────────────────────
   return (
@@ -241,7 +249,7 @@ export default function SeatLayout() {
             Seat Layout — {bus.busNo}
           </h2>
           <p className="text-sm text-muted-foreground mt-0.5">
-            Route: {bus.routeId} &nbsp;·&nbsp; Total seats: {totalSeats}
+            Route: {bus.routeId} &nbsp;·&nbsp; Total seats: {layoutSeatNumbers.length}
           </p>
         </div>
       </div>
@@ -265,7 +273,7 @@ export default function SeatLayout() {
                 const nextStop = routeStops.find((stop) => stop.stopId === nextId);
                 setBoardingStopId(nextId);
                 if ((routeStops.find((stop) => stop.stopId === dropStopId)?.sequence ?? -1) <= (nextStop?.sequence ?? -1)) {
-                  setDropStopId(routeStops.find((stop) => stop.alightingAllowed === true && stop.sequence > nextStop.sequence)?.stopId || "");
+                  setDropStopId(routeStops.find((stop) => stop.sequence > nextStop.sequence)?.stopId || "");
                 }
               }}
               className="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -283,6 +291,12 @@ export default function SeatLayout() {
               {destinationStops.map((stop) => <option key={stop.stopId} value={stop.stopId}>{stop.name}</option>)}
             </select>
           </label>
+          <div className="md:col-span-2 flex items-center justify-between rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
+            <span className="text-sm font-semibold text-emerald-800">Fare for this journey</span>
+            <span className="text-lg font-bold text-emerald-700">
+              {fareLabel ?? "Calculated at checkout"}
+            </span>
+          </div>
         </CardContent>
       </Card>
 
@@ -294,7 +308,7 @@ export default function SeatLayout() {
         </div>
         <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-red-50 border border-red-200 text-red-700 text-sm font-medium">
           <span className="w-3 h-3 rounded-sm bg-red-400 inline-block" />
-          Booked: {bookedSeats.length}
+          Booked: {bookedCount}
         </div>
         <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-blue-50 border border-blue-200 text-blue-700 text-sm font-medium">
           <span className="w-3 h-3 rounded-sm bg-blue-400 inline-block" />
@@ -491,8 +505,13 @@ export default function SeatLayout() {
                 <p className="text-sm text-muted-foreground">
                   {bus.busNo} &nbsp;|&nbsp; {bus.route?.startStop} to {bus.route?.endStop}
                 </p>
+                {fareLabel && (
+                  <p className="text-2xl font-bold text-emerald-600">{fareLabel}</p>
+                )}
                 <p className="text-xs text-muted-foreground">
-                  Your seat is reserved while you complete secure checkout. The confirmed fare is shown by Stripe.
+                  {fareLabel
+                    ? "Your seat is reserved while you complete secure checkout at this fare."
+                    : "Your seat is reserved while you complete secure checkout. The confirmed fare is shown by Stripe."}
                 </p>
               </div>
               {checkoutError && (

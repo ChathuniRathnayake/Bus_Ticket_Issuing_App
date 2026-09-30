@@ -7,6 +7,17 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ArrowLeft, Calendar } from "lucide-react";
 
+// Schedule IDs follow a sequential schNN scheme. Derive the next free ID from
+// the existing schedules so admins never hand-type or collide.
+function nextScheduleId(schedules) {
+  let max = 0;
+  for (const schedule of schedules) {
+    const match = /^sch(\d+)$/i.exec(String(schedule.scheduleId || schedule.id || "").trim());
+    if (match) max = Math.max(max, Number(match[1]));
+  }
+  return `sch${String(max + 1).padStart(2, "0")}`;
+}
+
 export default function AddSchedule() {
   const navigate = useNavigate();
 
@@ -34,21 +45,26 @@ export default function AddSchedule() {
 
     const fetchData = async () => {
       try {
-        const [busRes, routeRes] = await Promise.all([
+        const [busRes, routeRes, scheduleRes] = await Promise.all([
           fetch("http://localhost:5000/api/bus", {
             headers: { Authorization: `Bearer ${token}` },
           }),
           fetch("http://localhost:5000/api/route", {
             headers: { Authorization: `Bearer ${token}` },
           }),
+          fetch("http://localhost:5000/api/schedule", {
+            headers: { Authorization: `Bearer ${token}` },
+          }),
         ]);
 
-        const [busesData, routesData] = await Promise.all([busRes.json(), routeRes.json()]);
+        const [busesData, routesData, schedulesData] = await Promise.all([busRes.json(), routeRes.json(), scheduleRes.json()]);
         if (!busRes.ok) throw new Error(busesData.message || "Failed to load buses");
         if (!routeRes.ok) throw new Error(routesData.message || "Failed to load routes");
+        if (!scheduleRes.ok) throw new Error(schedulesData.message || "Failed to load schedules");
 
         setBuses(busesData);
         setRoutes(routesData);
+        setForm((prev) => ({ ...prev, scheduleId: nextScheduleId(Array.isArray(schedulesData) ? schedulesData : []) }));
 
       } catch (err) {
         console.error(err);
@@ -184,9 +200,10 @@ export default function AddSchedule() {
                 <Input
                   name="scheduleId"
                   value={form.scheduleId}
-                  onChange={handleChange}
-                  placeholder="SCH001"
+                  readOnly
+                  className="bg-slate-50 font-mono text-slate-600"
                 />
+                <p className="mt-1 text-xs text-muted-foreground">Auto-generated</p>
               </div>
 
               {/* Bus */}
@@ -269,7 +286,7 @@ export default function AddSchedule() {
               <Button
                 type="submit"
                 disabled={loading}
-                className="flex-1 bg-orange-600 text-white"
+                className="flex-1 bg-orange-600 text-white hover:bg-orange-700"
               >
                 {loading ? "Adding..." : "Add Schedule"}
               </Button>
