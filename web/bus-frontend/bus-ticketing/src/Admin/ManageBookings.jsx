@@ -33,6 +33,7 @@ export default function ManageBookings() {
   const [busIdFilter, setBusIdFilter] = useState("");
   const [routeFilter, setRouteFilter] = useState("");
   const [startTimeFilter, setStartTimeFilter] = useState("");
+  const [dateFilter, setDateFilter] = useState("");
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [expandedIds, setExpandedIds] = useState(() => new Set());
@@ -126,9 +127,11 @@ export default function ManageBookings() {
   const matchesTripFilters = (trip) => {
     const busId = trip.schedule?.busId || trip.busId || trip.id;
     const routeId = trip.schedule?.routeId || trip.routeId || trip.route?.routeId || trip.route?.id;
+    const tripDate = String(trip.schedule?.date || trip.date || "").slice(0, 10);
     const departureTime = trip.schedule?.departureTime || trip.departureTime || "";
     if (busIdFilter && String(busId) !== busIdFilter) return false;
     if (routeFilter && String(routeId) !== routeFilter) return false;
+    if (dateFilter && tripDate !== dateFilter) return false;
     if (startTimeFilter && departureTime !== startTimeFilter) return false;
 
     const departureTimestamp = getTripDepartureTimestamp(trip);
@@ -365,7 +368,7 @@ export default function ManageBookings() {
             <Ticket className="h-4 w-4" /> All Bookings
           </Button>
         </div>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_1fr_1fr_auto]">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_1fr_1fr_1fr_auto]">
           <label className="grid gap-1 text-xs font-medium text-muted-foreground">
             Trip period
             <select value={tripPeriodFilter} onChange={(event) => setTripPeriodFilter(event.target.value)} className="h-9 rounded-md border border-input bg-background px-2 text-sm text-foreground">
@@ -395,11 +398,16 @@ export default function ManageBookings() {
               {startTimeOptions.map((time) => <option key={time} value={time}>{time}</option>)}
             </select>
           </label>
-          <Button variant="outline" size="sm" className="self-end" disabled={!busIdFilter && !routeFilter && !startTimeFilter && tripPeriodFilter === "all"} onClick={() => {
+          <label className="grid gap-1 text-xs font-medium text-muted-foreground">
+            Travel date
+            <Input type="date" value={dateFilter} onChange={(event) => setDateFilter(event.target.value)} className="h-9" />
+          </label>
+          <Button variant="outline" size="sm" className="self-end" disabled={!busIdFilter && !routeFilter && !startTimeFilter && !dateFilter && tripPeriodFilter === "all"} onClick={() => {
             setTripPeriodFilter("all");
             setBusIdFilter("");
             setRouteFilter("");
             setStartTimeFilter("");
+            setDateFilter("");
           }}>Clear filters</Button>
         </div>
       </div>
