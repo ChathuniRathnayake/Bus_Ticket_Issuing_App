@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, Bus, Download, FileText, Ticket, Trash2, Clock } from "lucide-react";
 import QRCode from "qrcode";
 import TicketQRCode from "@/components/TicketQRCode";
-import { fetchPassengerBookings } from "@/utils/bookings";
+import { cancelPassengerBooking, fetchPassengerBookings } from "@/utils/bookings";
 
 function getRoutes() {
   return JSON.parse(localStorage.getItem("routes")) || [];
@@ -28,6 +28,8 @@ export default function MyBookings() {
   const [routes] = useState(getRoutes);
   const [pendingPayment, setPendingPayment] = useState(getPendingPayment);
   const [cancelBookingId, setCancelBookingId] = useState(null);
+  const [cancelling, setCancelling] = useState(false);
+  const [cancelError, setCancelError] = useState("");
   const [currentTime, setCurrentTime] = useState(() => new Date());
   const requestedStatus = searchParams.get("status");
   const validStatuses = ["all", "confirmed", "processing", "expired"];
@@ -75,17 +77,30 @@ export default function MyBookings() {
 
   const handleCancelClick = (bookingId) => {
     setCancelBookingId(bookingId);
+    setCancelError("");
   };
 
-  const confirmCancel = () => {
+  const confirmCancel = async () => {
     if (!cancelBookingId) return;
-    
-    const updatedBookings = bookings.filter((b) => b.bookingId !== cancelBookingId);
-    setBookings(updatedBookings);
-    localStorage.setItem("userBookings", JSON.stringify(updatedBookings));
-    
-    setCancelBookingId(null);
-    alert("✅ Booking cancelled successfully!");
+    const token = localStorage.getItem("token");
+    if (!token) {
+      navigate("/passenger-login");
+      return;
+    }
+
+    setCancelling(true);
+    setCancelError("");
+    try {
+      await cancelPassengerBooking(token, cancelBookingId);
+      const updatedBookings = bookings.filter((booking) => booking.bookingId !== cancelBookingId);
+      setBookings(updatedBookings);
+      localStorage.setItem("userBookings", JSON.stringify(updatedBookings));
+      setCancelBookingId(null);
+    } catch (error) {
+      setCancelError(error.message || "Could not cancel this booking. Please try again.");
+    } finally {
+      setCancelling(false);
+    }
   };
 
   const formatDateTime = (isoString) => {
@@ -433,10 +448,12 @@ export default function MyBookings() {
               <p className="text-slate-400 mb-8">
                 This action cannot be undone. Are you sure?
               </p>
+              {cancelError && <p role="alert" className="mb-4 text-sm text-red-300">{cancelError}</p>}
               <div className="flex gap-4">
                 <Button 
                   variant="outline" 
                   className="flex-1 border-slate-600 text-white hover:bg-slate-800"
+                  disabled={cancelling}
                   onClick={() => setCancelBookingId(null)}
                 >
                   No, Keep It
@@ -444,9 +461,10 @@ export default function MyBookings() {
                 <Button 
                   variant="destructive" 
                   className="flex-1 bg-red-600 hover:bg-red-700"
+                  disabled={cancelling}
                   onClick={confirmCancel}
                 >
-                  Yes, Cancel Ticket
+                  {cancelling ? "Cancelling..." : "Yes, Cancel Ticket"}
                 </Button>
               </div>
             </CardContent>

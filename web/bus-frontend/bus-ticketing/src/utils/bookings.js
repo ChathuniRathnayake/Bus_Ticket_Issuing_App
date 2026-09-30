@@ -11,6 +11,7 @@ export async function fetchPassengerBookings(token) {
   return data
     .filter((booking) => {
       const status = String(booking.status || "").toUpperCase();
+      if (["CANCELLED", "CANCELED", "RELEASED"].includes(status)) return false;
       return VISIBLE_BOOKING_STATUSES.has(status)
         || String(booking.paymentStatus || "").toUpperCase() === "SUCCEEDED";
     })
@@ -24,4 +25,14 @@ export async function fetchPassengerBookings(token) {
         paymentStatus: booking.paymentStatus || (status === "CONFIRMED" || status === "BOOKED" ? "SUCCEEDED" : undefined),
       };
     });
+}
+
+export async function cancelPassengerBooking(token, bookingId) {
+  const response = await fetch(`http://localhost:5000/api/booking/cancel/${encodeURIComponent(bookingId)}`, {
+    method: "PUT",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.message || "Could not cancel this booking");
+  return data;
 }
