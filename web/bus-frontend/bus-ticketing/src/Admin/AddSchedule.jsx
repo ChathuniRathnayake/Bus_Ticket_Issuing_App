@@ -286,7 +286,7 @@ export default function AddSchedule() {
               <Button
                 type="submit"
                 disabled={loading}
-                className="flex-1 bg-orange-600 text-white"
+                className="flex-1 bg-orange-600 text-white hover:bg-orange-700"
               >
                 {loading ? "Adding..." : "Add Schedule"}
               </Button>

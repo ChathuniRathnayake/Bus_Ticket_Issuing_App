@@ -14,6 +14,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
+  ArrowLeft,
   ArrowRight,
   Bus,
   CalendarClock,
@@ -37,6 +38,10 @@ const PAGE_SIZE = 10;
 function statusBadgeClass(status) {
   const base = "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ring-1 ring-inset";
   switch (String(status || "").toLowerCase()) {
+    case "on the way":
+      return `${base} bg-blue-50 text-blue-700 ring-blue-200`;
+    case "expired":
+      return `${base} bg-red-50 text-red-700 ring-red-200`;
     case "active":
       return `${base} bg-emerald-50 text-emerald-700 ring-emerald-200`;
     case "cancelled":
@@ -48,9 +53,48 @@ function statusBadgeClass(status) {
   }
 }
 
-function StatCard({ icon, label, value, accent }) {
+function getScheduleDepartureTime(schedule) {
+  const departureAt = new Date(`${schedule.date || ""}T${schedule.departureTime || ""}`);
+  return Number.isNaN(departureAt.getTime()) ? null : departureAt;
+}
+
+function getScheduleDisplayStatus(schedule, now) {
+  const status = String(schedule.status || "").trim();
+  if (status.toLowerCase() !== "active") return status || "Unknown";
+
+  const departureAt = getScheduleDepartureTime(schedule);
+  if (!departureAt || now < departureAt) return status;
+
+  const duration = String(schedule.routeDuration || "").match(/^(\d+):([0-5]?\d)$/);
+  if (!duration) return status;
+
+  const durationMinutes = Number(duration[1]) * 60 + Number(duration[2]);
+  const arrivalAt = new Date(departureAt.getTime() + durationMinutes * 60_000);
+  return now < arrivalAt ? "On the way" : "Expired";
+}
+
+function matchesScheduleStatus(schedule, statusFilter, now) {
+  if (!statusFilter) return true;
+
+  const storedStatus = String(schedule.status || "").toLowerCase();
+  if (statusFilter === "Active") return storedStatus === "active";
+  if (statusFilter === "Inactive") return storedStatus === "inactive";
+  if (statusFilter === "Cancelled") return storedStatus === "cancelled";
+  if (statusFilter === "Upcoming") {
+    const departureAt = getScheduleDepartureTime(schedule);
+    return storedStatus === "active" && departureAt && departureAt > now;
+  }
+  return getScheduleDisplayStatus(schedule, now) === statusFilter;
+}
+
+function StatCard({ icon, label, value, accent, onClick }) {
   return (
-    <div className="flex items-center gap-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition-shadow hover:shadow-md">
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={`Show ${label.toLowerCase()} schedules (${value})`}
+      className="group flex w-full items-center gap-4 rounded-xl border border-slate-200 bg-white p-5 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+    >
       <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-lg ${accent}`}>
         {icon}
       </div>
@@ -58,7 +102,7 @@ function StatCard({ icon, label, value, accent }) {
         <p className="text-2xl font-semibold leading-none text-slate-900">{value}</p>
         <p className="mt-1.5 truncate text-sm text-slate-500">{label}</p>
       </div>
-    </div>
+    </button>
   );
 }
 
@@ -70,6 +114,7 @@ export default function ManageSchedules() {
   const [buses, setBuses] = useState([]);
   const [routes, setRoutes] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [currentTime, setCurrentTime] = useState(() => new Date());
 
   const [search, setSearch] = useState("");
   const [fromFilter, setFromFilter] = useState("");
@@ -157,6 +202,11 @@ export default function ManageSchedules() {
     loadData();
   }, [loadData]);
 
+  useEffect(() => {
+    const interval = window.setInterval(() => setCurrentTime(new Date()), 30_000);
+    return () => window.clearInterval(interval);
+  }, []);
+
   const handleEdit = (schedule) => {
     setViewId(null);
     setEditId(schedule.id);
@@ -210,12 +260,24 @@ export default function ManageSchedules() {
     setPage(1);
   };
 
-  const todayStr = new Date().toISOString().slice(0, 10);
+  const showScheduleCategory = (selectedStatus) => {
+    resetFilters();
+    setStatusFilter(selectedStatus);
+    window.requestAnimationFrame(() => {
+      document.getElementById("admin-schedules-table")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  };
+
   const stats = {
     total: schedules.length,
     active: schedules.filter((s) => s.status === "Active").length,
-    upcoming: schedules.filter((s) => s.status === "Active" && s.date >= todayStr).length,
+    upcoming: schedules.filter((s) => {
+      const departureAt = getScheduleDepartureTime(s);
+      return s.status === "Active" && departureAt && departureAt > currentTime;
+    }).length,
     inactive: schedules.filter((s) => s.status === "Inactive").length,
+    onTheWay: schedules.filter((s) => getScheduleDisplayStatus(s, currentTime) === "On the way").length,
+    expired: schedules.filter((s) => getScheduleDisplayStatus(s, currentTime) === "Expired").length,
   };
 
   const fromOptions = [...new Set(schedules.map((s) => s.routeStart))].sort();
@@ -225,12 +287,12 @@ export default function ManageSchedules() {
     const q = search.toLowerCase();
     const matchesSearch =
       !q ||
-      [s.scheduleId, s.id, s.busNo, s.routeName, s.date, s.status]
+      [s.scheduleId, s.id, s.busNo, s.routeName, s.date, getScheduleDisplayStatus(s, currentTime)]
         .some((value) => String(value || "").toLowerCase().includes(q));
     const matchesFrom = !fromFilter || s.routeStart === fromFilter;
     const matchesTo = !toFilter || s.routeEnd === toFilter;
     const matchesDate = !dateFilter || s.date === dateFilter;
-    const matchesStatus = !statusFilter || s.status === statusFilter;
+    const matchesStatus = matchesScheduleStatus(s, statusFilter, currentTime);
     return matchesSearch && matchesFrom && matchesTo && matchesDate && matchesStatus;
   });
 
@@ -249,6 +311,13 @@ export default function ManageSchedules() {
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-4">
+          <Button
+            variant="ghost"
+            onClick={() => navigate("/admin-dashboard")}
+            className="h-10 gap-2 text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+          >
+            <ArrowLeft className="h-4 w-4" /> Back to Dashboard
+          </Button>
           <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-blue-600 shadow-sm">
             <Bus className="h-6 w-6 text-white" />
           </div>
@@ -263,11 +332,13 @@ export default function ManageSchedules() {
       </div>
 
       {/* Stat cards */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard icon={<Bus className="h-5 w-5 text-blue-600" />} label="Total Schedules" value={stats.total} accent="bg-blue-50" />
-        <StatCard icon={<CheckCircle2 className="h-5 w-5 text-emerald-600" />} label="Active" value={stats.active} accent="bg-emerald-50" />
-        <StatCard icon={<CalendarClock className="h-5 w-5 text-amber-600" />} label="Upcoming Departures" value={stats.upcoming} accent="bg-amber-50" />
-        <StatCard icon={<CircleSlash2 className="h-5 w-5 text-slate-500" />} label="Inactive" value={stats.inactive} accent="bg-slate-100" />
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        <StatCard icon={<Bus className="h-5 w-5 text-blue-600" />} label="Total Schedules" value={stats.total} accent="bg-blue-50" onClick={() => showScheduleCategory("")} />
+        <StatCard icon={<CheckCircle2 className="h-5 w-5 text-emerald-600" />} label="Active" value={stats.active} accent="bg-emerald-50" onClick={() => showScheduleCategory("Active")} />
+        <StatCard icon={<CalendarClock className="h-5 w-5 text-amber-600" />} label="Upcoming Departures" value={stats.upcoming} accent="bg-amber-50" onClick={() => showScheduleCategory("Upcoming")} />
+        <StatCard icon={<CircleSlash2 className="h-5 w-5 text-slate-500" />} label="Inactive" value={stats.inactive} accent="bg-slate-100" onClick={() => showScheduleCategory("Inactive")} />
+        <StatCard icon={<Bus className="h-5 w-5 text-blue-600" />} label="On the way" value={stats.onTheWay} accent="bg-blue-50" onClick={() => showScheduleCategory("On the way")} />
+        <StatCard icon={<CalendarDays className="h-5 w-5 text-rose-600" />} label="Expired" value={stats.expired} accent="bg-rose-50" onClick={() => showScheduleCategory("Expired")} />
       </div>
 
       {/* Filter bar */}
@@ -312,6 +383,9 @@ export default function ManageSchedules() {
             <select value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }} className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm">
               <option value="">All Statuses</option>
               <option value="Active">Active</option>
+              <option value="Upcoming">Upcoming Departures</option>
+              <option value="On the way">On the way</option>
+              <option value="Expired">Expired</option>
               <option value="Inactive">Inactive</option>
               <option value="Cancelled">Cancelled</option>
             </select>
@@ -324,7 +398,7 @@ export default function ManageSchedules() {
       </Card>
 
       {/* Table */}
-      <Card className="rounded-xl border-slate-200 shadow-sm">
+      <Card id="admin-schedules-table" className="scroll-mt-4 rounded-xl border-slate-200 shadow-sm">
         <CardContent className="p-0">
           {loading ? (
             <p className="py-12 text-center text-muted-foreground">Loading...</p>
@@ -352,6 +426,7 @@ export default function ManageSchedules() {
                   </TableHeader>
                   <TableBody>
                     {pageItems.map((s) => {
+                      const displayStatus = getScheduleDisplayStatus(s, currentTime);
                       const visibleStops = expandedStops[s.id]
                         ? s.intermediateStops
                         : s.intermediateStops.slice(0, MAX_VISIBLE_STOPS);
@@ -398,7 +473,7 @@ export default function ManageSchedules() {
                             <TableCell className="font-mono text-sm">{s.routeDuration}</TableCell>
                             <TableCell className="whitespace-nowrap">{s.date}</TableCell>
                             <TableCell className="whitespace-nowrap font-medium">{s.departureTime}</TableCell>
-                            <TableCell><span className={statusBadgeClass(s.status)}><span className="h-1.5 w-1.5 rounded-full bg-current" />{s.status || "—"}</span></TableCell>
+                            <TableCell><span className={statusBadgeClass(displayStatus)}><span className="h-1.5 w-1.5 rounded-full bg-current" />{displayStatus}</span></TableCell>
                             <TableCell>
                               <div className="flex justify-end gap-1">
                                 <Button size="icon" variant="ghost" title="View details" className="text-blue-600 hover:bg-blue-50" onClick={() => { setEditId(null); setViewId(viewId === s.id ? null : s.id); }}>
@@ -430,7 +505,7 @@ export default function ManageSchedules() {
                                     ))}
                                   </div>
                                   <p className="text-xs text-slate-500">
-                                    Bus {s.busNo} · {s.routeDuration} estimated · {s.date} at {s.departureTime} · {s.status}
+                                    Bus {s.busNo} · {s.routeDuration} estimated · {s.date} at {s.departureTime} · {displayStatus}
                                   </p>
                                 </div>
                               </TableCell>

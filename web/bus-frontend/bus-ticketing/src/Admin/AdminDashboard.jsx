@@ -107,7 +107,7 @@ export default function AdminDashboard() {
                     <Button
                       onClick={() => navigate(sec.add)}
                       variant="outline"
-                      className="h-11 w-full gap-2 font-medium transition-colors"
+                      className="h-11 w-full gap-2 font-medium transition-colors hover:bg-slate-100 hover:text-slate-900"
                     >
                       + Add New
                     </Button>

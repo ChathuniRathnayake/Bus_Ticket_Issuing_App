@@ -193,8 +193,6 @@ export default function ManageBuses() {
                     <TableHead>Fleet ID</TableHead>
                     <TableHead>Bus number</TableHead>
                     <TableHead>Route</TableHead>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Time</TableHead>
                     <TableHead>Total Seats</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
@@ -221,8 +219,6 @@ export default function ManageBuses() {
                         )}
                       </TableCell>
                       <TableCell><div className="flex items-center gap-2"><Route className="h-4 w-4 text-blue-500" /><span>{bus.routeName || "No route assigned"}</span></div><span className="ml-6 font-mono text-xs text-slate-400">{bus.routeId || "—"}</span></TableCell>
-                      <TableCell><span className="text-sm">{bus.routeDate || "—"}</span></TableCell>
-                      <TableCell><span className="font-mono text-sm">{bus.routeTime || "—"}</span></TableCell>
                       <TableCell>
                         {editId === bus.id ? (
                           <Input

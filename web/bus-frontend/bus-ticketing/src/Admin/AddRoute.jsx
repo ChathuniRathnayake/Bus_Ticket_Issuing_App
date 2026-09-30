@@ -23,6 +23,7 @@ export default function AddRoute({ routes, setRoutes }) {
   const [durationHours, setDurationHours] = useState("");
   const [durationMinutes, setDurationMinutes] = useState("");
   const [intermediateStopsText, setIntermediateStopsText] = useState("");
+  const [customStopFields, setCustomStopFields] = useState({ startStop: false, endStop: false });
 
   const [loading, setLoading] = useState(false);
 
@@ -32,6 +33,21 @@ export default function AddRoute({ routes, setRoutes }) {
   const handleChange = (e) => {
     const { name, value } = e.target;
     setForm((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleStopSelection = (event) => {
+    const { name, value } = event.target;
+    if (value === "__add_new_stop__") {
+      setCustomStopFields((prev) => ({ ...prev, [name]: true }));
+      setForm((prev) => ({ ...prev, [name]: "" }));
+      return;
+    }
+    setForm((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const useExistingStops = (fieldName) => {
+    setCustomStopFields((prev) => ({ ...prev, [fieldName]: false }));
+    setForm((prev) => ({ ...prev, [fieldName]: "" }));
   };
 
   // Build the "H:MM" duration string from the explicit hour/minute inputs.
@@ -131,6 +147,7 @@ export default function AddRoute({ routes, setRoutes }) {
       setDurationHours("");
       setDurationMinutes("");
       setIntermediateStopsText("");
+      setCustomStopFields({ startStop: false, endStop: false });
 
       navigate("/admin-dashboard/manage-routes");
 
@@ -222,21 +239,37 @@ export default function AddRoute({ routes, setRoutes }) {
               <Label htmlFor="startStop" className="text-sm font-medium">
                 Start Stop
               </Label>
-              <select
-                id="startStop"
-                name="startStop"
-                value={form.startStop}
-                onChange={handleChange}
-                className="h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 transition-all"
-                required
-              >
-                <option value="">-- Select Start Stop --</option>
-                {availableStops.map((stop) => (
-                  <option key={stop} value={stop}>
-                    {stop}
-                  </option>
-                ))}
-              </select>
+              {customStopFields.startStop ? (
+                <div className="flex gap-2">
+                  <Input
+                    id="startStop"
+                    name="startStop"
+                    value={form.startStop}
+                    onChange={handleChange}
+                    placeholder="Enter a new start stop"
+                    className="h-11"
+                    required
+                  />
+                  <Button type="button" variant="outline" onClick={() => useExistingStops("startStop")}>
+                    Choose existing
+                  </Button>
+                </div>
+              ) : (
+                <select
+                  id="startStop"
+                  name="startStop"
+                  value={form.startStop}
+                  onChange={handleStopSelection}
+                  className="h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-sm transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
+                  required
+                >
+                  <option value="">-- Select Start Stop --</option>
+                  {availableStops.map((stop) => (
+                    <option key={stop} value={stop}>{stop}</option>
+                  ))}
+                  <option value="__add_new_stop__">+ Add a new stop...</option>
+                </select>
+              )}
             </div>
 
 
@@ -246,23 +279,39 @@ export default function AddRoute({ routes, setRoutes }) {
               <Label htmlFor="endStop" className="text-sm font-medium">
                 End Stop
               </Label>
-              <select
-                id="endStop"
-                name="endStop"
-                value={form.endStop}
-                onChange={handleChange}
-                className="h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 transition-all"
-                required
-              >
-                <option value="">-- Select End Stop --</option>
-                {availableStops
-                  .filter((stop) => stop !== form.startStop)
-                  .map((stop) => (
-                    <option key={stop} value={stop}>
-                      {stop}
-                    </option>
-                  ))}
-              </select>
+              {customStopFields.endStop ? (
+                <div className="flex gap-2">
+                  <Input
+                    id="endStop"
+                    name="endStop"
+                    value={form.endStop}
+                    onChange={handleChange}
+                    placeholder="Enter a new end stop"
+                    className="h-11"
+                    required
+                  />
+                  <Button type="button" variant="outline" onClick={() => useExistingStops("endStop")}>
+                    Choose existing
+                  </Button>
+                </div>
+              ) : (
+                <select
+                  id="endStop"
+                  name="endStop"
+                  value={form.endStop}
+                  onChange={handleStopSelection}
+                  className="h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-sm transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
+                  required
+                >
+                  <option value="">-- Select End Stop --</option>
+                  {availableStops
+                    .filter((stop) => stop !== form.startStop)
+                    .map((stop) => (
+                      <option key={stop} value={stop}>{stop}</option>
+                    ))}
+                  <option value="__add_new_stop__">+ Add a new stop...</option>
+                </select>
+              )}
             </div>
 
 
