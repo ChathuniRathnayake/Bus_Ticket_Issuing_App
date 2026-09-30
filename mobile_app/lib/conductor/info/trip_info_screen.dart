@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../auth/conductor_login.dart';
 import '../conductor_bottom_nav.dart';
+import '../ticket/issue_ticket_screen.dart';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../models/bus_model.dart';
@@ -48,9 +49,16 @@ class TripInfoScreen extends StatelessWidget {
                   size: 28,
                 ),
                 onPressed: () {
-                  if (Navigator.canPop(context)) {
-                    Navigator.pop(context);
-                  }
+                  Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => IssueTicketScreen(
+                        conductor: conductor,
+                        bus: bus,
+                        route: route,
+                      ),
+                    ),
+                  );
                 },
               ),
 

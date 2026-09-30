@@ -6,6 +6,7 @@ import 'package:mobile_app/models/route_model.dart';
 import 'package:mobile_app/core/models/seat_status.dart';
 import 'package:mobile_app/conductor/conductor_bottom_nav.dart';
 import '../auth/conductor_login.dart';
+import '../dashboard/conductor_dashboard.dart';
 import 'seat_widget.dart';
 
 class SeatMapScreen extends StatelessWidget {
@@ -44,9 +45,16 @@ class SeatMapScreen extends StatelessWidget {
               IconButton(
                 icon: const Icon(Icons.arrow_back, color: Colors.white, size: 28),
                 onPressed: () {
-                  if (Navigator.canPop(context)) {
-                    Navigator.pop(context);
-                  }
+                  Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => ConductorDashboard(
+                        conductor: conductor,
+                        bus: bus,
+                        route: route,
+                      ),
+                    ),
+                  );
                 },
               ),
               // Conductor Name pill
@@ -130,8 +138,14 @@ class SeatMapScreen extends StatelessWidget {
                         if (snapshot.hasData) {
                           for (var doc in snapshot.data!.docs) {
                             final data = doc.data() as Map<String, dynamic>;
-                            final int seatNo = int.tryParse(data['seatNo']?.toString() ?? '0') ?? 0;
-                            bookedSeatsData[seatNo] = data;
+                            // seatNo can be stored as int (conductor) or String (passenger app)
+                            final rawSeatNo = data['seatNo'];
+                            final int? seatNo = rawSeatNo is int
+                                ? rawSeatNo
+                                : int.tryParse(rawSeatNo?.toString() ?? '');
+                            if (seatNo != null && seatNo > 0) {
+                              bookedSeatsData[seatNo] = data;
+                            }
                           }
                         }
 

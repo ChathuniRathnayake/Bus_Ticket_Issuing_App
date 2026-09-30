@@ -263,27 +263,10 @@ class _ConductorDashboardState extends State<ConductorDashboard> {
                           .where('busId', isEqualTo: widget.bus!.id)
                           .snapshots(),
                       builder: (context, seatsSnapshot) {
-                        // Only count seats that are actually still booked.
-                        // NOTE: this assumes a `status` field on the seat
-                        // document (e.g. 'booked' / 'cancelled' / 'released').
-                        // A seat with no status field is treated as booked
-                        // for backward compatibility. If your seat docs use a
-                        // different field name (e.g. `isBooked`), swap the
-                        // condition below for that field instead.
-                        final bookedDocs = seatsSnapshot.hasData
-                            ? seatsSnapshot.data!.docs.where((doc) {
-                                final data =
-                                    doc.data() as Map<String, dynamic>?;
-                                final status = data?['status']
-                                    ?.toString()
-                                    .toLowerCase();
-                                return status == null ||
-                                    (status != 'cancelled' &&
-                                        status != 'released');
-                              }).toList()
-                            : <QueryDocumentSnapshot>[];
-
-                        final bookedCount = bookedDocs.length;
+                        // Count all seats for this bus - matches exactly what the seat map shows in red.
+                        final bookedCount = seatsSnapshot.hasData
+                            ? seatsSnapshot.data!.docs.length
+                            : 0;
 
                         final total =
                             widget.bus?.totalSeats ??
@@ -316,13 +299,17 @@ class _ConductorDashboardState extends State<ConductorDashboard> {
                                 .limit(1)
                                 .snapshots(),
                             builder: (context, routeSnapshot) {
-                              String routeName =
-                                  widget.route?.routeName ?? "Unknown";
-                              String nextStop =
-                                  busData?['nextStop'] ??
-                                  (widget.route?.stops?.isNotEmpty == true
-                                      ? widget.route!.stops!.first
-                                      : widget.route?.endStop ?? "Unknown");
+                              String routeName = widget.route?.routeName ?? "Unknown";
+                              String nextStop = busData?['nextStop'] ?? "Unknown";
+                              
+                              if (busData?['nextStop'] == null && widget.route?.stops?.isNotEmpty == true) {
+                                final firstStop = widget.route!.stops!.first;
+                                nextStop = firstStop is String 
+                                    ? firstStop 
+                                    : (firstStop is Map ? firstStop['name']?.toString() ?? "Unknown" : firstStop.toString());
+                              } else if (busData?['nextStop'] == null) {
+                                nextStop = widget.route?.endStop ?? "Unknown";
+                              }
 
                               if (routeSnapshot.hasData &&
                                   routeSnapshot.data!.docs.isNotEmpty) {
@@ -338,7 +325,8 @@ class _ConductorDashboardState extends State<ConductorDashboard> {
                                   final List<dynamic>? stops =
                                       routeData?['stops'];
                                   if (stops != null && stops.isNotEmpty) {
-                                    nextStop = stops.first.toString();
+                                    final s = stops.first;
+                                    nextStop = s is String ? s : (s is Map ? s['name']?.toString() ?? "Unknown" : s.toString());
                                   }
                                 }
                               }
@@ -381,12 +369,20 @@ class _ConductorDashboardState extends State<ConductorDashboard> {
   }
 
   Widget _buildStaticDashboard(BuildContext context) {
+    String getFirstStop() {
+      if (widget.route?.stops?.isNotEmpty == true) {
+        final stop = widget.route!.stops!.first;
+        if (stop is String) return stop;
+        if (stop is Map) return stop['name']?.toString() ?? "Unknown";
+        return stop.toString();
+      }
+      return widget.route?.endStop ?? "Unknown";
+    }
+
     return _buildDashboardContent(
       context: context,
       currentLocation: _currentCoords,
-      nextStop: widget.route?.stops?.isNotEmpty == true
-          ? widget.route!.stops!.first
-          : widget.route?.endStop ?? "Unknown",
+      nextStop: getFirstStop(),
       availableSeats: "0",
       bookedSeats: "0",
       routeName: widget.route?.routeName ?? "Unknown",

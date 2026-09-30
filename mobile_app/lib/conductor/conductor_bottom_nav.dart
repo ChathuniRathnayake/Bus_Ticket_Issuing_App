@@ -57,7 +57,6 @@ class _ConductorBottomNavState extends State<ConductorBottomNav> {
         break;
       case 2:
         screen = IssueTicketScreen(
-          seatNo: 1, // Default seat if navigating directly from navbar
           bus: widget.bus,
           conductor: widget.conductor,
           route: widget.route,

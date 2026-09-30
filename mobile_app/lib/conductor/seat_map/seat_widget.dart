@@ -27,6 +27,8 @@ class SeatWidget extends StatelessWidget {
         return Colors.green;
       case SeatStatus.booked:
         return Colors.red;
+      case SeatStatus.droppingNext:
+        return Colors.orange;
     }
   }
 
