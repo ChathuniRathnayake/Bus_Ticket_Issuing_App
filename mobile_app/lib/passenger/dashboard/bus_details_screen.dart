@@ -182,29 +182,31 @@ class _BusDetailsScreenState extends State<BusDetailsScreen> {
             // Bus Name and Status Header
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      widget.bus.routeName ?? widget.bus.busModel ?? 'Unknown Route',
-                      style: const TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF333333),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        widget.bus.routeName ?? widget.bus.busModel ?? 'Unknown Route',
+                        style: const TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF333333),
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      widget.bus.busPlateNumber ?? widget.bus.busModel ?? '',
-                      style: TextStyle(
-                        fontSize: 16,
-                        color: Colors.grey[600],
+                      const SizedBox(height: 4),
+                      Text(
+                        widget.bus.busPlateNumber ?? widget.bus.busModel ?? '',
+                        style: TextStyle(
+                          fontSize: 16,
+                          color: Colors.grey[600],
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-                _buildTripStatus(true), 
               ],
             ),
             const SizedBox(height: 24),

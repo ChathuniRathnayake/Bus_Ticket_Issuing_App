@@ -7,6 +7,7 @@ import 'package:mobile_app/models/bus_model.dart';
 import 'package:mobile_app/models/conductor_model.dart';
 import 'package:mobile_app/models/route_model.dart';
 import 'package:mobile_app/core/services/location_service.dart';
+import 'package:mobile_app/core/services/conductor_data_service.dart';
 import '../../widgets/custom_button.dart';
 import '../conductor_bottom_nav.dart';
 import '../seat_map/seat_map_screen.dart';
@@ -257,16 +258,30 @@ class _ConductorDashboardState extends State<ConductorDashboard> {
                       busData = snapshot.data!.data() as Map<String, dynamic>?;
                     }
 
-                    return StreamBuilder<QuerySnapshot>(
-                      stream: FirebaseFirestore.instance
-                          .collection('seats')
-                          .where('busId', isEqualTo: widget.bus!.id)
-                          .snapshots(),
-                      builder: (context, seatsSnapshot) {
-                        // Count all seats for this bus - matches exactly what the seat map shows in red.
-                        final bookedCount = seatsSnapshot.hasData
-                            ? seatsSnapshot.data!.docs.length
-                            : 0;
+                    final ConductorDataService service = ConductorDataService();
+
+                    return FutureBuilder<Map<String, dynamic>?>(
+                      future: service.getActiveSchedule(widget.bus!.id),
+                      builder: (context, scheduleSnapshot) {
+                        if (scheduleSnapshot.connectionState == ConnectionState.waiting) {
+                          return const Center(child: CircularProgressIndicator());
+                        }
+
+                        final today = DateTime.now();
+                        final fallbackDateStr = "${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}";
+                        final activeDate = scheduleSnapshot.data?['date']?.toString() ?? fallbackDateStr;
+
+                        return StreamBuilder<QuerySnapshot>(
+                          stream: FirebaseFirestore.instance
+                              .collection('seats')
+                              .where('busId', isEqualTo: widget.bus!.id)
+                              .where('date', isEqualTo: activeDate)
+                              .snapshots(),
+                          builder: (context, seatsSnapshot) {
+                            // Count all seats for this bus - matches exactly what the seat map shows in red.
+                            final bookedCount = seatsSnapshot.hasData
+                                ? seatsSnapshot.data!.docs.length
+                                : 0;
 
                         final total =
                             widget.bus?.totalSeats ??
@@ -353,6 +368,8 @@ class _ConductorDashboardState extends State<ConductorDashboard> {
                           routeName: widget.route?.routeName ?? "Unknown",
                           routeId: activeRouteId ?? "Unknown",
                         );
+                      },
+                    );
                       },
                     );
                   },

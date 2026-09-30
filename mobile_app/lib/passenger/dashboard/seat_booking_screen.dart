@@ -32,7 +32,7 @@ class _SeatBookingScreenState extends State<SeatBookingScreen> {
   bool _isLoadingSeats = true;
   double _pricePerSeat = 0.0;
   
-  int get totalSeats => 40;
+  int get totalSeats => int.tryParse(widget.bus.totalSeats ?? '42') ?? 42;
   int get bookedSeatsCount => _seatStatuses.values.where((s) => s == SeatStatus.booked).length;
   int get availableSeatsCount => totalSeats - bookedSeatsCount;
 
@@ -162,9 +162,16 @@ class _SeatBookingScreenState extends State<SeatBookingScreen> {
 
   Future<void> _fetchBookedSeats() async {
     try {
-      final snapshot = await FirebaseFirestore.instance
+      final bookingsSnapshot = await FirebaseFirestore.instance
           .collection('bookings')
           .where('scheduleId', isEqualTo: widget.bus.id)
+          .where('date', isEqualTo: widget.date)
+          .get();
+
+      final seatsSnapshot = await FirebaseFirestore.instance
+          .collection('seats')
+          .where('busId', isEqualTo: widget.bus.busId)
+          .where('date', isEqualTo: widget.date)
           .get();
 
       Map<int, SeatStatus> fetchedStatuses = {};
@@ -174,13 +181,25 @@ class _SeatBookingScreenState extends State<SeatBookingScreen> {
         fetchedStatuses[i] = SeatStatus.available;
       }
 
-      for (var doc in snapshot.docs) {
+      for (var doc in bookingsSnapshot.docs) {
         final data = doc.data();
         if (data['selectedSeats'] != null) {
           final List<dynamic> seats = data['selectedSeats'];
           for (var seat in seats) {
             fetchedStatuses[int.parse(seat.toString())] = SeatStatus.booked;
           }
+        }
+      }
+
+      for (var doc in seatsSnapshot.docs) {
+        final data = doc.data();
+        final status = data['status']?.toString().toLowerCase();
+        final isActive = status == null || (status != 'cancelled' && status != 'released');
+        if (isActive && data['seatNo'] != null) {
+           final seatNo = int.tryParse(data['seatNo'].toString());
+           if (seatNo != null) {
+             fetchedStatuses[seatNo] = SeatStatus.booked;
+           }
         }
       }
 
@@ -264,7 +283,7 @@ class _SeatBookingScreenState extends State<SeatBookingScreen> {
                       crossAxisSpacing: 10,
                       childAspectRatio: 1,
                     ),
-                    itemCount: 40, // 8 rows of 5 slots
+                    itemCount: (totalSeats / 4).ceil() * 5, // Dynamically calculate rows
                     itemBuilder: (context, index) {
                       int row = index ~/ 5;
                       int col = index % 5;
@@ -277,7 +296,7 @@ class _SeatBookingScreenState extends State<SeatBookingScreen> {
                       // Map grid index to seat number
                       int seatIndex = (row * 4) + (col > 2 ? col - 1 : col) + 1;
                       
-                      if (seatIndex > 32) return const SizedBox.shrink();
+                      if (seatIndex > totalSeats) return const SizedBox.shrink();
                       
                       return _buildSeat(seatIndex);
                     },

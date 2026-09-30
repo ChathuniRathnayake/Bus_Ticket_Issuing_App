@@ -5,6 +5,7 @@ import 'package:mobile_app/models/conductor_model.dart';
 import 'package:mobile_app/models/route_model.dart';
 import 'package:mobile_app/core/models/seat_status.dart';
 import 'package:mobile_app/conductor/conductor_bottom_nav.dart';
+import 'package:mobile_app/core/services/conductor_data_service.dart';
 import '../auth/conductor_login.dart';
 import '../dashboard/conductor_dashboard.dart';
 import 'seat_widget.dart';
@@ -121,13 +122,24 @@ class SeatMapScreen extends StatelessWidget {
                     }
                     if (totalSeats <= 0) totalSeats = 42;
 
-                    return StreamBuilder<QuerySnapshot>(
-                      stream: FirebaseFirestore.instance
-                          .collection('seats')
-                          .where('busId', isEqualTo: bus?.id)
-                          .snapshots(),
-                      builder: (context, snapshot) {
-                        if (snapshot.hasError) {
+                    return FutureBuilder<Map<String, dynamic>?>(
+                      future: ConductorDataService().getActiveSchedule(bus?.id ?? ''),
+                      builder: (context, scheduleSnap) {
+                        if (scheduleSnap.connectionState == ConnectionState.waiting) {
+                          return const Center(child: CircularProgressIndicator());
+                        }
+                        final today = DateTime.now();
+                        final fallbackDateStr = "${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}";
+                        final activeDate = scheduleSnap.data?['date']?.toString() ?? fallbackDateStr;
+
+                        return StreamBuilder<QuerySnapshot>(
+                          stream: FirebaseFirestore.instance
+                              .collection('seats')
+                              .where('busId', isEqualTo: bus?.id)
+                              .where('date', isEqualTo: activeDate)
+                              .snapshots(),
+                          builder: (context, snapshot) {
+                            if (snapshot.hasError) {
                           return Center(child: Text("Error fetching seats: ${snapshot.error}"));
                         }
                         if (snapshot.connectionState == ConnectionState.waiting) {
@@ -212,6 +224,8 @@ class SeatMapScreen extends StatelessWidget {
                             }),
                           ),
                         );
+                      },
+                    );
                       },
                     );
                   }

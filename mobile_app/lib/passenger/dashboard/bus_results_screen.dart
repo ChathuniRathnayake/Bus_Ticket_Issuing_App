@@ -31,45 +31,25 @@ class _BusResultsScreenState extends State<BusResultsScreen> {
   final PassengerDataService _dataService = PassengerDataService();
   List<ScheduleModel> _availableBuses = [];
   bool _isLoading = true;
+  late String _queryDate;
 
   @override
   void initState() {
     super.initState();
+    _queryDate = widget.date;
+    if (_queryDate == "Today" || _queryDate.isEmpty) {
+      final now = DateTime.now();
+      _queryDate = "${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}";
+    }
     _loadBuses();
   }
 
   Future<void> _loadBuses() async {
     try {
-      // If date is "Today" or similar, use current date
-      String queryDate = widget.date;
-      if (queryDate == "Today" || queryDate.isEmpty) {
-        final now = DateTime.now();
-        queryDate = "${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}";
-      }
-
-      final schedules = await _dataService.getSchedulesForRouteAndDate(widget.from, widget.to, queryDate);
-
-      // Filter out past schedules for today
-      final now = DateTime.now();
-      final currentDateStr = "${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}";
-      
-      final activeSchedules = schedules.where((schedule) {
-        if (queryDate == currentDateStr && schedule.departureTime.isNotEmpty) {
-          final timeParts = schedule.departureTime.split(':');
-          if (timeParts.length >= 2) {
-            final scheduleTime = DateTime(
-              now.year, now.month, now.day, 
-              int.parse(timeParts[0]), 
-              int.parse(timeParts[1])
-            );
-            return scheduleTime.isAfter(now);
-          }
-        }
-        return true;
-      }).toList();
+      final schedules = await _dataService.getSchedulesForRouteAndDate(widget.from, widget.to, _queryDate);
 
       setState(() {
-        _availableBuses = activeSchedules;
+        _availableBuses = schedules;
         _isLoading = false;
       });
     } catch (e) {
@@ -99,7 +79,7 @@ class _BusResultsScreenState extends State<BusResultsScreen> {
                 const Icon(Icons.calendar_today, size: 16, color: Colors.blue),
                 const SizedBox(width: 8),
                 Text(
-                  'Date: ${widget.date}',
+                  'Date: $_queryDate',
                   style: const TextStyle(fontWeight: FontWeight.w500),
                 ),
               ],
@@ -171,33 +151,27 @@ class _BusResultsScreenState extends State<BusResultsScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    bus.routeName ?? bus.busModel ?? 'Unknown Route',
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF333333),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      bus.routeName ?? bus.busModel ?? 'Unknown Route',
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF333333),
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    bus.busPlateNumber ?? bus.busModel ?? '',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey[600],
+                    const SizedBox(height: 4),
+                    Text(
+                      bus.busPlateNumber ?? bus.busModel ?? '',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.grey[600],
+                      ),
                     ),
-                  ),
-                ],
-              ),
-              Text(
-                bus.price ?? 'Rs. 0',
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.blue,
+                  ],
                 ),
               ),
             ],
@@ -230,7 +204,7 @@ class _BusResultsScreenState extends State<BusResultsScreen> {
                         bus: bus,
                         from: widget.from,
                         to: widget.to,
-                        date: widget.date,
+                        date: _queryDate,
                       ),
                     ),
                   );

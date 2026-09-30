@@ -176,11 +176,12 @@ class ConductorDataService {
   // SEATS
   // ─────────────────────────────────────────────────────────────────────────
 
-  /// Live stream of all booked seats for a bus.
-  Stream<List<Map<String, dynamic>>> bookedSeatsStream(String busId) {
+  /// Live stream of all booked seats for a bus on a specific date.
+  Stream<List<Map<String, dynamic>>> bookedSeatsStream(String busId, String date) {
     return _db
         .collection('seats')
         .where('busId', isEqualTo: busId)
+        .where('date', isEqualTo: date)
         .snapshots()
         .map((snap) => snap.docs.map((d) {
               final data = d.data();
@@ -208,6 +209,8 @@ class ConductorDataService {
     required String dropStop,
     required double price,
     required String conductorId,
+    required String date,
+    String? scheduleId,
   }) async {
     // 1. Write to seats collection
     await _db.collection('seats').add({
@@ -220,6 +223,8 @@ class ConductorDataService {
       'price': price,
       'issuedBy': conductorId,
       'status': 'booked',
+      'date': date,
+      'scheduleId': scheduleId,
       'issuedAt': FieldValue.serverTimestamp(),
     });
 
@@ -234,7 +239,10 @@ class ConductorDataService {
       'price': price,
       'issuedBy': conductorId,
       'status': 'booked',
+      'date': date,
+      'scheduleId': scheduleId,
       'issuedAt': FieldValue.serverTimestamp(),
+      'createdAt': FieldValue.serverTimestamp(),
     });
 
     // 3. Update bus seat counters inside a transaction
@@ -300,6 +308,69 @@ class ConductorDataService {
   // ─────────────────────────────────────────────────────────────────────────
   // SCHEDULES
   // ─────────────────────────────────────────────────────────────────────────
+
+  /// Fetch the current active schedule for a bus (most recent).
+  Future<Map<String, dynamic>?> getActiveSchedule(String busId) async {
+    try {
+      final snap = await _db.collection('schedules')
+          .where('busId', isEqualTo: busId)
+          .where('status', isEqualTo: 'Active')
+          .get();
+          
+      if (snap.docs.isEmpty) {
+        // Fallback: get the most recent one regardless of status
+        final fallbackSnap = await _db.collection('schedules')
+            .where('busId', isEqualTo: busId)
+            .orderBy('date', descending: true)
+            .limit(1)
+            .get();
+        if (fallbackSnap.docs.isNotEmpty) {
+          final data = fallbackSnap.docs.first.data();
+          data['id'] = fallbackSnap.docs.first.id;
+          return data;
+        }
+        return null;
+      }
+      
+      // Helper to safely parse strings, Timestamps, or Maps to comparable strings
+      String toComparableString(dynamic val) {
+        if (val == null) return '';
+        if (val is String) return val;
+        if (val is Timestamp) return val.toDate().toIso8601String();
+        if (val is Map) {
+          if (val.containsKey('seconds')) {
+            return Timestamp(val['seconds'] as int, val['nanoseconds'] as int? ?? 0).toDate().toIso8601String();
+          }
+          // If it's a custom time object with hour/minute, parse it
+          if (val.containsKey('hour') && val.containsKey('minute')) {
+            return "${val['hour'].toString().padLeft(2, '0')}:${val['minute'].toString().padLeft(2, '0')}";
+          }
+          return val.toString();
+        }
+        return val.toString();
+      }
+
+      // If there are multiple active schedules, sort chronologically (date ascending, then time ascending)
+      // so the conductor gets the earliest active trip first.
+      final docs = snap.docs;
+      docs.sort((a, b) {
+        final dateA = toComparableString(a.data()['date']);
+        final dateB = toComparableString(b.data()['date']);
+        final cmpDate = dateA.compareTo(dateB);
+        if (cmpDate != 0) return cmpDate;
+        
+        final timeA = toComparableString(a.data()['departureTime']);
+        final timeB = toComparableString(b.data()['departureTime']);
+        return timeA.compareTo(timeB);
+      });
+      final data = docs.first.data();
+      data['id'] = docs.first.id;
+      return data;
+    } catch (e) {
+      print('ConductorDataService.getActiveSchedule error: $e');
+      return null;
+    }
+  }
 
   /// Fetch schedules for a bus for the next [days] days (default 7).
   Future<List<Map<String, dynamic>>> getSchedulesForBus(

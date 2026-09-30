@@ -8,6 +8,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../models/bus_model.dart';
 import '../../models/conductor_model.dart';
 import '../../models/route_model.dart';
+import '../../core/services/conductor_data_service.dart';
 
 class TripInfoScreen extends StatelessWidget {
   final Conductor conductor;
@@ -126,13 +127,24 @@ class TripInfoScreen extends StatelessWidget {
                 int.tryParse(busData?['totalSeats']?.toString() ?? '0') ??
                 40;
 
-            return StreamBuilder<QuerySnapshot>(
-              stream: FirebaseFirestore.instance
-                  .collection('seats')
-                  .where('busId', isEqualTo: bus?.id)
-                  .snapshots(),
-              builder: (context, seatSnapshot) {
-                int bookedCount = 0;
+            return FutureBuilder<Map<String, dynamic>?>(
+              future: ConductorDataService().getActiveSchedule(bus?.id ?? ''),
+              builder: (context, scheduleSnap) {
+                if (scheduleSnap.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                final today = DateTime.now();
+                final fallbackDateStr = "${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}";
+                final activeDate = scheduleSnap.data?['date']?.toString() ?? fallbackDateStr;
+
+                return StreamBuilder<QuerySnapshot>(
+                  stream: FirebaseFirestore.instance
+                      .collection('seats')
+                      .where('busId', isEqualTo: bus?.id)
+                      .where('date', isEqualTo: activeDate)
+                      .snapshots(),
+                  builder: (context, seatSnapshot) {
+                    int bookedCount = 0;
 
                 if (seatSnapshot.hasData) {
                   for (var doc in seatSnapshot.data!.docs) {
@@ -188,6 +200,8 @@ class TripInfoScreen extends StatelessWidget {
                     ],
                   ),
                 );
+              },
+            );
               },
             );
           },

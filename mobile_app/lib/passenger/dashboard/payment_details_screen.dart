@@ -83,9 +83,12 @@ class _PaymentDetailsScreenState extends State<PaymentDetailsScreen> {
 
       // Save each individual seat to the 'seats' collection so they appear as booked
       final batch = FirebaseFirestore.instance.batch();
+      final double pricePerSeat = widget.totalAmount / widget.selectedSeats.length;
       for (var seat in widget.selectedSeats) {
         final seatDoc = FirebaseFirestore.instance.collection('seats').doc();
-        batch.set(seatDoc, {
+        final ticketDoc = FirebaseFirestore.instance.collection('tickets').doc();
+        
+        final seatData = {
           'busId': widget.bus.busId,
           'routeId': widget.bus.routeId,
           'scheduleId': widget.bus.id,
@@ -93,10 +96,18 @@ class _PaymentDetailsScreenState extends State<PaymentDetailsScreen> {
           'seatNo': seat.toString(),
           'userId': userId,
           'passengerName': _nameController.text.trim(),
+          'boardingStop': widget.from,
+          'dropStop': widget.to,
+          'price': pricePerSeat,
           'date': widget.date,
           'status': 'booked',
+          'issuedBy': 'Passenger App',
           'issuedAt': FieldValue.serverTimestamp(),
-        });
+          'createdAt': FieldValue.serverTimestamp(),
+        };
+
+        batch.set(seatDoc, seatData);
+        batch.set(ticketDoc, seatData);
       }
       await batch.commit();
 

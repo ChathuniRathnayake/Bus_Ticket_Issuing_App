@@ -82,6 +82,19 @@ class PassengerAuthService {
     await user.updatePassword(newPassword);
   }
 
+  // Update username for logged-in user
+  Future<void> updateUsername(String newName) async {
+    final user = _auth.currentUser;
+    if (user == null) throw Exception("No logged in user");
+    
+    // Update display name in Firebase Auth
+    await user.updateDisplayName(newName);
+    
+    // Update in Firestore
+    await _firestore.collection('users').doc(user.uid).update({'name': newName});
+    await _firestore.collection('passengers').doc(user.uid).update({'name': newName});
+  }
+
   // Verify OTP (dummy for now)
   Future<void> verifyOtp(String otp) async {
     if (otp != "123456") throw Exception("Invalid OTP");

@@ -1,3 +1,5 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 class ScheduleModel {
   final String id;
   final String busId;
@@ -32,12 +34,43 @@ class ScheduleModel {
   });
 
   factory ScheduleModel.fromMap(Map<String, dynamic> map, {String? id}) {
+    String parseDate(dynamic val) {
+      if (val == null) return '';
+      if (val is String) return val;
+      if (val is Timestamp) {
+        final dt = val.toDate();
+        return "${dt.year}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')}";
+      }
+      if (val is Map && val.containsKey('seconds')) {
+        final dt = Timestamp(val['seconds'] as int, val['nanoseconds'] as int? ?? 0).toDate();
+        return "${dt.year}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')}";
+      }
+      return val.toString();
+    }
+
+    String parseTime(dynamic val) {
+      if (val == null) return '';
+      if (val is String) return val;
+      if (val is Timestamp) {
+        final dt = val.toDate();
+        return "${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}";
+      }
+      if (val is Map && val.containsKey('seconds')) {
+        final dt = Timestamp(val['seconds'] as int, val['nanoseconds'] as int? ?? 0).toDate();
+        return "${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}";
+      }
+      if (val is Map && val.containsKey('hour') && val.containsKey('minute')) {
+        return "${val['hour'].toString().padLeft(2, '0')}:${val['minute'].toString().padLeft(2, '0')}";
+      }
+      return val.toString();
+    }
+
     return ScheduleModel(
       id: id ?? map['scheduleId']?.toString() ?? map['id']?.toString() ?? '',
       busId: map['busId']?.toString() ?? '',
       routeId: map['routeId']?.toString() ?? '',
-      date: map['date']?.toString() ?? '',
-      departureTime: map['departureTime']?.toString() ?? '',
+      date: parseDate(map['date']),
+      departureTime: parseTime(map['departureTime']),
       status: map['status']?.toString() ?? 'Active',
       routeName: map['routeName']?.toString(),
       startStop: map['startStop']?.toString(),

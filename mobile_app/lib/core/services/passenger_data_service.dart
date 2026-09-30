@@ -342,11 +342,10 @@ class PassengerDataService {
   // Fetch schedules for a specific route and date
   Future<List<ScheduleModel>> getSchedulesForRouteAndDate(String from, String to, String date) async {
     try {
-      // 1. Fetch all active schedules for the given date
+      // 1. Fetch all schedules for the given date
       final schedulesSnapshot = await _firestore
           .collection('schedules')
           .where('date', isEqualTo: date)
-          .where('status', isEqualTo: 'Active')
           .get();
 
       if (schedulesSnapshot.docs.isEmpty) return [];

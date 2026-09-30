@@ -138,6 +138,14 @@ class _IssueTicketScreenState extends State<IssueTicketScreen> {
 
     setState(() => _isLoading = true);
     try {
+      final activeSchedule = await _service.getActiveSchedule(_busId);
+      final scheduleId = activeSchedule?['id']?.toString();
+      
+      // Fallback to today's date if no schedule is found
+      final today = DateTime.now();
+      final fallbackDateStr = "${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}";
+      final dateStr = activeSchedule?['date']?.toString() ?? fallbackDateStr;
+
       await _service.issueTicket(
         busId: _busId,
         routeId: _routeId,
@@ -146,11 +154,11 @@ class _IssueTicketScreenState extends State<IssueTicketScreen> {
         boardingStop: _boardingStop!,
         dropStop: _dropStop!,
         price: double.tryParse(priceText) ?? 0.0,
-        // Use .id (the Firestore document ID = Firebase Auth UID).
-        // conductor.conductorId is a custom field that may be empty.
         conductorId: widget.conductor.id.isNotEmpty
             ? widget.conductor.id
             : widget.conductor.conductorId,
+        date: dateStr,
+        scheduleId: scheduleId,
       );
 
       if (!mounted) return;
@@ -349,12 +357,23 @@ class _IssueTicketScreenState extends State<IssueTicketScreen> {
         }
         if (totalSeats <= 0) totalSeats = 42;
 
-        return StreamBuilder<QuerySnapshot>(
-          stream: FirebaseFirestore.instance
-              .collection('seats')
-              .where('busId', isEqualTo: _busId)
-              .snapshots(),
-          builder: (context, seatsSnap) {
+        return FutureBuilder<Map<String, dynamic>?>(
+          future: _service.getActiveSchedule(_busId),
+          builder: (context, scheduleSnap) {
+            if (scheduleSnap.connectionState == ConnectionState.waiting) {
+              return _buildSeatDropdownRow([]);
+            }
+            final today = DateTime.now();
+            final fallbackDateStr = "${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}";
+            final activeDate = scheduleSnap.data?['date']?.toString() ?? fallbackDateStr;
+
+            return StreamBuilder<QuerySnapshot>(
+              stream: FirebaseFirestore.instance
+                  .collection('seats')
+                  .where('busId', isEqualTo: _busId)
+                  .where('date', isEqualTo: activeDate)
+                  .snapshots(),
+              builder: (context, seatsSnap) {
             final Set<int> booked = {};
             if (seatsSnap.hasData) {
               for (var doc in seatsSnap.data!.docs) {
@@ -380,6 +399,8 @@ class _IssueTicketScreenState extends State<IssueTicketScreen> {
             }
 
             return _buildSeatDropdownRow(available);
+          },
+        );
           },
         );
       },
