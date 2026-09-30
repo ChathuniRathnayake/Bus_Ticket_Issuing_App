@@ -4,7 +4,7 @@ import '../passenger_bottom_nav.dart';
 import '../auth/passenger_login.dart';
 import 'seat_booking_screen.dart';
 import '../../core/services/passenger_data_service.dart';
-import '../../models/halt_model.dart';
+import '../../models/schedule_model.dart';
 import 'dashboard_screen.dart';
 import 'my_tickets_screen.dart';
 import 'profile_screen.dart';
@@ -12,7 +12,7 @@ import '../../widgets/passenger_app_bar.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class BusDetailsScreen extends StatefulWidget {
-  final Map<String, String> bus;
+  final ScheduleModel bus;
   final String from;
   final String to;
   final String date;
@@ -30,49 +30,124 @@ class BusDetailsScreen extends StatefulWidget {
 }
 
 class _BusDetailsScreenState extends State<BusDetailsScreen> {
-  int _selectedIndex = 1; // Assuming 'Find' section is active
+  int _selectedIndex = 1;
   final PassengerDataService _dataService = PassengerDataService();
-  List<HaltModel> _halts = [];
-  bool _isLoadingHalts = true;
+  
+  List<String> _uniqueStops = [];
+  String? _selectedFrom;
+  String? _selectedTo;
+  
+  bool _isLoadingRoute = true;
   String _currentLocation = "Not Available";
   String _nextStop = "Not Available";
+  String _fullTicketPrice = "N/A";
+  
+  int _bookedSeatsCount = 0;
+  bool _isLoadingSeats = true;
+  int get _totalSeats => 40;
 
   @override
   void initState() {
     super.initState();
     _loadData();
+    _loadSeatsCount();
+  }
+
+  Future<void> _loadSeatsCount() async {
+    try {
+      final snapshot = await FirebaseFirestore.instance
+          .collection('bookings')
+          .where('scheduleId', isEqualTo: widget.bus.id)
+          .get();
+
+      int count = 0;
+      for (var doc in snapshot.docs) {
+        final data = doc.data();
+        if (data['selectedSeats'] != null) {
+          final List<dynamic> seats = data['selectedSeats'];
+          count += seats.length;
+        }
+      }
+
+      if (mounted) {
+        setState(() {
+          _bookedSeatsCount = count;
+          _isLoadingSeats = false;
+        });
+      }
+    } catch (e) {
+      print("Error loading seat count: $e");
+      if (mounted) {
+        setState(() {
+          _isLoadingSeats = false;
+        });
+      }
+    }
   }
 
   Future<void> _loadData() async {
-    await _loadHalts();
+    await _loadRouteDetails();
     _listenToBusLocation();
   }
 
-  Future<void> _loadHalts() async {
-    final routeId = widget.bus['routeId'];
-    if (routeId == null || routeId.isEmpty) {
-      setState(() => _isLoadingHalts = false);
+  Future<void> _loadRouteDetails() async {
+    final routeId = widget.bus.routeId;
+    if (routeId.isEmpty) {
+      setState(() => _isLoadingRoute = false);
       return;
     }
 
     try {
-      final haltDatas = await _dataService.getHaltsForRoute(routeId);
-      setState(() {
-        _halts = haltDatas.map((data) => HaltModel.fromMap(data, id: data['id'])).toList();
-        _isLoadingHalts = false;
-        if (_halts.isNotEmpty) {
-          _nextStop = _halts.first.name;
+      final doc = await FirebaseFirestore.instance.collection('routes').doc(routeId).get();
+      if (doc.exists) {
+        final data = doc.data()!;
+        List<String> stops = [];
+        
+        if (data['startStop'] != null) stops.add(data['startStop'].toString());
+        if (data['stops'] != null) {
+          for (var s in data['stops']) {
+            if (s is String) stops.add(s);
+            else if (s is Map && s['name'] != null) stops.add(s['name'].toString());
+          }
         }
-      });
+        if (data['endStop'] != null) stops.add(data['endStop'].toString());
+
+        // Extract full price
+        String price = data['price']?.toString() ?? "N/A";
+        if (price == "N/A" && data['stopFareCents'] != null) {
+           final fares = List<dynamic>.from(data['stopFareCents']);
+           if (fares.isNotEmpty) {
+             final maxFare = int.tryParse(fares.last.toString()) ?? 0;
+             if (maxFare > 0) price = (maxFare / 100.0).toStringAsFixed(2);
+           }
+        }
+        
+        _uniqueStops = stops.toSet().toList();
+        
+        // Try to match initial selections
+        if (_uniqueStops.contains(widget.from)) _selectedFrom = widget.from;
+        if (_uniqueStops.contains(widget.to)) _selectedTo = widget.to;
+        
+        // Fallback
+        if (_selectedFrom == null || _selectedFrom == "Not Selected") _selectedFrom = _uniqueStops.isNotEmpty ? _uniqueStops.first : null;
+        if (_selectedTo == null || _selectedTo == "Not Selected") _selectedTo = _uniqueStops.isNotEmpty ? _uniqueStops.last : null;
+
+        setState(() {
+          _fullTicketPrice = price;
+          _isLoadingRoute = false;
+        });
+      } else {
+        setState(() => _isLoadingRoute = false);
+      }
     } catch (e) {
-      print("Error loading halts: $e");
-      setState(() => _isLoadingHalts = false);
+      print("Error loading route details: $e");
+      setState(() => _isLoadingRoute = false);
     }
   }
 
   void _listenToBusLocation() {
-    final busId = widget.bus['id'];
-    if (busId == null || busId.isEmpty) return;
+    final busId = widget.bus.busId;
+    if (busId.isEmpty) return;
 
     FirebaseFirestore.instance
         .collection('buses')
@@ -112,7 +187,7 @@ class _BusDetailsScreenState extends State<BusDetailsScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      widget.bus['busName']!,
+                      widget.bus.routeName ?? widget.bus.busModel ?? 'Unknown Route',
                       style: const TextStyle(
                         fontSize: 24,
                         fontWeight: FontWeight.bold,
@@ -121,7 +196,7 @@ class _BusDetailsScreenState extends State<BusDetailsScreen> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      widget.bus['type']!,
+                      widget.bus.busPlateNumber ?? widget.bus.busModel ?? '',
                       style: TextStyle(
                         fontSize: 16,
                         color: Colors.grey[600],
@@ -129,7 +204,7 @@ class _BusDetailsScreenState extends State<BusDetailsScreen> {
                     ),
                   ],
                 ),
-                _buildTripStatus(true), // Mocking 'Departed' status
+                _buildTripStatus(true), 
               ],
             ),
             const SizedBox(height: 24),
@@ -151,12 +226,22 @@ class _BusDetailsScreenState extends State<BusDetailsScreen> {
               ),
               child: Column(
                 children: [
-                  _buildRouteRow(Icons.location_on, 'From', widget.from, Colors.blue),
-                  const Padding(
-                    padding: EdgeInsets.only(left: 36),
-                    child: Divider(height: 24),
-                  ),
-                  _buildRouteRow(Icons.flag, 'To', widget.to, Colors.red),
+                  _isLoadingRoute 
+                    ? const Center(child: CircularProgressIndicator())
+                    : Column(
+                        children: [
+                          _buildDropdownRow(Icons.location_on, 'From', _uniqueStops, _selectedFrom, Colors.green, (val) {
+                            setState(() => _selectedFrom = val);
+                          }),
+                          const Padding(
+                            padding: EdgeInsets.only(left: 36),
+                            child: Divider(height: 24),
+                          ),
+                          _buildDropdownRow(Icons.flag, 'To', _uniqueStops, _selectedTo, Colors.red, (val) {
+                            setState(() => _selectedTo = val);
+                          }),
+                        ],
+                      ),
                   const Padding(
                     padding: EdgeInsets.symmetric(vertical: 12),
                     child: Divider(),
@@ -164,7 +249,7 @@ class _BusDetailsScreenState extends State<BusDetailsScreen> {
                   _buildInfoRow('Current Location', _currentLocation),
                   const SizedBox(height: 8),
                   _buildInfoRow('Next Stop', _nextStop),
-                  if (_halts.isNotEmpty) ...[
+                  if (_uniqueStops.isNotEmpty) ...[
                     const Padding(
                       padding: EdgeInsets.symmetric(vertical: 12),
                       child: Divider(),
@@ -172,11 +257,11 @@ class _BusDetailsScreenState extends State<BusDetailsScreen> {
                     const Align(
                       alignment: Alignment.centerLeft,
                       child: Text(
-                        'Route Halts',
+                        'All Route Stops',
                         style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                       ),
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 12),
                     _buildHaltsList(),
                   ],
                 ],
@@ -186,24 +271,15 @@ class _BusDetailsScreenState extends State<BusDetailsScreen> {
 
             // Seat Availability Card
             _buildSectionHeader('Seat Availability'),
-            StreamBuilder<List<int>>(
-              stream: _dataService.getBookedSeatsStream(widget.bus['id'] ?? '', widget.date),
-              builder: (context, snapshot) {
-                final bookedSeats = snapshot.data ?? [];
-                // Total seats default to 32 since that is the bus layout on the booking screen (40 grid cells, 8 aisle).
-                // It can also be fetched from widget.bus['totalSeats'] if available, but layout supports 32 max.
-                int totalSeats = int.tryParse(widget.bus['totalSeats'] ?? '32') ?? 32;
-                if (totalSeats > 32) totalSeats = 32; // Limit to UI design
-                int bookedCount = bookedSeats.length;
-                int availableCount = totalSeats - bookedCount;
-
-                return Row(
+            _isLoadingSeats 
+              ? const Center(child: CircularProgressIndicator())
+              : Row(
                   children: [
                     Expanded(
                       child: _buildAvailabilityCard(
                         Icons.event_seat,
                         'Available',
-                        availableCount.toString(),
+                        '${_totalSeats - _bookedSeatsCount}',
                         Colors.green,
                       ),
                     ),
@@ -212,27 +288,29 @@ class _BusDetailsScreenState extends State<BusDetailsScreen> {
                       child: _buildAvailabilityCard(
                         Icons.event_seat_outlined,
                         'Booked',
-                        bookedCount.toString(),
+                        '$_bookedSeatsCount',
                         Colors.orange,
                       ),
                     ),
                   ],
-                );
-              }
-            ),
+                ),
             const SizedBox(height: 32),
 
             // Book a Seat Button
             CustomButton(
-              text: 'Book a Seat',
+              text: 'Book Seats',
               onTap: () {
+                if (_selectedFrom == null || _selectedTo == null) {
+                   ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please select From and To stops')));
+                   return;
+                }
                 Navigator.push(
                   context,
                   MaterialPageRoute(
                     builder: (_) => SeatBookingScreen(
                       bus: widget.bus,
-                      from: widget.from,
-                      to: widget.to,
+                      from: _selectedFrom!,
+                      to: _selectedTo!,
                       date: widget.date,
                     ),
                   ),
@@ -309,23 +387,29 @@ class _BusDetailsScreenState extends State<BusDetailsScreen> {
     );
   }
 
-  Widget _buildRouteRow(IconData icon, String label, String value, Color iconColor) {
+  Widget _buildDropdownRow(IconData icon, String label, List<String> items, String? currentValue, Color iconColor, ValueChanged<String?> onChanged) {
     return Row(
       children: [
-        Icon(icon, color: iconColor, size: 20),
+        Icon(icon, color: iconColor, size: 24),
         const SizedBox(width: 16),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              label,
-              style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-            ),
-            Text(
-              value,
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-            ),
-          ],
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+              ),
+              DropdownButton<String>(
+                isExpanded: true,
+                value: currentValue,
+                underline: const SizedBox(),
+                hint: const Text("Select Stop", style: TextStyle(fontWeight: FontWeight.bold)),
+                items: items.map((e) => DropdownMenuItem(value: e, child: Text(e, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)))).toList(),
+                onChanged: onChanged,
+              ),
+            ],
+          ),
         ),
       ],
     );
@@ -383,38 +467,58 @@ class _BusDetailsScreenState extends State<BusDetailsScreen> {
   }
 
   Widget _buildHaltsList() {
-    return Column(
-      children: _halts.map((halt) {
-        final isNext = halt.name == _nextStop;
-        return Padding(
-          padding: const EdgeInsets.symmetric(vertical: 4),
-          child: Row(
-            children: [
-              Icon(
-                Icons.circle,
-                size: 8,
-                color: isNext ? Colors.blue : Colors.grey[400],
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  halt.name,
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: isNext ? FontWeight.bold : FontWeight.normal,
-                    color: isNext ? Colors.blue : Colors.black87,
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.grey[50],
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey[200]!),
+      ),
+      child: Column(
+        children: _uniqueStops.asMap().entries.map((entry) {
+          final index = entry.key;
+          final stop = entry.value;
+          final isNext = stop == _nextStop;
+          
+          return Padding(
+            padding: const EdgeInsets.symmetric(vertical: 6),
+            child: Row(
+              children: [
+                Container(
+                  width: 20,
+                  height: 20,
+                  decoration: BoxDecoration(
+                    color: isNext ? Colors.blue.withOpacity(0.2) : Colors.transparent,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Center(
+                    child: Icon(
+                      Icons.circle,
+                      size: isNext ? 12 : 8,
+                      color: isNext ? Colors.blue : Colors.grey[400],
+                    ),
                   ),
                 ),
-              ),
-              if (halt.arrivalTime != null)
-                Text(
-                  halt.arrivalTime!,
-                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    stop,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: isNext ? FontWeight.bold : FontWeight.normal,
+                      color: isNext ? Colors.blue : Colors.black87,
+                    ),
+                  ),
                 ),
-            ],
-          ),
-        );
-      }).toList(),
+                if (index == 0)
+                  Text("Start", style: TextStyle(fontSize: 11, color: Colors.green[700], fontWeight: FontWeight.bold))
+                else if (index == _uniqueStops.length - 1)
+                  Text("End", style: TextStyle(fontSize: 11, color: Colors.red[700], fontWeight: FontWeight.bold))
+              ],
+            ),
+          );
+        }).toList(),
+      ),
     );
   }
 }

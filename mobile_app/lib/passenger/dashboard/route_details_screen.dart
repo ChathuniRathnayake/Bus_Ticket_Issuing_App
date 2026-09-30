@@ -2,17 +2,74 @@ import 'package:flutter/material.dart';
 import '../../models/route_model.dart';
 import '../../widgets/passenger_app_bar.dart';
 
-class RouteDetailsScreen extends StatelessWidget {
+class RouteDetailsScreen extends StatefulWidget {
   final RouteModel route;
 
   const RouteDetailsScreen({super.key, required this.route});
+
+  @override
+  State<RouteDetailsScreen> createState() => _RouteDetailsScreenState();
+}
+
+class _RouteDetailsScreenState extends State<RouteDetailsScreen> {
+  List<String> _allStops = [];
+  List<String> _filteredStops = [];
+  final TextEditingController _searchController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeStops();
+    _searchController.addListener(_filterStops);
+  }
+
+  void _initializeStops() {
+    // Add start stop
+    if (widget.route.startStop.isNotEmpty) {
+      _allStops.add(widget.route.startStop);
+    }
+    
+    // Add intermediate stops
+    if (widget.route.stops != null) {
+      for (var s in widget.route.stops!) {
+        if (s is String) _allStops.add(s);
+        else if (s is Map && s['name'] != null) _allStops.add(s['name'].toString());
+      }
+    }
+    
+    // Add end stop
+    if (widget.route.endStop.isNotEmpty) {
+      _allStops.add(widget.route.endStop);
+    }
+    
+    // Remove duplicates while preserving order
+    _allStops = _allStops.toSet().toList();
+    _filteredStops = List.from(_allStops);
+  }
+
+  void _filterStops() {
+    String query = _searchController.text.toLowerCase();
+    setState(() {
+      if (query.isEmpty) {
+        _filteredStops = List.from(_allStops);
+      } else {
+        _filteredStops = _allStops.where((stop) => stop.toLowerCase().contains(query)).toList();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7FB),
       appBar: PassengerAppBar(
-        title: route.routeName,
+        title: widget.route.routeName,
         showBackButton: true,
       ),
       body: SingleChildScrollView(
@@ -43,7 +100,7 @@ class RouteDetailsScreen extends StatelessWidget {
                   const Icon(Icons.directions_bus, color: Colors.white, size: 48),
                   const SizedBox(height: 12),
                   Text(
-                    route.routeName,
+                    widget.route.routeName,
                     style: const TextStyle(
                       color: Colors.white,
                       fontSize: 22,
@@ -59,7 +116,7 @@ class RouteDetailsScreen extends StatelessWidget {
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Text(
-                      'Route ID: ${route.id}',
+                      'Route ID: ${widget.route.id}',
                       style: const TextStyle(color: Colors.white, fontSize: 12),
                     ),
                   ),
@@ -88,7 +145,7 @@ class RouteDetailsScreen extends StatelessWidget {
                   _buildDetailRow(
                     Icons.location_on,
                     'Start Stop',
-                    route.startStop,
+                    widget.route.startStop,
                     Colors.green,
                   ),
                   const Padding(
@@ -98,7 +155,7 @@ class RouteDetailsScreen extends StatelessWidget {
                   _buildDetailRow(
                     Icons.flag,
                     'End Stop',
-                    route.endStop,
+                    widget.route.endStop,
                     Colors.red,
                   ),
                 ],
@@ -129,7 +186,7 @@ class RouteDetailsScreen extends StatelessWidget {
                         child: _buildInfoBlock(
                           Icons.access_time,
                           'Departure',
-                          route.departureTime ?? 'N/A',
+                          widget.route.departureTime ?? 'N/A',
                           Colors.blue,
                         ),
                       ),
@@ -138,7 +195,7 @@ class RouteDetailsScreen extends StatelessWidget {
                         child: _buildInfoBlock(
                           Icons.timer_outlined,
                           'Arrival',
-                          route.arrivalTime ?? 'N/A',
+                          widget.route.arrivalTime ?? 'N/A',
                           Colors.orange,
                         ),
                       ),
@@ -147,15 +204,15 @@ class RouteDetailsScreen extends StatelessWidget {
                   const Divider(height: 30),
                   _buildDetailRow(
                     Icons.payments_outlined,
-                    'Ticket Price',
-                    route.price ?? 'N/A',
+                    'Full Ticket Price',
+                    widget.route.price ?? 'N/A',
                     Colors.blue,
                   ),
                 ],
               ),
             ),
             
-            if (route.stops != null && route.stops!.isNotEmpty) ...[
+            if (_allStops.isNotEmpty) ...[
               const SizedBox(height: 24),
               _buildSectionHeader('All Stops'),
               Container(
@@ -171,25 +228,59 @@ class RouteDetailsScreen extends StatelessWidget {
                     ),
                   ],
                 ),
-                child: ListView.separated(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  itemCount: route.stops!.length,
-                  separatorBuilder: (context, index) => const Divider(),
-                  itemBuilder: (context, index) {
-                    return ListTile(
-                      leading: CircleAvatar(
-                        radius: 12,
-                        backgroundColor: Colors.blue.shade50,
-                        child: Text(
-                          '${index + 1}',
-                          style: const TextStyle(fontSize: 10, color: Colors.blue),
+                child: Column(
+                  children: [
+                    TextField(
+                      controller: _searchController,
+                      decoration: InputDecoration(
+                        hintText: 'Search stops...',
+                        prefixIcon: const Icon(Icons.search),
+                        filled: true,
+                        fillColor: Colors.grey[100],
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide.none,
                         ),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                       ),
-                      title: Text(route.stops![index]),
-                      dense: true,
-                    );
-                  },
+                    ),
+                    const SizedBox(height: 16),
+                    _filteredStops.isEmpty 
+                      ? const Padding(
+                          padding: EdgeInsets.all(16.0),
+                          child: Text("No stops found", style: TextStyle(color: Colors.grey)),
+                        )
+                      : ListView.separated(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          itemCount: _filteredStops.length,
+                          separatorBuilder: (context, index) => const Divider(),
+                          itemBuilder: (context, index) {
+                            final stopName = _filteredStops[index];
+                            final isStart = stopName == widget.route.startStop;
+                            final isEnd = stopName == widget.route.endStop;
+                            
+                            return ListTile(
+                              leading: CircleAvatar(
+                                radius: 14,
+                                backgroundColor: isStart ? Colors.green.shade50 : (isEnd ? Colors.red.shade50 : Colors.blue.shade50),
+                                child: Icon(
+                                  isStart ? Icons.location_on : (isEnd ? Icons.flag : Icons.fiber_manual_record),
+                                  size: 16,
+                                  color: isStart ? Colors.green : (isEnd ? Colors.red : Colors.blue),
+                                ),
+                              ),
+                              title: Text(
+                                stopName,
+                                style: TextStyle(
+                                  fontWeight: (isStart || isEnd) ? FontWeight.bold : FontWeight.normal,
+                                ),
+                              ),
+                              dense: true,
+                            );
+                          },
+                        ),
+                  ],
                 ),
               ),
             ],

@@ -3,7 +3,8 @@ class RouteModel {
   final String routeName;
   final String startStop;
   final String endStop;
-  final List<String>? stops;
+  final List<dynamic>? stops;
+  final List<dynamic>? stopFareCents;
   final String? price;
   final String? departureTime;
   final String? arrivalTime;
@@ -14,6 +15,7 @@ class RouteModel {
     required this.startStop,
     required this.endStop,
     this.stops,
+    this.stopFareCents,
     this.price,
     this.departureTime,
     this.arrivalTime,
@@ -25,7 +27,8 @@ class RouteModel {
       routeName: map['routeName'] ?? map['name'] ?? '',
       startStop: map['startStop'] ?? map['startPoint'] ?? '',
       endStop: map['endStop'] ?? map['endPoint'] ?? '',
-      stops: map['stops'] != null ? List<String>.from(map['stops']) : null,
+      stops: map['stops'] != null ? List<dynamic>.from(map['stops']) : null,
+      stopFareCents: map['stopFareCents'] != null ? List<dynamic>.from(map['stopFareCents']) : null,
       price: map['price']?.toString(),
       departureTime: map['departureTime']?.toString(),
       arrivalTime: map['arrivalTime']?.toString(),
@@ -38,6 +41,7 @@ class RouteModel {
       'startStop': startStop,
       'endStop': endStop,
       'stops': stops,
+      'stopFareCents': stopFareCents,
       'price': price,
       'departureTime': departureTime,
       'arrivalTime': arrivalTime,

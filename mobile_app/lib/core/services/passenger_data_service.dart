@@ -1,23 +1,45 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../models/route_model.dart';
+import '../../models/schedule_model.dart';
 
 class PassengerDataService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  // Fetch all available bus stops as a stream
+  // Fetch all available bus stops as a stream from routes
   Stream<List<String>> getBusStopsStream() {
-    return _firestore.collection('halts').snapshots().map((snapshot) {
+    return _firestore.collection('routes').snapshots().map((snapshot) {
       if (snapshot.docs.isEmpty) return [];
       
-      final Set<String> stopNames = snapshot.docs
-          .map((doc) {
-            final data = doc.data();
-            // Check multiple possible field names
-            return (data['name'] ?? data['haltName'] ?? data['stopName'] ?? '').toString();
-          })
-          .where((name) => name.isNotEmpty)
-          .cast<String>()
-          .toSet();
+      final Set<String> stopNames = {};
+      
+      for (var doc in snapshot.docs) {
+        final data = doc.data();
+        
+        // Add start and end stops
+        if (data['startStop'] != null && data['startStop'].toString().isNotEmpty) {
+          stopNames.add(data['startStop'].toString());
+        }
+        if (data['startPoint'] != null && data['startPoint'].toString().isNotEmpty) {
+          stopNames.add(data['startPoint'].toString());
+        }
+        if (data['endStop'] != null && data['endStop'].toString().isNotEmpty) {
+          stopNames.add(data['endStop'].toString());
+        }
+        if (data['endPoint'] != null && data['endPoint'].toString().isNotEmpty) {
+          stopNames.add(data['endPoint'].toString());
+        }
+        
+        // Add intermediate stops if they exist
+        if (data['stops'] != null && data['stops'] is List) {
+          for (var stop in data['stops']) {
+            if (stop is String && stop.isNotEmpty) {
+              stopNames.add(stop);
+            } else if (stop is Map && stop['name'] != null && stop['name'].toString().isNotEmpty) {
+              stopNames.add(stop['name'].toString());
+            }
+          }
+        }
+      }
       
       final List<String> sortedStops = stopNames.toList()..sort();
       return sortedStops;
@@ -67,64 +89,188 @@ class PassengerDataService {
     }
   }
 
+  // Fetch upcoming available schedules for the home page (up to 10)
+  Future<List<ScheduleModel>> getAvailableSchedules() async {
+    try {
+      final now = DateTime.now();
+      final dateStr = "${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}";
+      
+      final snapshot = await _firestore
+          .collection('schedules')
+          .where('date', isGreaterThanOrEqualTo: dateStr)
+          .orderBy('date')
+          .limit(20) // Fetch some extra to account for filtering
+          .get();
+          
+      final List<ScheduleModel> result = [];
+      
+      for (var doc in snapshot.docs) {
+        final data = doc.data();
+        
+        // Skip past schedules if it's today
+        if (data['date'] == dateStr && data['departureTime'] != null) {
+          final timeParts = data['departureTime'].toString().split(':');
+          if (timeParts.length >= 2) {
+            final scheduleTime = DateTime(
+              now.year, now.month, now.day, 
+              int.parse(timeParts[0]), 
+              int.parse(timeParts[1])
+            );
+            if (scheduleTime.isBefore(now)) continue;
+          }
+        }
+        
+        String routeName = "Unknown Route";
+        String startStop = "";
+        String endStop = "";
+        String busPlateNumber = "";
+        String busModel = "";
+        String price = "N/A";
+
+        // Fetch Route details
+        if (data['routeId'] != null) {
+          final routeDoc = await _firestore.collection('routes').doc(data['routeId']).get();
+          if (routeDoc.exists) {
+            final routeData = routeDoc.data()!;
+            routeName = routeData['routeName'] ?? routeName;
+            startStop = routeData['startStop'] ?? startStop;
+            endStop = routeData['endStop'] ?? endStop;
+            price = routeData['price']?.toString() ?? price;
+          }
+        }
+
+        // Fetch Bus details
+        if (data['busId'] != null) {
+          final busDoc = await _firestore.collection('buses').doc(data['busId']).get();
+          if (busDoc.exists) {
+            final busData = busDoc.data()!;
+            busPlateNumber = busData['plateNumber'] ?? busPlateNumber;
+            busModel = busData['model'] ?? busModel;
+          }
+        }
+
+        result.add(ScheduleModel(
+          id: doc.id,
+          routeId: data['routeId'] ?? '',
+          busId: data['busId'] ?? '',
+          date: data['date'] ?? '',
+          departureTime: data['departureTime'] ?? '',
+          status: data['status'] ?? 'active',
+          routeName: routeName,
+          startStop: startStop,
+          endStop: endStop,
+          busPlateNumber: busPlateNumber,
+          busModel: busModel,
+          price: price,
+        ));
+        
+        if (result.length >= 10) break;
+      }
+      
+      return result;
+    } catch (e) {
+      print("Error fetching available schedules: $e");
+      return [];
+    }
+  }
+
   // Search routes based on from and to halts
   Future<List<RouteModel>> searchRoutes(String from, String to) async {
     try {
       final Set<String> matchingRouteIds = {};
 
-      // 1. Direct match with startStop and endStop in 'routes' collection
-      final directMatchSnapshot = await _firestore
-          .collection('routes')
-          .where('startStop', isEqualTo: from)
-          .where('endStop', isEqualTo: to)
-          .get();
-      
-      for (var doc in directMatchSnapshot.docs) {
-        matchingRouteIds.add(doc.id);
+      if (from == "Not Selected" && to == "Not Selected") {
+        // Return all routes
+        final snapshot = await _firestore.collection('routes').get();
+        return snapshot.docs.map((doc) => RouteModel.fromMap(doc.data(), id: doc.id)).toList();
       }
 
-      // 2. Search via 'halts' collection for intermediate halts
-      // Get routeIds that pass through 'from'
-      final fromSnapshot = await _firestore.collection('halts').where('name', isEqualTo: from).get();
-      final fromRoutes = fromSnapshot.docs.map((doc) => {
-        'routeId': (doc.data()['routeId'] ?? '').toString(),
-        'order': int.tryParse(doc.data()['order']?.toString() ?? '0') ?? 0
-      }).toList();
+      if (from != "Not Selected" && to != "Not Selected") {
+        // 1. Direct match with startStop and endStop in 'routes' collection
+        final directMatchSnapshot = await _firestore
+            .collection('routes')
+            .where('startStop', isEqualTo: from)
+            .where('endStop', isEqualTo: to)
+            .get();
+        
+        for (var doc in directMatchSnapshot.docs) {
+          matchingRouteIds.add(doc.id);
+        }
 
-      // Get routeIds that pass through 'to'
-      final toSnapshot = await _firestore.collection('halts').where('name', isEqualTo: to).get();
-      final toRoutes = toSnapshot.docs.map((doc) => {
-        'routeId': (doc.data()['routeId'] ?? '').toString(),
-        'order': int.tryParse(doc.data()['order']?.toString() ?? '0') ?? 0
-      }).toList();
+        // 2. Search via 'halts' collection for intermediate halts
+        final fromSnapshot = await _firestore.collection('halts').where('name', isEqualTo: from).get();
+        final fromRoutes = fromSnapshot.docs.map((doc) => {
+          'routeId': (doc.data()['routeId'] ?? '').toString(),
+          'order': int.tryParse(doc.data()['order']?.toString() ?? '0') ?? 0
+        }).toList();
 
-      // Find matching routeIds where fromOrder < toOrder
-      for (var f in fromRoutes) {
-        for (var t in toRoutes) {
-          if (f['routeId'] == t['routeId'] && (f['order'] as int) < (t['order'] as int)) {
-            matchingRouteIds.add(f['routeId'] as String);
+        final toSnapshot = await _firestore.collection('halts').where('name', isEqualTo: to).get();
+        final toRoutes = toSnapshot.docs.map((doc) => {
+          'routeId': (doc.data()['routeId'] ?? '').toString(),
+          'order': int.tryParse(doc.data()['order']?.toString() ?? '0') ?? 0
+        }).toList();
+
+        for (var f in fromRoutes) {
+          for (var t in toRoutes) {
+            if (f['routeId'] == t['routeId'] && (f['order'] as int) < (t['order'] as int)) {
+              matchingRouteIds.add(f['routeId'] as String);
+            }
           }
+        }
+      } else if (from != "Not Selected") {
+        // Match only from
+        final directMatchSnapshot = await _firestore
+            .collection('routes')
+            .where('startStop', isEqualTo: from)
+            .get();
+        for (var doc in directMatchSnapshot.docs) {
+          matchingRouteIds.add(doc.id);
+        }
+        final fromSnapshot = await _firestore.collection('halts').where('name', isEqualTo: from).get();
+        for (var doc in fromSnapshot.docs) {
+          matchingRouteIds.add((doc.data()['routeId'] ?? '').toString());
+        }
+      } else if (to != "Not Selected") {
+        // Match only to
+        final directMatchSnapshot = await _firestore
+            .collection('routes')
+            .where('endStop', isEqualTo: to)
+            .get();
+        for (var doc in directMatchSnapshot.docs) {
+          matchingRouteIds.add(doc.id);
+        }
+        final toSnapshot = await _firestore.collection('halts').where('name', isEqualTo: to).get();
+        for (var doc in toSnapshot.docs) {
+          matchingRouteIds.add((doc.data()['routeId'] ?? '').toString());
         }
       }
 
+      matchingRouteIds.removeWhere((id) => id.isEmpty);
+
       if (matchingRouteIds.isEmpty) return [];
 
-      // 3. Fetch the actual route documents
-      // Note: whereIn is limited to 30 items
-      final routesSnapshot = await _firestore
-          .collection('routes')
-          .where(FieldPath.documentId, whereIn: matchingRouteIds.take(30).toList())
-          .get();
+      // 3. Fetch the actual route documents in batches of 30 due to whereIn limits
+      final List<RouteModel> allMatchedRoutes = [];
+      final List<String> routeIdList = matchingRouteIds.toList();
       
-      return routesSnapshot.docs.map((doc) => RouteModel.fromMap(doc.data(), id: doc.id)).toList();
+      for (var i = 0; i < routeIdList.length; i += 30) {
+        final batch = routeIdList.skip(i).take(30).toList();
+        final routesSnapshot = await _firestore
+            .collection('routes')
+            .where(FieldPath.documentId, whereIn: batch)
+            .get();
+        allMatchedRoutes.addAll(routesSnapshot.docs.map((doc) => RouteModel.fromMap(doc.data(), id: doc.id)));
+      }
+      
+      return allMatchedRoutes;
     } catch (e) {
       print("Error searching routes via halts and direct match: $e");
       return [];
     }
   }
 
-  // Get buses assigned to specific routes matching from and to for a specific date
-  Future<List<Map<String, dynamic>>> getBusesForRoute(String from, String to, String date) async {
+  // Get buses assigned to specific routes matching from and to
+  Future<List<Map<String, dynamic>>> getBusesForRoute(String from, String to) async {
     try {
       final routes = await searchRoutes(from, to);
       if (routes.isEmpty) return [];
@@ -132,61 +278,21 @@ class PassengerDataService {
       final List<Map<String, dynamic>> allBuses = [];
 
       for (var route in routes) {
-        // Try schedules collection first (if it exists)
-        final scheduleSnapshot = await _firestore
-            .collection('schedules')
+        final snapshot = await _firestore
+            .collection('buses')
             .where('routeId', isEqualTo: route.id)
-            .where('date', isEqualTo: date)
             .get();
-
-        if (scheduleSnapshot.docs.isNotEmpty) {
-          // Schedules exist — use them to filter buses
-          final scheduledBusIds = scheduleSnapshot.docs
-              .map((doc) => doc.data()['busId']?.toString())
-              .where((id) => id != null && id.isNotEmpty)
-              .toSet();
-
-          final busSnapshot = await _firestore
-              .collection('buses')
-              .where('routeId', isEqualTo: route.id)
-              .get();
-
-          for (var doc in busSnapshot.docs) {
-            if (!scheduledBusIds.contains(doc.id)) continue;
-            final data = doc.data();
-            data['id'] = doc.id;
-            data['routeId'] = route.id;
-            data['routeName'] = route.routeName;
-            data['price'] = route.price;
-
-            final busSchedule = scheduleSnapshot.docs.firstWhere(
-              (s) => s.data()['busId'] == doc.id,
-              orElse: () => scheduleSnapshot.docs.first,
-            );
-            data['departureTime'] = busSchedule.data()['departureTime'] ?? route.departureTime ?? '';
-            data['arrivalTime'] = busSchedule.data()['arrivalTime'] ?? route.arrivalTime ?? '';
-            allBuses.add(data);
-          }
-        } else {
-          // No schedules collection — fall back to showing all buses on this route
-          final busSnapshot = await _firestore
-              .collection('buses')
-              .where('routeId', isEqualTo: route.id)
-              .get();
-
-          for (var doc in busSnapshot.docs) {
-            final data = doc.data();
-            data['id'] = doc.id;
-            data['routeId'] = route.id;
-            data['routeName'] = route.routeName;
-            data['price'] = route.price;
-            data['departureTime'] = route.departureTime ?? '';
-            data['arrivalTime'] = route.arrivalTime ?? '';
-            allBuses.add(data);
-          }
+        
+        for (var doc in snapshot.docs) {
+          final data = doc.data();
+          data['id'] = doc.id;
+          data['routeId'] = route.id;
+          data['routeName'] = route.routeName;
+          data['price'] = route.price;
+          allBuses.add(data);
         }
       }
-
+      
       return allBuses;
     } catch (e) {
       print("Error fetching buses for route: $e");
@@ -200,14 +306,18 @@ class PassengerDataService {
       final snapshot = await _firestore
           .collection('halts')
           .where('routeId', isEqualTo: routeId)
-          .orderBy('order')
           .get();
       
-      return snapshot.docs.map((doc) {
+      final halts = snapshot.docs.map((doc) {
         final data = doc.data();
         data['id'] = doc.id;
         return data;
       }).toList();
+
+      // Sort locally to avoid Firestore composite index requirement
+      halts.sort((a, b) => (a['order'] ?? 0).compareTo(b['order'] ?? 0));
+
+      return halts;
     } catch (e) {
       print("Error fetching halts for route: $e");
       return [];
@@ -229,133 +339,93 @@ class PassengerDataService {
     }
   }
 
-  // Get booked seats for a specific bus on a specific date
-  Stream<List<int>> getBookedSeatsStream(String busId, String date) {
-    return _firestore
-        .collection('bookings')
-        .where('busId', isEqualTo: busId)
-        .where('date', isEqualTo: date)
-        .snapshots()
-        .map((snapshot) {
-      List<int> bookedSeats = [];
-      for (var doc in snapshot.docs) {
-        final seats = doc.data()['selectedSeats'] as List<dynamic>?;
-        if (seats != null) {
-          bookedSeats.addAll(seats.cast<int>());
-        }
-      }
-      return bookedSeats;
-    });
-  }
-
-  // Get ALL scheduled buses for a specific date (no route filter)
-  // Falls back to all buses if the 'schedules' collection doesn't exist yet
-  Future<List<Map<String, dynamic>>> getAllBusesForDate(String date) async {
+  // Fetch schedules for a specific route and date
+  Future<List<ScheduleModel>> getSchedulesForRouteAndDate(String from, String to, String date) async {
     try {
-      final scheduleSnapshot = await _firestore
+      // 1. Fetch all active schedules for the given date
+      final schedulesSnapshot = await _firestore
           .collection('schedules')
           .where('date', isEqualTo: date)
+          .where('status', isEqualTo: 'Active')
           .get();
 
-      if (scheduleSnapshot.docs.isNotEmpty) {
-        // ── Schedules collection exists — use it ──────────────────────────
-        final List<Map<String, dynamic>> allBuses = [];
+      if (schedulesSnapshot.docs.isEmpty) return [];
 
-        for (var schedDoc in scheduleSnapshot.docs) {
-          final schedData = schedDoc.data();
-          final busId = schedData['busId']?.toString() ?? '';
-          final routeId = schedData['routeId']?.toString() ?? '';
-          if (busId.isEmpty) continue;
+      final List<ScheduleModel> allSchedules = [];
 
-          final busDoc = await _firestore.collection('buses').doc(busId).get();
-          if (!busDoc.exists) continue;
+      // 2. Process each schedule
+      for (var doc in schedulesSnapshot.docs) {
+        final data = doc.data();
+        final routeId = data['routeId'];
+        if (routeId == null) continue;
 
-          final busData = busDoc.data() ?? {};
-          busData['id'] = busId;
-          busData['routeId'] = routeId;
+        // Fetch route details
+        final routeDoc = await _firestore.collection('routes').doc(routeId).get();
+        if (!routeDoc.exists) continue;
+        
+        final routeData = routeDoc.data()!;
+        final startStop = routeData['startStop'] ?? routeData['startPoint'] ?? '';
+        final endStop = routeData['endStop'] ?? routeData['endPoint'] ?? '';
+        final stops = routeData['stops'] != null ? List<dynamic>.from(routeData['stops']) : [];
 
-          if (routeId.isNotEmpty) {
-            final routeDoc =
-                await _firestore.collection('routes').doc(routeId).get();
-            if (routeDoc.exists) {
-              final rd = routeDoc.data() ?? {};
-              busData['routeName'] = rd['routeName'] ?? '';
-              busData['startStop'] = rd['startStop'] ?? '';
-              busData['endStop'] = rd['endStop'] ?? '';
-              busData['price'] = rd['price']?.toString() ?? '';
+        // 3. Filter by 'from' and 'to'
+        bool matchesFrom = from == "Not Selected";
+        bool matchesTo = to == "Not Selected";
+
+        if (!matchesFrom) {
+          if (startStop == from) matchesFrom = true;
+          else if (stops.any((stop) => (stop is Map ? stop['name'] : stop) == from)) matchesFrom = true;
+        }
+
+        if (!matchesTo) {
+          if (endStop == to) matchesTo = true;
+          else if (stops.any((stop) => (stop is Map ? stop['name'] : stop) == to)) matchesTo = true;
+        }
+
+        // If it doesn't match both, skip this schedule
+        if (!matchesFrom || !matchesTo) continue;
+
+        data['scheduleId'] = doc.id;
+        data['routeId'] = routeId;
+        data['routeName'] = routeData['routeName'] ?? routeData['name'] ?? '';
+        data['price'] = routeData['price'];
+        
+        // Fetch bus details for the schedule
+        if (data['busId'] != null) {
+          final busDoc = await _firestore.collection('buses').doc(data['busId']).get();
+          if (busDoc.exists) {
+            final busData = busDoc.data();
+            if (busData != null) {
+              data['busModel'] = busData['model'];
+              data['busPlateNumber'] = busData['plateNumber'];
+              data['totalSeats'] = busData['totalSeats'];
+              data['busStatus'] = busData['status'];
+              
+              // Only add if bus is active
+              if (busData['status'] == 'Active') {
+                allSchedules.add(ScheduleModel.fromMap(data, id: doc.id));
+              }
             }
+          } else {
+             // Fallback if bus doesn't exist
+             allSchedules.add(ScheduleModel.fromMap(data, id: doc.id));
           }
-
-          busData['departureTime'] = schedData['departureTime'] ?? '';
-          busData['arrivalTime'] = schedData['arrivalTime'] ?? '';
-          allBuses.add(busData);
+        } else {
+          allSchedules.add(ScheduleModel.fromMap(data, id: doc.id));
         }
-        return allBuses;
       }
-
-      // ── No schedules collection — fall back to all buses linked to routes ──
-      final busSnapshot = await _firestore.collection('buses').get();
-      if (busSnapshot.docs.isEmpty) return [];
-
-      final List<Map<String, dynamic>> allBuses = [];
-
-      for (var busDoc in busSnapshot.docs) {
-        final busData = busDoc.data();
-        busData['id'] = busDoc.id;
-
-        final routeId = busData['routeId']?.toString() ?? '';
-        if (routeId.isNotEmpty) {
-          final routeDoc =
-              await _firestore.collection('routes').doc(routeId).get();
-          if (routeDoc.exists) {
-            final rd = routeDoc.data() ?? {};
-            busData['routeName'] = rd['routeName'] ?? '';
-            busData['startStop'] = rd['startStop'] ?? rd['startPoint'] ?? '';
-            busData['endStop'] = rd['endStop'] ?? rd['endPoint'] ?? '';
-            busData['price'] = rd['price']?.toString() ?? '';
-            busData['departureTime'] = rd['departureTime'] ?? '';
-            busData['arrivalTime'] = rd['arrivalTime'] ?? '';
-          }
-        }
-
-        if ((busData['routeName'] ?? '').toString().isEmpty) continue;
-        allBuses.add(busData);
-      }
-
-      return allBuses;
+      
+      // Sort schedules by departure time
+      allSchedules.sort((a, b) {
+        final timeA = a.departureTime.isEmpty ? '00:00' : a.departureTime;
+        final timeB = b.departureTime.isEmpty ? '00:00' : b.departureTime;
+        return timeA.compareTo(timeB);
+      });
+      
+      return allSchedules;
     } catch (e) {
-      print("Error fetching all buses for date: $e");
+      print("Error fetching schedules for route and date: $e");
       return [];
     }
-  }
-
-  // Book tickets
-  Future<String> bookTickets({
-    required String busId,
-    required String from,
-    required String to,
-    required String date,
-    required List<int> selectedSeats,
-    required double totalAmount,
-    required String passengerName,
-    required String phone,
-    required String nic,
-    required String email,
-  }) async {
-    final docRef = await _firestore.collection('bookings').add({
-      'busId': busId,
-      'from': from,
-      'to': to,
-      'date': date,
-      'selectedSeats': selectedSeats,
-      'totalAmount': totalAmount,
-      'passengerName': passengerName,
-      'phone': phone,
-      'nic': nic,
-      'email': email,
-      'status': 'confirmed',
-      'createdAt': FieldValue.serverTimestamp(),
-    });
-    return docRef.id;
   }
 }

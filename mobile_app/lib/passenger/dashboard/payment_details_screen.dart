@@ -1,13 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/custom_textfield.dart';
 import '../passenger_bottom_nav.dart';
 import '../auth/passenger_login.dart';
-import '../../core/services/passenger_data_service.dart';
+import '../../models/schedule_model.dart';
 import 'booking_confirmed_screen.dart';
 
 class PaymentDetailsScreen extends StatefulWidget {
-  final Map<String, String> bus;
+  final ScheduleModel bus;
   final String from;
   final String to;
   final String date;
@@ -36,9 +38,8 @@ class _PaymentDetailsScreenState extends State<PaymentDetailsScreen> {
   final _phoneController = TextEditingController();
   final _nicController = TextEditingController();
   final _emailController = TextEditingController();
-  
-  final PassengerDataService _dataService = PassengerDataService();
-  bool _isLoading = false;
+
+  bool _isProcessing = false;
 
   @override
   void dispose() {
@@ -47,6 +48,89 @@ class _PaymentDetailsScreenState extends State<PaymentDetailsScreen> {
     _nicController.dispose();
     _emailController.dispose();
     super.dispose();
+  }
+
+  Future<void> _processPaymentAndBooking() async {
+    if (!_formKey.currentState!.validate()) return;
+    
+    setState(() {
+      _isProcessing = true;
+    });
+
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      final userId = user?.uid ?? 'guest';
+
+      // Save booking to Firestore
+      final bookingRef = await FirebaseFirestore.instance.collection('bookings').add({
+        'userId': userId,
+        'scheduleId': widget.bus.id,
+        'routeId': widget.bus.routeId,
+        'busId': widget.bus.busId,
+        'from': widget.from,
+        'to': widget.to,
+        'date': widget.date,
+        'departureTime': widget.bus.departureTime,
+        'passengerName': _nameController.text.trim(),
+        'phone': _phoneController.text.trim(),
+        'nic': _nicController.text.trim(),
+        'email': _emailController.text.trim(),
+        'selectedSeats': widget.selectedSeats,
+        'totalAmount': widget.totalAmount,
+        'bookingDate': FieldValue.serverTimestamp(),
+        'status': 'confirmed'
+      });
+
+      // Save each individual seat to the 'seats' collection so they appear as booked
+      final batch = FirebaseFirestore.instance.batch();
+      for (var seat in widget.selectedSeats) {
+        final seatDoc = FirebaseFirestore.instance.collection('seats').doc();
+        batch.set(seatDoc, {
+          'busId': widget.bus.busId,
+          'routeId': widget.bus.routeId,
+          'scheduleId': widget.bus.id,
+          'bookingId': bookingRef.id,
+          'seatNo': seat.toString(),
+          'userId': userId,
+          'passengerName': _nameController.text.trim(),
+          'date': widget.date,
+          'status': 'booked',
+          'issuedAt': FieldValue.serverTimestamp(),
+        });
+      }
+      await batch.commit();
+
+      if (!mounted) return;
+
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (_) => BookingConfirmedScreen(
+            bus: widget.bus,
+            from: widget.from,
+            to: widget.to,
+            date: widget.date,
+            passengerName: _nameController.text,
+            phone: _phoneController.text,
+            nic: _nicController.text,
+            email: _emailController.text,
+            selectedSeats: widget.selectedSeats,
+            totalAmount: widget.totalAmount,
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Booking failed: $e')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isProcessing = false;
+        });
+      }
+    }
   }
 
   @override
@@ -64,22 +148,6 @@ class _PaymentDetailsScreenState extends State<PaymentDetailsScreen> {
           icon: const Icon(Icons.arrow_back, color: Colors.black),
           onPressed: () => Navigator.of(context).pop(),
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.account_circle, color: Colors.blue),
-            onPressed: () {},
-          ),
-          IconButton(
-            icon: const Icon(Icons.logout, color: Colors.red),
-            onPressed: () {
-              Navigator.pushAndRemoveUntil(
-                context,
-                MaterialPageRoute(builder: (_) => const LoginScreen()),
-                (route) => false,
-              );
-            },
-          ),
-        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24.0),
@@ -196,62 +264,12 @@ class _PaymentDetailsScreenState extends State<PaymentDetailsScreen> {
               ),
               const SizedBox(height: 40),
 
-              _isLoading
-                  ? const Center(child: CircularProgressIndicator())
-                  : CustomButton(
-                      text: 'Pay Now',
-                      onTap: () async {
-                        if (_formKey.currentState!.validate()) {
-                          setState(() => _isLoading = true);
-                          try {
-                            String bookingId = await _dataService.bookTickets(
-                              busId: widget.bus['id'] ?? '',
-                              from: widget.from,
-                              to: widget.to,
-                              date: widget.date,
-                              selectedSeats: widget.selectedSeats,
-                              totalAmount: widget.totalAmount,
-                              passengerName: _nameController.text,
-                              phone: _phoneController.text,
-                              nic: _nicController.text,
-                              email: _emailController.text,
-                            );
-
-                            if (mounted) {
-                              Navigator.pushReplacement(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => BookingConfirmedScreen(
-                                    bus: widget.bus,
-                                    from: widget.from,
-                                    to: widget.to,
-                                    date: widget.date,
-                                    passengerName: _nameController.text,
-                                    phone: _phoneController.text,
-                                    nic: _nicController.text,
-                                    email: _emailController.text,
-                                    selectedSeats: widget.selectedSeats,
-                                    totalAmount: widget.totalAmount,
-                                    bookingId: bookingId,
-                                  ),
-                                ),
-                              );
-                            }
-                          } catch (e) {
-                            print("Error booking tickets: \$e");
-                            if (mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Failed to book tickets. Please try again.')),
-                              );
-                            }
-                          } finally {
-                            if (mounted) {
-                              setState(() => _isLoading = false);
-                            }
-                          }
-                        }
-                      },
-                    ),
+              _isProcessing 
+                ? const Center(child: CircularProgressIndicator())
+                : CustomButton(
+                    text: 'Pay Now',
+                    onTap: _processPaymentAndBooking,
+                  ),
               const SizedBox(height: 20),
             ],
           ),
