@@ -34,9 +34,11 @@ export default function AdminLogin() {
         body: JSON.stringify({ idToken: token }),
       });
 
-      const data = await response.json();
+      const data = await response.json().catch(() => ({}));
 
-      if (!response.ok) throw new Error(data.message || "Login failed");
+      if (!response.ok) {
+        throw new Error(data.message || `Login failed (HTTP ${response.status})`);
+      }
 
       localStorage.setItem("token", token);
 

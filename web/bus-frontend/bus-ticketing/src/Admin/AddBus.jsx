@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -7,6 +7,8 @@ import { Label } from "@/components/ui/label";
 import { ArrowLeft, Bus } from "lucide-react";
 
 export default function AddBus({ routes }) {
+  const [availableRoutes, setAvailableRoutes] = useState(Array.isArray(routes) ? routes : []);
+  const [routesLoading, setRoutesLoading] = useState(true);
   const [form, setForm] = useState({
     busId: "",
     routeId: "",
@@ -24,6 +26,37 @@ export default function AddBus({ routes }) {
 
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    let isCurrent = true;
+
+    const loadRoutes = async () => {
+      const token = localStorage.getItem("token");
+      if (!token) {
+        navigate("/admin-login");
+        return;
+      }
+
+      try {
+        const response = await fetch("/api/route", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const data = await response.json().catch(() => []);
+        if (!response.ok) throw new Error(data.message || "Failed to load routes");
+        if (isCurrent) setAvailableRoutes(Array.isArray(data) ? data : []);
+      } catch (error) {
+        console.error(error);
+        if (isCurrent) alert(error.message || "Failed to load routes");
+      } finally {
+        if (isCurrent) setRoutesLoading(false);
+      }
+    };
+
+    loadRoutes();
+    return () => {
+      isCurrent = false;
+    };
+  }, [navigate]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -143,7 +176,11 @@ export default function AddBus({ routes }) {
                 required
               >
                 <option value="">-- Select Route --</option>
-                {routes.map((r) => (
+                {routesLoading ? (
+                  <option value="" disabled>Loading routes...</option>
+                ) : availableRoutes.length === 0 ? (
+                  <option value="" disabled>No routes available</option>
+                ) : availableRoutes.map((r) => (
                   <option key={r.routeId} value={r.routeId}>
                     {r.startStop} → {r.endStop} ({r.routeName || r.routeId})
                   </option>

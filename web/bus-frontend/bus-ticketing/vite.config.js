@@ -13,4 +13,9 @@ export default defineConfig({
       "@": path.resolve(projectRoot, "./src"),
     },
   },
+  server: {
+    proxy: {
+      "/api": "http://localhost:5000",
+    },
+  },
 })
