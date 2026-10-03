@@ -58,6 +58,15 @@ function getScheduleDepartureTime(schedule) {
   return Number.isNaN(departureAt.getTime()) ? null : departureAt;
 }
 
+function getScheduleArrivalTime(schedule) {
+  const departureAt = getScheduleDepartureTime(schedule);
+  const duration = String(schedule.routeDuration || "").match(/^(\d+):([0-5]?\d)$/);
+  if (!departureAt || !duration) return null;
+
+  const durationMinutes = Number(duration[1]) * 60 + Number(duration[2]);
+  return new Date(departureAt.getTime() + durationMinutes * 60_000);
+}
+
 function getScheduleDisplayStatus(schedule, now) {
   const status = String(schedule.status || "").trim();
   if (status.toLowerCase() !== "active") return status || "Unknown";
@@ -65,11 +74,8 @@ function getScheduleDisplayStatus(schedule, now) {
   const departureAt = getScheduleDepartureTime(schedule);
   if (!departureAt || now < departureAt) return status;
 
-  const duration = String(schedule.routeDuration || "").match(/^(\d+):([0-5]?\d)$/);
-  if (!duration) return status;
-
-  const durationMinutes = Number(duration[1]) * 60 + Number(duration[2]);
-  const arrivalAt = new Date(departureAt.getTime() + durationMinutes * 60_000);
+  const arrivalAt = getScheduleArrivalTime(schedule);
+  if (!arrivalAt) return status;
   return now < arrivalAt ? "On the way" : "Expired";
 }
 
@@ -420,6 +426,7 @@ export default function ManageSchedules() {
                       <TableHead className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Duration</TableHead>
                       <TableHead className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Date</TableHead>
                       <TableHead className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Departure</TableHead>
+                      <TableHead className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Arrival</TableHead>
                       <TableHead className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Status</TableHead>
                       <TableHead className="text-right text-[11px] font-semibold uppercase tracking-wider text-slate-500">Actions</TableHead>
                     </TableRow>
@@ -473,6 +480,13 @@ export default function ManageSchedules() {
                             <TableCell className="font-mono text-sm">{s.routeDuration}</TableCell>
                             <TableCell className="whitespace-nowrap">{s.date}</TableCell>
                             <TableCell className="whitespace-nowrap font-medium">{s.departureTime}</TableCell>
+                            <TableCell className="whitespace-nowrap font-medium">
+                              {getScheduleArrivalTime(s)?.toLocaleTimeString("en-LK", {
+                                timeZone: "Asia/Colombo",
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              }) || "—"}
+                            </TableCell>
                             <TableCell><span className={statusBadgeClass(displayStatus)}><span className="h-1.5 w-1.5 rounded-full bg-current" />{displayStatus}</span></TableCell>
                             <TableCell>
                               <div className="flex justify-end gap-1">
@@ -491,7 +505,7 @@ export default function ManageSchedules() {
 
                           {viewId === s.id && (
                             <TableRow className="bg-slate-50">
-                              <TableCell colSpan={9}>
+                              <TableCell colSpan={10}>
                                 <div className="space-y-2 py-1">
                                   <p className="text-xs font-semibold uppercase tracking-wide text-slate-600">Full stop sequence</p>
                                   <div className="flex flex-wrap items-center gap-1">
@@ -514,7 +528,7 @@ export default function ManageSchedules() {
 
                           {editId === s.id && (
                             <TableRow className="bg-blue-50/40">
-                              <TableCell colSpan={9}>
+                              <TableCell colSpan={10}>
                                 <div className="grid grid-cols-1 gap-3 rounded-lg border border-slate-200 bg-white p-4 md:grid-cols-[repeat(5,minmax(0,1fr))]">
                                   <div className="min-w-0 space-y-1">
                                     <label className="text-xs font-medium text-slate-600">Bus</label>

@@ -82,21 +82,20 @@ export default function SeatLayout() {
   const [checkoutError, setCheckoutError] = useState("");
 
   useEffect(() => {
-    if (!bus?.scheduleId || !(bus.id || bus.busId) || !boardingStopId || !dropStopId) {
+    if (!bus?.scheduleId || !(bus.id || bus.busId)) {
       setLoadingSeats(false);
       return undefined;
     }
     const fetchBookedSeats = async () => {
       try {
         const token = localStorage.getItem("token");
-        const busId = bus.id || bus.busId;
-        const query = new URLSearchParams({ scheduleId: bus.scheduleId, busId, boardingStopId, dropStopId });
-        const res = await fetch(`/api/ticket/availability?${query}`, {
+        const res = await fetch(`/api/booking/schedule/${encodeURIComponent(bus.scheduleId)}`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.message || "Failed to load booked seats");
-        setBookedSeats(data.occupiedSeats.map(String));
+        if (!Array.isArray(data)) throw new Error("Invalid booked seats response");
+        setBookedSeats(data.map(String));
       } catch (error) {
         console.error(error);
       } finally {
@@ -106,7 +105,7 @@ export default function SeatLayout() {
     fetchBookedSeats();
     const interval = window.setInterval(fetchBookedSeats, 5000);
     return () => window.clearInterval(interval);
-  }, [bus, boardingStopId, dropStopId]);
+  }, [bus]);
 
   // ── Seat number helpers ───────────────────────────────────────────────────────
   // Seats are numbered sequentially left-to-right across the full row, top-to-bottom.
@@ -257,7 +256,7 @@ export default function SeatLayout() {
       {loadingSeats && (
         <div className="mb-4 flex items-center gap-3 rounded-xl border border-blue-100 bg-blue-50 px-6 py-4 text-sm text-blue-700">
           <div className="h-4 w-4 rounded-full border-2 border-blue-300 border-t-blue-600 animate-spin shrink-0" />
-          Loading current seat reservations for this bus...
+          Loading current seat reservations for this schedule...
         </div>
       )}
 

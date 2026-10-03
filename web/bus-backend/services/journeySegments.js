@@ -7,6 +7,10 @@ export const ACTIVE_TICKET_STATUSES = new Set([
 	"Confirmed",
 ]);
 
+export function isSeatRecordForSchedule(record, scheduleId, seatNo) {
+	return record.scheduleId === scheduleId && String(record.seatNo) === String(seatNo);
+}
+
 export function getOrderedStops(route) {
 	if (Array.isArray(route.stops) && route.stops.length >= 2) {
 		return route.stops.map((raw, index) => {

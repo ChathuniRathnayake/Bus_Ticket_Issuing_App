@@ -8,11 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, Bus, Download, FileText, Ticket, Trash2, Clock } from "lucide-react";
 import QRCode from "qrcode";
 import TicketQRCode from "@/components/TicketQRCode";
-import { cancelPassengerBooking, fetchPassengerBookings } from "@/utils/bookings";
-
-function getRoutes() {
-  return JSON.parse(localStorage.getItem("routes")) || [];
-}
+import { cancelPassengerBooking, fetchPassengerBookings, getTripTiming, getTripTimingStatus } from "@/utils/bookings";
 
 function getPendingPayment() {
   try {
@@ -26,15 +22,17 @@ export default function MyBookings() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [bookings, setBookings] = useState(() => JSON.parse(localStorage.getItem("userBookings") || "[]"));
-  const [routes] = useState(getRoutes);
+  const [routes, setRoutes] = useState([]);
   const [pendingPayment, setPendingPayment] = useState(getPendingPayment);
   const [cancelBookingId, setCancelBookingId] = useState(null);
   const [cancelling, setCancelling] = useState(false);
   const [cancelError, setCancelError] = useState("");
   const [currentTime, setCurrentTime] = useState(() => new Date());
   const requestedStatus = searchParams.get("status");
-  const validStatuses = ["all", "confirmed", "processing", "expired"];
-  const selectedStatus = validStatuses.includes(requestedStatus) ? requestedStatus : "all";
+  const validStatuses = ["all", "active", "upcoming", "on_the_way", "processing", "expired"];
+  const selectedStatus = requestedStatus === "confirmed"
+    ? "active"
+    : validStatuses.includes(requestedStatus) ? requestedStatus : "all";
   const selectedBookingId = searchParams.get("bookingId");
 
   useEffect(() => {
@@ -64,6 +62,26 @@ export default function MyBookings() {
   }, []);
 
   useEffect(() => {
+    let active = true;
+    const restoreRoutes = async () => {
+      const token = localStorage.getItem("token");
+      if (!token) return;
+      try {
+        const response = await fetch("/api/route/available", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const data = await response.json().catch(() => []);
+        if (!response.ok) throw new Error(data.message || "Could not load route details");
+        if (active) setRoutes(Array.isArray(data) ? data : []);
+      } catch (error) {
+        console.error("Failed to restore passenger routes:", error);
+      }
+    };
+    restoreRoutes();
+    return () => { active = false; };
+  }, []);
+
+  useEffect(() => {
     const interval = window.setInterval(() => {
       setCurrentTime(new Date());
       setPendingPayment(getPendingPayment());
@@ -76,15 +94,20 @@ export default function MyBookings() {
     document.getElementById(`booking-detail-${selectedBookingId}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
   }, [selectedBookingId]);
 
-  const isBookingExpired = (booking, now = currentTime) => {
+  const getBookingTripStatus = (booking, now = currentTime) => {
     const route = routes.find((item) => item.routeId === booking.routeId);
-    const departureAt = new Date(`${booking.date || route?.date || ""}T${booking.departureTime || route?.startTime || ""}`);
-    return !Number.isNaN(departureAt.getTime()) && departureAt <= now;
+    return getTripTimingStatus(booking, route, now);
+  };
+
+  const hasBookingDeparted = (booking, now = currentTime) => {
+    const route = routes.find((item) => item.routeId === booking.routeId);
+    const { departureAt } = getTripTiming(booking, route);
+    return Boolean(departureAt && departureAt <= now);
   };
 
   const handleCancelClick = (bookingId) => {
     const booking = bookings.find((item) => item.bookingId === bookingId);
-    if (!booking || isBookingExpired(booking, new Date())) return;
+    if (!booking || hasBookingDeparted(booking, new Date())) return;
     setCancelBookingId(bookingId);
     setCancelError("");
   };
@@ -93,7 +116,7 @@ export default function MyBookings() {
     if (!cancelBookingId) return;
     const booking = bookings.find((item) => item.bookingId === cancelBookingId);
     if (!booking) return;
-    if (isBookingExpired(booking, new Date())) {
+    if (hasBookingDeparted(booking, new Date())) {
       setCancelError("This trip has departed and can no longer be cancelled.");
       return;
     }
@@ -199,7 +222,7 @@ export default function MyBookings() {
       ...booking,
       displayStatus: isProcessing
         ? "processing"
-        : isBookingExpired(booking) ? "expired" : "confirmed",
+        : getBookingTripStatus(booking),
     };
   });
 
@@ -209,17 +232,22 @@ export default function MyBookings() {
 
   const statusFilters = [
     { value: "all", label: "All" },
-    { value: "confirmed", label: "Confirmed" },
+    { value: "active", label: "Upcoming & on the way" },
+    { value: "upcoming", label: "Upcoming" },
+    { value: "on_the_way", label: "On the way" },
     { value: "processing", label: "Processing" },
-    { value: "expired", label: "Expired" },
+    { value: "expired", label: "Completed" },
   ];
   const statusCounts = bookingItems.reduce((counts, booking) => {
-    counts[booking.displayStatus] += 1;
+    if (booking.displayStatus === "upcoming" || booking.displayStatus === "on_the_way") counts.active += 1;
+    counts[booking.displayStatus] = (counts[booking.displayStatus] || 0) + 1;
     return counts;
-  }, { confirmed: 0, processing: 0, expired: 0 });
+  }, { active: 0, upcoming: 0, on_the_way: 0, processing: 0, expired: 0 });
   const visibleBookings = selectedStatus === "all"
     ? bookingItems
-    : bookingItems.filter((booking) => booking.displayStatus === selectedStatus);
+    : bookingItems.filter((booking) => selectedStatus === "active"
+      ? booking.displayStatus === "upcoming" || booking.displayStatus === "on_the_way"
+      : booking.displayStatus === selectedStatus);
 
   const selectStatus = (status) => {
     const nextParams = new URLSearchParams(searchParams);
@@ -302,9 +330,16 @@ export default function MyBookings() {
             const route = getRouteDetails(booking.routeId);
             const isExpired = booking.displayStatus === "expired";
             const isProcessing = booking.displayStatus === "processing";
+            const isOnTheWay = booking.displayStatus === "on_the_way";
+            const hasDeparted = hasBookingDeparted(booking);
+            const { arrivalAt } = getTripTiming(booking, route);
             
             let duration = "—";
-            if (route?.startTime && route?.endTime) {
+            const durationMatch = String(route?.duration || "").match(/^(\d+):([0-5]?\d)$/);
+            if (durationMatch) {
+              const minutes = Number(durationMatch[1]) * 60 + Number(durationMatch[2]);
+              duration = `${Math.floor(minutes / 60)}h ${minutes % 60}m`;
+            } else if (route?.startTime && route?.endTime) {
               const [sh, sm] = route.startTime.split(":").map(Number);
               const [eh, em] = route.endTime.split(":").map(Number);
               let mins = (eh * 60 + em) - (sh * 60 + sm);
@@ -336,9 +371,11 @@ export default function MyBookings() {
                           ? "bg-amber-500 text-white px-5 py-1.5 text-sm font-medium shadow"
                           : isExpired
                             ? "bg-rose-600 text-white px-5 py-1.5 text-sm font-medium shadow"
-                            : "bg-gradient-to-r from-emerald-500 to-teal-500 text-white px-5 py-1.5 text-sm font-medium shadow"}
+                            : isOnTheWay
+                              ? "bg-blue-600 text-white px-5 py-1.5 text-sm font-medium shadow"
+                              : "bg-gradient-to-r from-emerald-500 to-teal-500 text-white px-5 py-1.5 text-sm font-medium shadow"}
                         >
-                          {booking.displayStatus.toUpperCase()}
+                          {booking.displayStatus.replace(/_/g, " ").toUpperCase()}
                         </Badge>
                       </div>
 
@@ -354,8 +391,16 @@ export default function MyBookings() {
 
                         <div className="text-center bg-white/70 rounded-2xl px-6 py-4 shadow-sm">
                           <p className="text-xs text-violet-600 font-medium">ARRIVAL</p>
-                          <p className="text-4xl font-bold text-violet-600 mt-1">{route?.endTime}</p>
-                          <p className="text-sm text-gray-600 mt-1">{duration}</p>
+                          <p className="text-4xl font-bold text-violet-600 mt-1">
+                            {arrivalAt
+                              ? arrivalAt.toLocaleTimeString("en-LK", { timeZone: "Asia/Colombo", hour: "2-digit", minute: "2-digit" })
+                              : route?.endTime || "—"}
+                          </p>
+                          <p className="text-sm text-gray-600 mt-1">
+                            {arrivalAt
+                              ? `${arrivalAt.toLocaleDateString("en-LK", { timeZone: "Asia/Colombo", day: "numeric", month: "short" })} · ${duration}`
+                              : duration}
+                          </p>
                         </div>
                       </div>
 
@@ -429,7 +474,7 @@ export default function MyBookings() {
                             </Button>
                           </div>
 
-                          {isExpired ? (
+                          {hasDeparted ? (
                             <p className="mt-6 text-center text-sm font-medium text-slate-500">
                               Cancellation is unavailable after departure.
                             </p>

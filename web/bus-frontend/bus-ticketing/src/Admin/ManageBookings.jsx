@@ -167,29 +167,18 @@ export default function ManageBookings() {
     setOccupiedSeats([]);
     setSeatMapError("");
     setSeatMapLoading(true);
-    const route = selectedSeatMapTrip.route;
-    const routeStops = getRouteStops(route);
-    const firstStop = routeStops[0];
-    const lastStop = routeStops.at(-1);
-    if (!firstStop?.stopId || !lastStop?.stopId) {
-      setSeatMapError("This route does not have usable start and destination stops.");
-      setSeatMapLoading(false);
-      return undefined;
-    }
 
     const refreshAvailability = async () => {
       try {
-        const params = new URLSearchParams({
-          scheduleId: selectedSeatMapTrip.scheduleId,
-          busId: selectedSeatMapTrip.id || selectedSeatMapTrip.busId,
-          boardingStopId: firstStop.stopId,
-          dropStopId: lastStop.stopId,
-        });
-        const response = await axios.get(`/api/ticket/availability?${params}`, {
+        const response = await axios.get(
+          `/api/booking/schedule/${encodeURIComponent(selectedSeatMapTrip.scheduleId)}`,
+          {
           headers: { Authorization: `Bearer ${token}` },
-        });
+          }
+        );
         if (isCurrent) {
-          setOccupiedSeats(Array.isArray(response.data.occupiedSeats) ? response.data.occupiedSeats.map(String) : []);
+          if (!Array.isArray(response.data)) throw new Error("Invalid booked seats response");
+          setOccupiedSeats(response.data.map(String));
           setSeatMapError("");
         }
       } catch (error) {
@@ -224,27 +213,11 @@ export default function ManageBookings() {
 
   const showBookingForSeat = (seatNumber) => {
     const trip = selectedSeatMapTrip;
-    const busIds = new Set([trip?.schedule?.busId, trip?.id, trip?.busId].filter(Boolean).map(String));
-    const scheduleIds = new Set([trip?.scheduleId, trip?.schedule?.id, trip?.schedule?.scheduleId].filter(Boolean).map(String));
-    const tripDate = String(trip?.schedule?.date || trip?.date || "").slice(0, 10);
-    const tripStartTime = String(trip?.schedule?.departureTime || trip?.departureTime || "").slice(0, 5);
-    const seatBookings = bookings.filter((booking) =>
-      String(booking.seatNumber ?? booking.seatNo ?? "").trim().toUpperCase() === seatNumber.trim().toUpperCase()
+    const scheduleId = String(trip?.scheduleId || trip?.schedule?.id || trip?.schedule?.scheduleId || "");
+    const bookingsToShow = bookings.filter((booking) =>
+      String(booking.scheduleId || "") === scheduleId
+      && String(booking.seatNumber ?? booking.seatNo ?? "").trim().toUpperCase() === seatNumber.trim().toUpperCase()
     );
-    const busIdMatches = seatBookings.filter((booking) => !booking.busId || busIds.has(String(booking.busId)));
-    const busNumberMatches = seatBookings.filter((booking) => booking.busNo && booking.busNo === trip?.busNo);
-    const sameBusBookings = busIdMatches.length > 0
-      ? busIdMatches
-      : busNumberMatches.length > 0
-        ? busNumberMatches
-        : seatBookings.filter((booking) => !booking.busId && !booking.busNo);
-    const matchingBookings = sameBusBookings.filter((booking) => {
-      const sameSchedule = booking.scheduleId && scheduleIds.has(String(booking.scheduleId));
-      const sameDeparture = String(booking.date || "").slice(0, 10) === tripDate
-        && String(booking.departureTime || "").slice(0, 5) === tripStartTime;
-      return sameSchedule || sameDeparture || !booking.scheduleId;
-    });
-    const bookingsToShow = matchingBookings.length > 0 ? matchingBookings : sameBusBookings;
 
     if (bookingsToShow.length === 0) {
       setSeatMapError(`No ticket record was found for booked seat ${seatNumber} on this trip.`);
@@ -588,20 +561,6 @@ export default function ManageBookings() {
 
     </div>
   );
-}
-
-function getRouteStops(route) {
-  if (Array.isArray(route?.stops) && route.stops.length >= 2) {
-    return route.stops.map((stop, index) => {
-      if (typeof stop !== "string") return { ...stop, sequence: Number.isInteger(stop.sequence) ? stop.sequence : index };
-      const slug = stop.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "stop";
-      return { stopId: `legacy-${index}-${slug}`, name: stop, sequence: index };
-    }).sort((a, b) => a.sequence - b.sequence);
-  }
-  return [
-    { stopId: `legacy-${route?.routeId || route?.startStop}-origin`, name: route?.startStop, sequence: 0 },
-    { stopId: `legacy-${route?.routeId || route?.endStop}-destination`, name: route?.endStop, sequence: 1 },
-  ];
 }
 
 function AdminSeatMap({ trip, occupiedSeats, loading, highlightedSeat, onBookedSeatClick }) {

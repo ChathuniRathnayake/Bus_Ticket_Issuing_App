@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { admin, db } from "../config/firebase.js";
-import { ACTIVE_TICKET_STATUSES, journeySegmentsOverlap, validateJourneySegment } from "./journeySegments.js";
+import { ACTIVE_TICKET_STATUSES, isSeatRecordForSchedule, journeySegmentsOverlap, validateJourneySegment } from "./journeySegments.js";
 
 export { ACTIVE_TICKET_STATUSES, journeySegmentsOverlap, validateJourneySegment };
 
@@ -82,12 +82,14 @@ export async function allocateSeatInTransaction(transaction, input) {
 
 	const ticketConflict = ticketSnapshot.docs.some((doc) => {
 		const ticket = doc.data();
-		return String(ticket.seatNo) === seatNo
-			&& (!ticket.scheduleId || ticket.scheduleId === scheduleId)
+		return isSeatRecordForSchedule(ticket, scheduleId, seatNo)
 			&& ACTIVE_TICKET_STATUSES.has(ticket.status)
 			&& journeySegmentsOverlap(segment, ticket);
 	});
-	const legacyConflict = legacySnapshot.docs.some((doc) => String(doc.data().seatNo) === seatNo && isLegacySeatActive(doc.data().status));
+	const legacyConflict = legacySnapshot.docs.some((doc) => {
+		const legacySeat = doc.data();
+		return isSeatRecordForSchedule(legacySeat, scheduleId, seatNo) && isLegacySeatActive(legacySeat.status);
+	});
 	const lockConflict = lockSnapshots.some((doc) => doc.exists && ["ACTIVE", "PENDING"].includes(doc.data().status));
 	if (ticketConflict || legacyConflict || lockConflict) throw new Error("SEAT_UNAVAILABLE");
 

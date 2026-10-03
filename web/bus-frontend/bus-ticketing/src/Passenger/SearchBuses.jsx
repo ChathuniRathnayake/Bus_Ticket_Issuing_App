@@ -7,6 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { formatLkr, journeyFareCents } from "@/utils/fare";
+import { getTripTimingStatus } from "@/utils/bookings";
 import { ArrowLeft, Bus, Filter, Calendar, Clock, MapPin, Search } from "lucide-react";
 
 export default function SearchBuses() {
@@ -23,6 +24,7 @@ export default function SearchBuses() {
   const [startTimeFilter, setStartTimeFilter] = useState("");
   const [endTimeFilter, setEndTimeFilter] = useState("");
   const [dateFilter, setDateFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
 
   const token = localStorage.getItem("token");
 
@@ -86,10 +88,15 @@ export default function SearchBuses() {
         tripDate: schedule.date,
         departureTime: schedule.departureTime,
         route,
+        displayStatus: getTripTimingStatus(schedule, route, currentTime),
       };
     })
     .filter(Boolean)
-    .filter((trip) => new Date(`${trip.tripDate}T${trip.departureTime}`) > currentTime);
+    .filter((trip) => trip.displayStatus === "upcoming" || trip.displayStatus === "on_the_way")
+    .sort((first, second) => (
+      new Date(`${first.tripDate}T${first.departureTime}`).getTime()
+      - new Date(`${second.tripDate}T${second.departureTime}`).getTime()
+    ));
 
   const getStops = (route) => {
     if (Array.isArray(route?.stops) && route.stops.length > 0) {
@@ -132,6 +139,7 @@ export default function SearchBuses() {
     const matchStart = !startStopFilter || Boolean(boardingStop);
     const matchEnd = !endStopFilter || Boolean(dropStop);
     const matchDate = !dateFilter || b.tripDate === dateFilter;
+    const matchStatus = !statusFilter || b.displayStatus === statusFilter;
 
     let matchTime = true;
     if (startTimeFilter && b.departureTime) matchTime = matchTime && b.departureTime >= startTimeFilter;
@@ -139,7 +147,7 @@ export default function SearchBuses() {
       matchTime = matchTime && (route.endTime || b.departureTime) <= endTimeFilter;
     }
 
-    if (!matchStart || !matchEnd || !matchTime || !matchDate) return false;
+    if (!matchStart || !matchEnd || !matchTime || !matchDate || !matchStatus) return false;
     b.boardingStop = boardingStop || stops.find((stop) => stop.boardingAllowed === true) || null;
     b.dropStop = dropStop || stops.find((stop) => stop.alightingAllowed === true) || null;
     return true;
@@ -182,7 +190,7 @@ export default function SearchBuses() {
             <h3 className="text-xl font-semibold">Filter Your Journey</h3>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-6 gap-4">
             <div className="space-y-1.5">
               <Label className="flex items-center gap-1.5 text-sm font-medium text-slate-700 dark:text-zinc-300">
                 <MapPin className="h-3.5 w-3.5 text-blue-500" /> From
@@ -250,6 +258,21 @@ export default function SearchBuses() {
                 className="h-11 rounded-xl border-slate-200 focus:ring-blue-500"
               />
             </div>
+
+            <div className="space-y-1.5">
+              <Label className="flex items-center gap-1.5 text-sm font-medium text-slate-700 dark:text-zinc-300">
+                <Bus className="h-3.5 w-3.5 text-blue-500" /> Trip status
+              </Label>
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className={selectClass}
+              >
+                <option value="">All statuses</option>
+                <option value="upcoming">Upcoming</option>
+                <option value="on_the_way">On the way</option>
+              </select>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -261,7 +284,7 @@ export default function SearchBuses() {
             <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-100 dark:bg-blue-950">
               <Bus className="h-5 w-5 text-blue-600" />
             </div>
-            Available Buses
+            Scheduled Buses
           </CardTitle>
           <span className="rounded-full bg-blue-100 dark:bg-blue-950 px-3 py-1 text-sm font-semibold text-blue-700 dark:text-blue-300">
             {filteredBuses.length} found
@@ -291,6 +314,7 @@ export default function SearchBuses() {
                     <TableHead className="font-semibold text-slate-600 dark:text-zinc-300">Route</TableHead>
                     <TableHead className="font-semibold text-slate-600 dark:text-zinc-300">Date</TableHead>
                     <TableHead className="font-semibold text-slate-600 dark:text-zinc-300">Departure</TableHead>
+                    <TableHead className="font-semibold text-slate-600 dark:text-zinc-300">Status</TableHead>
                     <TableHead className="font-semibold text-slate-600 dark:text-zinc-300">Seats</TableHead>
                     <TableHead className="font-semibold text-slate-600 dark:text-zinc-300">Bus No</TableHead>
                     <TableHead className="font-semibold text-slate-600 dark:text-zinc-300">Fare</TableHead>
@@ -312,6 +336,15 @@ export default function SearchBuses() {
                           <Clock className="h-3 w-3" /> {b.departureTime}
                         </span>
                       </TableCell>
+                      <TableCell>
+                        <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${b.displayStatus === "on_the_way"
+                          ? "bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300"
+                          : b.displayStatus === "expired"
+                            ? "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300"
+                            : "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300"}`}>
+                          {b.displayStatus === "on_the_way" ? "On the way" : b.displayStatus === "expired" ? "Expired" : "Upcoming"}
+                        </span>
+                      </TableCell>
                       <TableCell className="text-slate-600 dark:text-zinc-400">{b.totalSeats}</TableCell>
                       <TableCell className="font-medium text-slate-700 dark:text-zinc-300">{b.busNo}</TableCell>
                       <TableCell>
@@ -327,6 +360,7 @@ export default function SearchBuses() {
                       <TableCell className="text-right">
                         <Button
                           size="sm"
+                          disabled={b.displayStatus === "expired"}
                           className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-md hover:shadow-lg transition-all"
                           onClick={() =>
                             navigate("/passenger-dashboard/seat-layout", {
@@ -334,7 +368,7 @@ export default function SearchBuses() {
                             })
                           }
                         >
-                          Book Now
+                          {b.displayStatus === "expired" ? "Departed" : "Book Now"}
                         </Button>
                       </TableCell>
                     </TableRow>

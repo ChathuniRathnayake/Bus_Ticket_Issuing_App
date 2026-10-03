@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
-import { fetchPassengerBookings } from "@/utils/bookings";
+import { fetchPassengerBookings, getTripTiming, getTripTimingStatus } from "@/utils/bookings";
 import {
   Search, Ticket, User, Bus, Calendar, Clock,
   Sun, Moon, ArrowRight, Zap, TrendingUp, ChevronRight, Sparkles
@@ -20,12 +20,7 @@ function isProcessingBooking(booking) {
 }
 
 function getDepartureDate(booking, route) {
-  const date = booking.date || route?.date;
-  const time = booking.departureTime || route?.startTime;
-  if (!date || !time) return null;
-
-  const departure = new Date(`${date}T${time}`);
-  return Number.isNaN(departure.getTime()) ? null : departure;
+  return getTripTiming(booking, route).departureAt;
 }
 
 function formatCountdown(departureAt, now) {
@@ -68,19 +63,28 @@ export default function PassengerDashboard() {
   );
   const upcomingBookingCount = confirmedBookings.filter((booking) => {
     const route = routes.find((item) => item.routeId === booking.routeId);
-    const departure = getDepartureDate(booking, route);
-    return departure && departure > currentTime;
+    return getTripTimingStatus(booking, route, currentTime) === "upcoming";
+  }).length;
+  const onTheWayBookingCount = confirmedBookings.filter((booking) => {
+    const route = routes.find((item) => item.routeId === booking.routeId);
+    return getTripTimingStatus(booking, route, currentTime) === "on_the_way";
   }).length;
   const expiredBookings = confirmedBookings
     .map((booking) => {
       const route = routes.find((item) => item.routeId === booking.routeId);
-      return { ...booking, route, departureAt: getDepartureDate(booking, route), displayStatus: "expired" };
+      return {
+        ...booking,
+        route,
+        departureAt: getDepartureDate(booking, route),
+        displayStatus: getTripTimingStatus(booking, route, currentTime),
+      };
     })
-    .filter((booking) => booking.departureAt && booking.departureAt <= currentTime)
+    .filter((booking) => booking.displayStatus === "expired")
     .sort((first, second) => second.departureAt - first.departureAt);
   const recentExpiredBookings = expiredBookings.slice(0, 5);
-  const nextDepartureCountdown = upcomingBookings.length > 0
-    ? formatCountdown(upcomingBookings[0].departureAt, clockTime)
+  const nextDepartureBooking = upcomingBookings.find((booking) => booking.displayStatus === "upcoming");
+  const nextDepartureCountdown = nextDepartureBooking
+    ? formatCountdown(nextDepartureBooking.departureAt, clockTime)
     : "";
 
   // Fetch routes from backend
@@ -88,7 +92,7 @@ export default function PassengerDashboard() {
     const fetchRoutes = async () => {
       try {
         const token = localStorage.getItem("token");
-        const res = await fetch("/api/route", {
+        const res = await fetch("/api/route/available", {
           headers: { Authorization: `Bearer ${token}` },
         });
         if (res.ok) {
@@ -139,26 +143,31 @@ export default function PassengerDashboard() {
       .filter((booking) => isConfirmedBooking(booking) || isProcessingBooking(booking))
       .map((booking) => {
         const route = routes.find((item) => item.routeId === booking.routeId);
+        const { departureAt } = getTripTiming(booking, route);
         return {
           ...booking,
           route,
-          departureAt: getDepartureDate(booking, route),
-          displayStatus: isProcessingBooking(booking) ? "processing" : "confirmed",
+          departureAt,
+          displayStatus: isProcessingBooking(booking)
+            ? "processing"
+            : getTripTimingStatus(booking, route, currentTime),
         };
       });
 
     if (pendingPayment && !bookings.some((booking) => booking.bookingId === pendingPayment.bookingId)) {
       const route = routes.find((item) => item.routeId === pendingPayment.routeId);
+      const { departureAt } = getTripTiming(pendingPayment, route);
       trips.push({
         ...pendingPayment,
         route,
-        departureAt: getDepartureDate(pendingPayment, route),
+        departureAt,
         displayStatus: "processing",
       });
     }
 
     const upcoming = trips
-      .filter((booking) => booking.departureAt && booking.departureAt > currentTime)
+      .filter((booking) => booking.displayStatus === "on_the_way"
+        || (booking.departureAt && booking.departureAt > currentTime))
       .sort((first, second) => first.departureAt - second.departureAt);
 
     // This effect synchronizes the trip summaries with bookings, routes, and current time.
@@ -273,7 +282,7 @@ export default function PassengerDashboard() {
         {/* ── Stats Cards ── */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
           {/* Upcoming Trips */}
-          <Link to="/passenger-dashboard/my-bookings?status=confirmed" className="block rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400">
+          <Link to="/passenger-dashboard/my-bookings?status=active" className="block rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400">
             <Card className="h-full cursor-pointer border-0 shadow-xl overflow-hidden transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl">
               <div className="h-1 w-full bg-gradient-to-r from-blue-500 to-cyan-400" />
               <CardContent className="p-7">
@@ -281,12 +290,12 @@ export default function PassengerDashboard() {
                   <div>
                     <div className="flex items-center gap-2 mb-1">
                       <TrendingUp className="h-4 w-4 text-blue-500" />
-                      <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Upcoming Trips</p>
+                      <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Active Journeys</p>
                     </div>
                     <p className="text-6xl font-black mt-2 bg-gradient-to-r from-blue-600 to-cyan-500 bg-clip-text text-transparent animate-count">
-                      {String(upcomingBookingCount).padStart(2, "0")}
+                      {String(upcomingBookingCount + onTheWayBookingCount).padStart(2, "0")}
                     </p>
-                    <p className="text-sm text-muted-foreground mt-2">confirmed journeys ahead</p>
+                    <p className="text-sm text-muted-foreground mt-2">upcoming and on the way</p>
                   </div>
                   <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-500 to-cyan-500 shadow-lg shadow-blue-500/30">
                     <Calendar className="h-8 w-8 text-white" />
@@ -402,11 +411,11 @@ export default function PassengerDashboard() {
                 <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-600 shadow-md shadow-blue-500/30">
                   <Clock className="h-5 w-5 text-white" />
                 </div>
-                Your Next Journey
+                Your Journeys
               </CardTitle>
-              <CardDescription className="mt-1">Confirmed and processing bookings, ordered by departure time.</CardDescription>
+              <CardDescription className="mt-1">Upcoming and in-progress trips, ordered by departure time.</CardDescription>
             </div>
-            {upcomingBookings.length > 0 && (
+            {nextDepartureCountdown && (
               <div className="rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50 via-white to-cyan-50 px-5 py-4 shadow-md dark:border-emerald-900 dark:from-emerald-950 dark:via-zinc-900 dark:to-cyan-950">
                 <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-emerald-800 dark:text-emerald-300">
                   <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-500" /> Next departure in
@@ -420,6 +429,7 @@ export default function PassengerDashboard() {
               <div className="space-y-3">
                 {upcomingBookings.map((booking) => {
                   const isProcessing = booking.displayStatus === "processing";
+                  const isOnTheWay = booking.displayStatus === "on_the_way";
                   const startStop = booking.startStop || booking.route?.startStop || "Starting point";
                   const endStop = booking.endStop || booking.route?.endStop || "Destination";
                   return (
@@ -442,7 +452,7 @@ export default function PassengerDashboard() {
                           <p className="mt-1 text-sm text-muted-foreground">
                             Bus {booking.busNo || booking.busId || "—"} · Seat {booking.seat || "—"}
                           </p>
-                          <div className="mt-3 inline-flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 shadow-sm dark:border-blue-900 dark:bg-blue-950/60">
+                          {!isOnTheWay && <div className="mt-3 inline-flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 shadow-sm dark:border-blue-900 dark:bg-blue-950/60">
                             <Clock className="h-4 w-4 text-blue-600 dark:text-blue-300" />
                             <div>
                               <p className="text-[10px] font-bold uppercase tracking-wide text-blue-700 dark:text-blue-300">Departure in</p>
@@ -450,15 +460,17 @@ export default function PassengerDashboard() {
                                 {formatCountdown(booking.departureAt, clockTime)}
                               </p>
                             </div>
-                          </div>
+                          </div>}
                         </div>
                       </div>
                       <div className="flex items-center gap-2 sm:flex-col sm:items-end sm:gap-2">
                         <Badge className={isProcessing
                           ? "bg-amber-100 text-amber-700 border border-amber-200 hover:bg-amber-100 font-semibold"
-                          : "bg-emerald-100 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 font-semibold"}
+                          : isOnTheWay
+                            ? "bg-blue-100 text-blue-700 border border-blue-200 hover:bg-blue-100 font-semibold"
+                            : "bg-emerald-100 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 font-semibold"}
                         >
-                          {isProcessing ? "PROCESSING" : "CONFIRMED"}
+                          {isProcessing ? "PROCESSING" : isOnTheWay ? "ON THE WAY" : "UPCOMING"}
                         </Badge>
                         <ChevronRight className="h-5 w-5 text-muted-foreground group-hover:text-blue-500 transition-colors" />
                       </div>

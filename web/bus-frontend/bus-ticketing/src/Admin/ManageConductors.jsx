@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useCallback, useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -17,6 +17,7 @@ import { ArrowLeft, Pencil, Trash2, Users } from "lucide-react";
 export default function ManageConductors() {
   const navigate = useNavigate();
   const [conductors, setConductors] = useState([]);
+  const [buses, setBuses] = useState([]);
   const [loading, setLoading] = useState(false);
   const [editId, setEditId] = useState(null);
   const [form, setForm] = useState({ name: "", password: "", busId: "" });
@@ -24,28 +25,48 @@ export default function ManageConductors() {
   const token = localStorage.getItem("token");
 
   // 🔹 FETCH CONDUCTORS
-  const fetchConductors = async () => {
+  const fetchConductors = useCallback(async () => {
     if (!token) return;
 
     try {
       setLoading(true);
 
-      const res = await axios.get("/api/conductor", {
-        headers: { Authorization: `Bearer ${token}` },
+      const headers = { Authorization: `Bearer ${token}` };
+      const [conductorsRes, busesRes, routesRes] = await Promise.all([
+        axios.get("/api/conductor", { headers }),
+        axios.get("/api/bus", { headers }),
+        axios.get("/api/route", { headers }),
+      ]);
+
+      setBuses(busesRes.data.map((bus) => {
+        const route = routesRes.data.find((item) => item.id === bus.routeId || item.routeId === bus.routeId);
+        return {
+          ...bus,
+          routeLabel: route?.routeName || (route ? `${route.startStop} → ${route.endStop}` : bus.routeId || "Route not assigned"),
+        };
+      }));
+
+      const enrichedConductors = conductorsRes.data.map((conductor) => {
+        const bus = busesRes.data.find((item) => (item.id || item.busId) === conductor.busId);
+        const route = routesRes.data.find((item) => item.id === bus?.routeId || item.routeId === bus?.routeId);
+        return {
+          ...conductor,
+          busNo: bus?.busNo || "",
+          routeLabel: route?.routeName || (route ? `${route.startStop} → ${route.endStop}` : bus?.routeId || "Route not assigned"),
+        };
       });
 
-      setConductors(res.data);
+      setConductors(enrichedConductors);
     } catch (error) {
       console.error(error);
       alert(error.response?.data?.message || "Failed to fetch conductors");
     } finally {
       setLoading(false);
     }
-  };
+  }, [token]);
 
   // 🔹 INITIAL LOAD
   // Load once when the admin page opens.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     const token = localStorage.getItem("token");
     
@@ -63,7 +84,7 @@ export default function ManageConductors() {
     }
 
     fetchConductors();
-  }, [navigate]);
+  }, [fetchConductors, navigate]);
 
   // 🔹 EDIT
   const handleEdit = (c) => {
@@ -108,6 +129,17 @@ export default function ManageConductors() {
       console.error(error);
       alert(error.response?.data?.message || "Failed to delete conductor");
     }
+  };
+
+  const busesForConductor = (conductor) => {
+    const currentBusId = String(conductor.busId || "");
+    return buses.filter((bus) => {
+      const busId = String(bus.id || bus.busId || "");
+      const assignedToAnother = conductors.some((other) =>
+        other.id !== conductor.id && String(other.busId || "") === busId
+      );
+      return busId === currentBusId || (bus.status === "Active" && !assignedToAnother);
+    });
   };
 
   return (
@@ -181,15 +213,30 @@ export default function ManageConductors() {
 
                       <TableCell>
                         {editId === c.id ? (
-                          <Input
-                            value={form.busId}
-                            onChange={(e) =>
-                              setForm({ ...form, busId: e.target.value })
-                            }
-                            className="h-10 w-full focus:ring-blue-500"
-                          />
+                          <div className="space-y-1">
+                            <select
+                              value={form.busId}
+                              onChange={(event) => setForm({ ...form, busId: event.target.value })}
+                              className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm focus:ring-2 focus:ring-blue-500"
+                              required
+                            >
+                              <option value="">-- Select an available bus --</option>
+                              {busesForConductor(c).map((bus) => {
+                                const busId = bus.id || bus.busId;
+                                return (
+                                  <option key={busId} value={busId}>
+                                    {busId} · {bus.routeLabel}{bus.busNo ? ` · ${bus.busNo}` : ""}
+                                  </option>
+                                );
+                              })}
+                            </select>
+                            <p className="text-xs text-muted-foreground">Route: {c.routeLabel}</p>
+                          </div>
                         ) : (
-                          c.busId || "Not Assigned"
+                          <div>
+                            <div className="font-medium">{c.busId || "Not Assigned"}</div>
+                            {c.busId && <div className="text-xs text-muted-foreground">{c.routeLabel}{c.busNo ? ` · ${c.busNo}` : ""}</div>}
+                          </div>
                         )}
                       </TableCell>
 

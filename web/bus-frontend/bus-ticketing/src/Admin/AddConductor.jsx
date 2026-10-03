@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 
@@ -17,6 +17,8 @@ import { ArrowLeft, Users } from "lucide-react";
 
 export default function AddConductor() {
 
+  const [availableBuses, setAvailableBuses] = useState([]);
+  const [busesLoading, setBusesLoading] = useState(true);
   const [form, setForm] = useState({
     email: "",
     name: "",
@@ -26,6 +28,50 @@ export default function AddConductor() {
 
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    let isCurrent = true;
+
+    const fetchAvailableBuses = async () => {
+      const token = localStorage.getItem("token");
+      if (!token) {
+        navigate("/admin-login");
+        return;
+      }
+
+      try {
+        const headers = { Authorization: `Bearer ${token}` };
+        const [busesRes, conductorsRes, routesRes] = await Promise.all([
+          axios.get("/api/bus", { headers }),
+          axios.get("/api/conductor", { headers }),
+          axios.get("/api/route", { headers }),
+        ]);
+        const assignedBusIds = new Set(
+          conductorsRes.data.map((conductor) => String(conductor.busId || ""))
+        );
+        const unassignedBuses = busesRes.data
+          .filter((bus) => bus.status === "Active" && !assignedBusIds.has(String(bus.id || bus.busId || "")))
+          .map((bus) => {
+            const route = routesRes.data.find((item) => item.id === bus.routeId || item.routeId === bus.routeId);
+            return {
+              ...bus,
+              routeLabel: route?.routeName || (route ? `${route.startStop} → ${route.endStop}` : bus.routeId || "Route not assigned"),
+            };
+          });
+        if (isCurrent) setAvailableBuses(unassignedBuses);
+      } catch (error) {
+        console.error(error);
+        if (isCurrent) alert(error.response?.data?.message || "Failed to load available buses");
+      } finally {
+        if (isCurrent) setBusesLoading(false);
+      }
+    };
+
+    fetchAvailableBuses();
+    return () => {
+      isCurrent = false;
+    };
+  }, [navigate]);
 
   const handleChange = (e) =>
     setForm({
@@ -155,14 +201,27 @@ export default function AddConductor() {
             {/* Bus ID */}
             <div className="space-y-2">
               <Label htmlFor="busId" className="text-sm font-medium">Bus ID</Label>
-              <Input
+              <select
                 id="busId"
                 name="busId"
                 value={form.busId}
                 onChange={handleChange}
-                placeholder="Enter assigned bus ID"
-                className="h-11 transition-all focus:ring-2 focus:ring-[#318CE7]"
-              />
+                disabled={busesLoading || availableBuses.length === 0}
+                className="h-11 w-full rounded-md border border-input bg-background px-3 text-sm focus:ring-2 focus:ring-[#318CE7] disabled:cursor-not-allowed disabled:opacity-60"
+                required
+              >
+                <option value="">
+                  {busesLoading ? "Loading buses..." : availableBuses.length ? "-- Select an available bus --" : "No unassigned active buses"}
+                </option>
+                {availableBuses.map((bus) => {
+                  const busId = bus.id || bus.busId;
+                  return (
+                    <option key={busId} value={busId}>
+                      {bus.busNo ? `${bus.busNo} (${busId}) · ${bus.routeLabel}` : `${busId} · ${bus.routeLabel}`}
+                    </option>
+                  );
+                })}
+              </select>
             </div>
 
             {/* Buttons */}

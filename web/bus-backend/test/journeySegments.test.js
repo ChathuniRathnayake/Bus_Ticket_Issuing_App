@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { journeySegmentsOverlap, validateJourneySegment } from "../services/journeySegments.js";
+import { isSeatRecordForSchedule, journeySegmentsOverlap, validateJourneySegment } from "../services/journeySegments.js";
 
 const route = {
   routeId: "TEST_ROUTE",
@@ -32,6 +32,12 @@ test("rejects overlapping segments", () => {
     { boardingStopIndex: 0, dropStopIndex: 2 },
     { boardingStopIndex: 1, dropStopIndex: 2 },
   ), true);
+});
+
+test("scopes seat records to the selected schedule", () => {
+  assert.equal(isSeatRecordForSchedule({ scheduleId: "schedule-1", seatNo: 4 }, "schedule-1", "4"), true);
+  assert.equal(isSeatRecordForSchedule({ scheduleId: "schedule-1", seatNo: 4 }, "schedule-2", "4"), false);
+  assert.equal(isSeatRecordForSchedule({ seatNo: 4 }, "schedule-2", "4"), false);
 });
 
 test("rejects reverse stop order", () => {
